@@ -1,7 +1,8 @@
 version: "3.8"
 
 services:
-  # ── Security Gateway ─────────────────────────
+
+  # ── Kong Database ─────────────────────────────────────────────────────────
   kong-database:
     image: postgres:13
     environment:
@@ -10,7 +11,28 @@ services:
       POSTGRES_PASSWORD: kongpass
     volumes:
       - kong-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "kong"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
+  # ── Kong Migrations (runs once, sets up Kong's tables) ────────────────────
+  kong-migrations:
+    image: kong:3.4
+    command: kong migrations bootstrap
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: kong-database
+      KONG_PG_USER: kong
+      KONG_PG_PASSWORD: kongpass
+      KONG_PG_DATABASE: kong
+    depends_on:
+      kong-database:
+        condition: service_healthy
+    restart: on-failure
+
+  # ── Kong API Gateway ──────────────────────────────────────────────────────
   kong:
     image: kong:3.4
     environment:
@@ -19,13 +41,26 @@ services:
       KONG_PG_USER: kong
       KONG_PG_PASSWORD: kongpass
       KONG_PG_DATABASE: kong
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
       KONG_ADMIN_LISTEN: 0.0.0.0:8001
     ports:
       - "8000:8000"   # All API requests go here
-      - "8001:8001"   # Kong admin
+      - "8001:8001"   # Kong admin — J4 only
     depends_on:
-      - kong-database
+      kong-database:
+        condition: service_healthy
+      kong-migrations:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
+  # ── Keycloak (Authentication & Identity) ──────────────────────────────────
   keycloak:
     image: quay.io/keycloak/keycloak:23.0
     command: start-dev
@@ -34,23 +69,13 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: admin123
     ports:
       - "8180:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
 
-  # ── Observability ─────────────────────────────
-  prometheus:
-    image: prom/prometheus:latest
-    volumes:
-      - ./j4-platform-security/prometheus.yml:/etc/prometheus/prometheus.yml
-    ports:
-      - "9090:9090"
-
-  grafana:
-    image: grafana/grafana:latest
-    ports:
-      - "3000:3000"
-    environment:
-      GF_SECURITY_ADMIN_PASSWORD: admin123
-
-  # ── Database (shared for dev) ─────────────────
+  # ── Application Database (shared by J1, J2, J3, J4) ──────────────────────
   postgres:
     image: postgres:15
     environment:
@@ -61,7 +86,59 @@ services:
       - "5432:5432"
     volumes:
       - app-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "disaster"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
+  # ── Vault (Secrets Management) ────────────────────────────────────────────
+  vault:
+    image: hashicorp/vault:latest
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: dev-root-token
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+    ports:
+      - "8200:8200"
+    cap_add:
+      - IPC_LOCK
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Prometheus (Metrics Collection) ───────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./j4-platform-security/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    depends_on:
+      kong:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Grafana (Dashboards) ──────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin123
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      prometheus:
+        condition: service_healthy
+
+# ── Named Volumes ─────────────────────────────────────────────────────────
 volumes:
   kong-db-data:
   app-db-data:
+  grafana-data:
