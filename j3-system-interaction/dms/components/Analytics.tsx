@@ -156,10 +156,10 @@ export default function Analytics() {
                   {/* Minor 34% (Purple) */}
                   <circle cx="50" cy="50" r="40" fill="transparent" stroke="#818cf8" strokeWidth="12" strokeDasharray="251.2" strokeDashoffset={251.2 - (251.2 * 0.34)} />
                   {/* Moderate 42% (Teal) */}
-                  <circle cx="50" cy="50" r="40" fill="transparent" stroke="#2dd4bf" strokeWidth="12" strokeDasharray="251.2" strokeDashoffset={251.2 - (251.2 * 0.42)} strokeDashoffset-start={251.2 * 0.34} className="rotate-[122deg] origin-center" />
+                  <circle cx="50" cy="50" r="40" fill="transparent" stroke="#2dd4bf" strokeWidth="12"strokeDasharray="251.2" strokeDashoffset={251.2 - (251.2 * 0.42)} className="rotate-[122deg] origin-center"/>
                   {/* Critical 24% (Red) */}
-                  <circle cx="50" cy="50" r="40" fill="transparent" stroke="#ef4444" strokeWidth="12" strokeDasharray="251.2" strokeDashoffset={251.2 - (251.2 * 0.24)} className="rotate-[273deg] origin-center" />
-                </svg>
+                  <circle cx="50" cy="50" r="40" fill="transparent" stroke="#ef4444" strokeWidth="12" strokeDasharray="251.2" strokeDashoffset={251.2 - (251.2 * 0.24)} className="rotate-[273deg] origin-center"/>                
+                  </svg>
 
                 <div className="absolute inset-0 flex flex-col justify-center items-center z-0 bg-[#131924] m-[14px] rounded-full">
                   <span className="text-3xl font-bold text-white">342</span>

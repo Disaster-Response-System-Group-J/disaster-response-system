@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Shield, Eye, EyeOff, User, Lock, IdCard, ArrowRight } from "lucide-react";
+import { Shield, Eye, EyeOff, User, Lock, Contact, ArrowRight } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 
 export default function Login() {
@@ -92,7 +92,7 @@ export default function Login() {
                   </label>
                   <div className="relative">
                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
-                      <IdCard size={18} />
+                      <Contact size={18} />
                     </div>
                     <select className="w-full bg-[#0a0f16] border border-slate-800/80 rounded-lg pl-12 pr-10 py-3.5 text-slate-200 text-sm focus:outline-none focus:border-blue-500/50 transition-all appearance-none cursor-pointer font-medium">
                       <option value="administrator">Incident Commander</option>

@@ -1,1 +1,11 @@
 J3 implementations 
+
+from project root, run the following command
+
+cd j3-system-interaction/dms 
+npm install
+npm run dev
+
+admin 
+email: admin@gmail.com
+pwd: admin123
