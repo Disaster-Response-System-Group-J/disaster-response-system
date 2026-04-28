@@ -2,6 +2,8 @@
 pragma solidity ^0.8.28;
 
 contract IncidentAuditLog {
+
+  //AuditEvent struct to store details of each audit event
   struct AuditEvent {
     uint256 id;
     uint256 caseId;
@@ -20,12 +22,16 @@ contract IncidentAuditLog {
     uint256 timestamp;
   }
 
+  // Array to store all audit events
   AuditEvent[] private auditEvents;
   uint256 private nextCaseId = 1;
 
-  mapping(uint256 => bool) private caseExists;
+  // Mapping to track existing caseIds
+  mapping(uint256 => bool) private caseExists;  
+  // Mapping from caseId to array of auditEventIds
   mapping(uint256 => uint256[]) private eventIdsByCaseId;
-  mapping(string => uint256[]) private eventIdsByType;
+  // Mapping from eventType to array of auditEventIds 
+  mapping(string => uint256[]) private eventIdsByType; 
 
   event ManualIncidentCreated(
     uint256 indexed caseId,
