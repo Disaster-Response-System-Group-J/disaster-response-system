@@ -41,4 +41,55 @@ describe("IncidentAuditLog", function () {
       await auditLog.getEventIdsByType("MANUAL_INCIDENT_CREATED"),
     ).to.deep.equal([0n]);
   });
+
+  it("Should log an INCIDENT_ASSIGNED audit event under an existing case", async function () {
+    const auditLog = await ethers.deployContract("IncidentAuditLog");
+
+    await auditLog.createManualIncident(
+      "evt-001",
+      "inc-001",
+      "user-001",
+      "operator",
+      "Colombo",
+      "Manual incident created from phone call",
+      "corr-001",
+    );
+
+    await expect(
+      auditLog.logAuditEvent(
+        1,
+        "evt-002",
+        "INCIDENT_ASSIGNED",
+        "inc-001",
+        "",
+        "",
+        "user-002",
+        "operator",
+        "new",
+        "assigned",
+        "Colombo",
+        "Incident assigned to operator user-002",
+        "corr-001",
+      ),
+    )
+      .to.emit(auditLog, "AuditEventLogged")
+      .withArgs(1n, 1n, "INCIDENT_ASSIGNED", "inc-001", "user-002");
+
+    expect(await auditLog.getEventCount()).to.equal(2n);
+
+    const auditEvent = await auditLog.getFunction("getEvent").staticCall(1);
+
+    expect(auditEvent.id).to.equal(1n);
+    expect(auditEvent.caseId).to.equal(1n);
+    expect(auditEvent.eventType).to.equal("INCIDENT_ASSIGNED");
+    expect(auditEvent.incidentId).to.equal("inc-001");
+    expect(auditEvent.performedBy).to.equal("user-002");
+    expect(auditEvent.previousStatus).to.equal("new");
+    expect(auditEvent.newStatus).to.equal("assigned");
+
+    expect(await auditLog.getEventIdsByCaseId(1)).to.deep.equal([0n, 1n]);
+    expect(await auditLog.getEventIdsByType("INCIDENT_ASSIGNED")).to.deep.equal([
+      1n,
+    ]);
+  });
 });
