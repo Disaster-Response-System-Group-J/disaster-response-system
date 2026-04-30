@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FileText, CheckCircle2, XCircle, Copy, Eye, MapPin, Clock, Camera, AlertTriangle } from 'lucide-react';
 import { MOCK_INCOMING_REPORTS } from '@/data/mock-data';
 import { VerificationStatus, ReportSource, IncomingReport } from '@/types';
 import { useAuth } from '@/context/AuthContext';
+import { useSocket } from '@/context/SocketContext';
 
 const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
   J1_SOS_APP: { label: 'J1 SOS', color: 'bg-red-500/10 text-red-400 border-red-500/20' },
@@ -24,10 +25,26 @@ const STATUS_STYLES: Record<string, string> = {
 
 export default function IncomingReportsPage() {
   const { hasPermission } = useAuth();
-  const [reports, setReports] = useState(MOCK_INCOMING_REPORTS);
+  const socket = useSocket();
+  const [reports, setReports] = useState<IncomingReport[]>(MOCK_INCOMING_REPORTS);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [sourceFilter, setSourceFilter] = useState<string>('ALL');
   const [selectedReport, setSelectedReport] = useState<IncomingReport | null>(null);
+
+  // WebSocket Integration for Real-Time Updates
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleNewReport = (newReport: IncomingReport) => {
+      setReports((prevReports) => [newReport, ...prevReports]);
+    };
+
+    socket.on('dashboard:new-report', handleNewReport);
+
+    return () => {
+      socket.off('dashboard:new-report', handleNewReport);
+    };
+  }, [socket]);
 
   const filtered = reports.filter(r => {
     if (statusFilter !== 'ALL' && r.verificationStatus !== statusFilter) return false;
@@ -73,8 +90,8 @@ export default function IncomingReportsPage() {
         <div className="grid grid-cols-3 gap-6">
           {/* Reports List */}
           <div className="col-span-2 space-y-3">
-            {filtered.map(report => (
-              <div key={report.reportId}
+            {filtered.map((report, index) => (
+                <div key={report.reportId || `new-report-${index}`}
                 onClick={() => setSelectedReport(report)}
                 className={`bg-[#131924] border rounded-xl p-5 cursor-pointer transition-all hover:border-slate-700 ${
                   selectedReport?.reportId === report.reportId ? 'border-blue-500/50 ring-1 ring-blue-500/20' : 'border-slate-800/80'
@@ -85,10 +102,10 @@ export default function IncomingReportsPage() {
                     <span className={`px-2 py-0.5 rounded text-[8px] font-bold tracking-widest border ${SOURCE_LABELS[report.source]?.color}`}>
                       {SOURCE_LABELS[report.source]?.label}
                     </span>
-                    {report.mediaUrls.length > 0 && <Camera size={12} className="text-teal-400" />}
+                    {report.mediaUrls && report.mediaUrls.length > 0 && <Camera size={12} className="text-teal-400" />}
                   </div>
                   <span className={`px-2 py-0.5 rounded text-[8px] font-bold tracking-widest border ${STATUS_STYLES[report.verificationStatus]}`}>
-                    {report.verificationStatus.replace(/_/g, ' ')}
+                    {(report.verificationStatus || 'UNKNOWN').replace(/_/g, ' ')}
                   </span>
                 </div>
                 <p className="text-sm text-slate-300 mb-3 line-clamp-2">{report.description}</p>
@@ -118,7 +135,7 @@ export default function IncomingReportsPage() {
                     <p className="text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-1">DESCRIPTION</p>
                     <p className="text-xs text-slate-300 leading-relaxed">{selectedReport.description}</p>
                   </div>
-                  {selectedReport.mediaUrls.length > 0 && (
+                  {selectedReport.mediaUrls && selectedReport.mediaUrls.length > 0 && (
                     <div>
                       <p className="text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-2">MEDIA ({selectedReport.mediaUrls.length})</p>
                       <div className="flex gap-2">

@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AlertTriangle, MapPin, Clock, Search, Filter } from 'lucide-react';
 import { MOCK_ALERTS } from '@/data/mock-data';
 import { IncidentSeverity, AlertType } from '@/types';
 import { DISTRICT_NAMES } from '@/data/districts';
+import { useSocket } from '@/context/SocketContext';
 
 const SEVERITY_STYLES: Record<string, string> = {
   CRITICAL: 'bg-red-500/10 text-red-400 border-red-500/30',
@@ -21,13 +22,32 @@ const ALERT_TYPE_STYLES: Record<string, string> = {
   INCIDENT_STATUS: 'bg-slate-800 text-slate-300 border-slate-700',
 };
 
+// Extracted type from MOCK_ALERTS for type safety
+type Alert = typeof MOCK_ALERTS[0];
+
 export default function AlertsPage() {
+  const socket = useSocket();
+  const [alerts, setAlerts] = useState<Alert[]>(MOCK_ALERTS);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
   const [districtFilter, setDistrictFilter] = useState<string>('ALL');
 
-  const filtered = MOCK_ALERTS.filter(a => {
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleNewAlert = (newAlert: Alert) => {
+      setAlerts((prevAlerts) => [newAlert, ...prevAlerts]);
+    };
+
+    socket.on('dashboard:risk-alert', handleNewAlert);
+
+    return () => {
+      socket.off('dashboard:risk-alert', handleNewAlert);
+    };
+  }, [socket]);
+
+  const filtered = alerts.filter(a => {
     if (search && !a.title.toLowerCase().includes(search.toLowerCase()) && !a.description.toLowerCase().includes(search.toLowerCase())) return false;
     if (typeFilter !== 'ALL' && a.type !== typeFilter) return false;
     if (severityFilter !== 'ALL' && a.severity !== severityFilter) return false;
@@ -68,8 +88,8 @@ export default function AlertsPage() {
 
         {/* Alerts List */}
         <div className="space-y-4">
-          {filtered.map(alert => (
-            <div key={alert.alertId} className={`bg-[#131924] border rounded-xl p-6 ${alert.severity === IncidentSeverity.CRITICAL && alert.isActive ? 'border-red-500/30' : 'border-slate-800/80'} ${!alert.isActive ? 'opacity-60' : ''}`}>
+          {filtered.map((alert, index) => (
+              <div key={alert.alertId || `new-alert-${index}`} className={`bg-[#131924] border rounded-xl p-6 ${alert.severity === IncidentSeverity.CRITICAL && alert.isActive ? 'border-red-500/30' : 'border-slate-800/80'} ${!alert.isActive ? 'opacity-60' : ''}`}>
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-4">
                   <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${alert.severity === IncidentSeverity.CRITICAL ? 'bg-red-500/10' : 'bg-blue-500/10'}`}>
@@ -91,7 +111,7 @@ export default function AlertsPage() {
                     {alert.severity} SEVERITY
                   </span>
                   <span className={`px-2.5 py-1 rounded text-[9px] font-bold tracking-widest border ${ALERT_TYPE_STYLES[alert.type]}`}>
-                    {alert.type.replace('_', ' ')}
+                    {(alert.type || 'UNKNOWN').replace(/_/g, ' ')}
                   </span>
                 </div>
               </div>

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
+import { SocketProvider } from '@/context/SocketContext';
 import { AuthProvider } from '@/context/AuthContext';
 import './globals.css';
 
@@ -19,18 +20,15 @@ export const metadata: Metadata = {
     'Real-time flood and landslide monitoring, incident reporting, and emergency coordination platform for Sri Lanka.',
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">
-        <AuthProvider>{children}</AuthProvider>
+    <html lang="en">
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#0a0f16] text-white`}>
+        <AuthProvider> 
+          <SocketProvider>
+            {children}
+          </SocketProvider>
+        </AuthProvider>
       </body>
     </html>
   );
