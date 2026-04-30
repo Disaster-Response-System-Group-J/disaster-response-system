@@ -1,5 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../components/nav_bar.dart';
@@ -22,61 +24,27 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   int _currentNavIndex = 2; // Map tab
-  final TransformationController _transformationController = TransformationController();
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final size = MediaQuery.of(context).size;
-      // Center the 2000x2000 map on the screen
-      _transformationController.value = Matrix4.translationValues(
-        -(2000 - size.width) / 2,
-        -(2000 - size.height) / 2,
-        0.0,
-      );
-    });
-  }
+  final MapController _mapController = MapController();
+  final LatLng _center = const LatLng(34.0522, -118.2437); // Los Angeles, CA
 
   @override
   void dispose() {
-    _transformationController.dispose();
+    _mapController.dispose();
     super.dispose();
   }
 
   void _zoomIn() {
-    final Matrix4 matrix = _transformationController.value.clone();
-    // Use the center of the screen as the focal point
-    final size = MediaQuery.of(context).size;
-    final center = Offset(size.width / 2, size.height / 2);
-    
-    // Translate to center, scale, translate back
-    matrix.multiply(Matrix4.translationValues(center.dx, center.dy, 0.0));
-    matrix.multiply(Matrix4.diagonal3Values(1.5, 1.5, 1.0));
-    matrix.multiply(Matrix4.translationValues(-center.dx, -center.dy, 0.0));
-    
-    _transformationController.value = matrix;
+    final zoom = _mapController.camera.zoom + 1;
+    _mapController.move(_mapController.camera.center, zoom);
   }
 
   void _zoomOut() {
-    final Matrix4 matrix = _transformationController.value.clone();
-    final size = MediaQuery.of(context).size;
-    final center = Offset(size.width / 2, size.height / 2);
-    
-    matrix.multiply(Matrix4.translationValues(center.dx, center.dy, 0.0));
-    matrix.multiply(Matrix4.diagonal3Values(1 / 1.5, 1 / 1.5, 1.0));
-    matrix.multiply(Matrix4.translationValues(-center.dx, -center.dy, 0.0));
-    
-    _transformationController.value = matrix;
+    final zoom = _mapController.camera.zoom - 1;
+    _mapController.move(_mapController.camera.center, zoom);
   }
 
   void _resetZoom() {
-    final size = MediaQuery.of(context).size;
-    _transformationController.value = Matrix4.translationValues(
-      -(2000 - size.width) / 2,
-      -(2000 - size.height) / 2,
-      0.0,
-    );
+    _mapController.move(_center, 13.0);
   }
 
   @override
@@ -123,52 +91,26 @@ class _MapScreenState extends State<MapScreen> {
           //  TACTICAL MAP BACKGROUND & MARKERS
           // ═══════════════════════════════════════
           Positioned.fill(
-            child: InteractiveViewer(
-              transformationController: _transformationController,
-              minScale: 0.1,
-              maxScale: 4.0,
-              boundaryMargin: const EdgeInsets.all(1000),
-              constrained: false,
-              child: SizedBox(
-                width: 2000,
-                height: 2000,
-                child: Stack(
-                  children: [
-                    // Satellite map image
-                    Positioned.fill(
-                      child: Image.network(
-                        'https://lh3.googleusercontent.com/aida-public/AB6AXuABGLdxXbNjNnO8N-LnppVR75n8MSy2Ralj5rvuK_UoMOShWpkE7KW97lOu3l5YHRu9pZLiTTVsCJ0Oy-vUtKTxlXuBL5yzH3eYpDeccrxtKJHszCzLEe4VPdLbFgOi2X1OgBr38fchRC5pqq8TN25Zmf4EvUpWnzG55EEzgMX1m_93SUKTaJ2SWEs-i0S6CLSoi8FT_o9D8caGUC6nIBuU8NeI6fKw0nIizPG80hwZDOCgs1myJtMMnit6r4WqQvdpoKHpM3HEN3y1',
-                        fit: BoxFit.cover,
-                        color: Colors.white.withValues(alpha: 0.6),
-                        colorBlendMode: BlendMode.luminosity,
-                        errorBuilder: (context, error, stackTrace) {
-                          // Fallback: dark gradient if image fails to load
-                          return Container(
-                            decoration: const BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  Color(0xFF0B1326),
-                                  Color(0xFF10131A),
-                                  Color(0xFF0A1628),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    // Grid overlay
-                    Positioned.fill(
-                      child: CustomPaint(
-                        painter: _GridPainter(),
-                      ),
-                    ),
+            child: FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: _center,
+                initialZoom: 13.0,
+                minZoom: 3.0,
+                maxZoom: 18.0,
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+                  subdomains: const ['a', 'b', 'c', 'd'],
+                ),
+                MarkerLayer(
+                  markers: [
                     // Marker 1: Critical (FLOOD-01)
-                    Positioned(
-                      top: 1000,
-                      left: 1000,
+                    Marker(
+                      point: const LatLng(34.055, -118.25),
+                      width: 80,
+                      height: 80,
                       child: _buildMapMarker(
                         icon: Icons.warning,
                         bgColor: AppColors.error,
@@ -179,9 +121,10 @@ class _MapScreenState extends State<MapScreen> {
                       ),
                     ),
                     // Marker 2: Shelter (SHLT-COL)
-                    Positioned(
-                      top: 1100,
-                      left: 1200,
+                    Marker(
+                      point: const LatLng(34.045, -118.23),
+                      width: 80,
+                      height: 80,
                       child: _buildMapMarker(
                         icon: Icons.home_work,
                         bgColor: AppColors.secondary,
@@ -192,9 +135,10 @@ class _MapScreenState extends State<MapScreen> {
                       ),
                     ),
                     // Marker 3: Elevated (landslide — no label)
-                    Positioned(
-                      top: 800,
-                      left: 1400,
+                    Marker(
+                      point: const LatLng(34.065, -118.26),
+                      width: 40,
+                      height: 40,
                       child: _buildMapMarkerIconOnly(
                         icon: Icons.landslide,
                         bgColor: AppColors.tertiaryContainer,
@@ -204,6 +148,15 @@ class _MapScreenState extends State<MapScreen> {
                     ),
                   ],
                 ),
+              ],
+            ),
+          ),
+
+          // Grid overlay (fixed over the map)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: CustomPaint(
+                painter: _GridPainter(),
               ),
             ),
           ),
