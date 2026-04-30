@@ -11,7 +11,7 @@ class AlertsScreen extends StatefulWidget {
 }
 
 class _AlertsScreenState extends State<AlertsScreen> {
-  int currentIndex = 0;
+  int currentIndex = 4; // Alerts tab
 
   @override
   Widget build(BuildContext context) {
@@ -120,9 +120,9 @@ class _AlertsScreenState extends State<AlertsScreen> {
             right: 0,
             bottom: 0,
             child: BottomNav(
-              currentIndex: 4,
+              currentIndex: currentIndex,
               onTap: (index) {
-                if (index == 4) return;
+                if (index == currentIndex) return;
                 setState(() {
                   currentIndex = index;
                 });

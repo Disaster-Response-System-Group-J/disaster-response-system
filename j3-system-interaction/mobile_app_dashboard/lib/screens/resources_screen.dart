@@ -54,9 +54,10 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
       body: Stack(
         children: [
           // ─── Content ───
-          Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+          Positioned.fill(
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
                   Icons.inventory_2_outlined,
@@ -84,6 +85,7 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
                 ),
               ],
             ),
+          ),
           ),
 
           // ─── Bottom nav (fixed) ───

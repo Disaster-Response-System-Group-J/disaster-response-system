@@ -32,6 +32,7 @@ class BottomNav extends StatelessWidget {
         child: SizedBox(
           height: 64,
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildNavItem(0, Icons.dashboard, 'Dashboard'),
               _buildNavItem(1, Icons.description, 'Reports'),
@@ -56,13 +57,14 @@ class BottomNav extends StatelessWidget {
         onTap: () => onTap(index),
         behavior: HitTestBehavior.opaque,
         child: Container(
-          decoration: isActive
-              ? const BoxDecoration(
-                  border: Border(
+          decoration: BoxDecoration(
+            color: Colors.transparent, // Ensures Container fills the Expanded space for taps
+            border: isActive
+                ? const Border(
                     top: BorderSide(color: Color(0xFF3B82F6), width: 2),
-                  ),
-                )
-              : null,
+                  )
+                : null,
+          ),
           padding: EdgeInsets.only(top: isActive ? 6 : 8),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
