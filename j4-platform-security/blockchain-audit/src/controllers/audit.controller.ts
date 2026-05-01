@@ -4,6 +4,7 @@ import {
   CaseNotFoundError,
   createManualIncidentAuditCase,
   getManualIncidentCasesFromChain,
+  getResourceEventsByCaseIdFromChain,
   type CreateAuditCaseInput,
   logAuditEventOnChain,
   type LogAuditEventInput,
@@ -130,6 +131,40 @@ export async function getManualIncidentCases(
       error instanceof Error
         ? error.message
         : "Failed to get manual incident cases";
+
+    return response.status(500).json(errorResponse(message));
+  }
+}
+
+export async function getResourceEventsByCaseId(
+  request: Request,
+  response: Response,
+) {
+  const caseIdParam = Array.isArray(request.params.caseId)
+    ? request.params.caseId[0]
+    : request.params.caseId;
+
+  const caseId = getPositiveInteger(caseIdParam);
+
+  if (!caseId) {
+    return response
+      .status(400)
+      .json(errorResponse("caseId must be a positive integer"));
+  }
+
+  try {
+    const result = await getResourceEventsByCaseIdFromChain(caseId);
+
+    return response.status(200).json(successResponse(result));
+  } catch (error) {
+    if (error instanceof CaseNotFoundError) {
+      return response.status(404).json(errorResponse("caseId does not exist"));
+    }
+
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Failed to get resource events for caseId";
 
     return response.status(500).json(errorResponse(message));
   }

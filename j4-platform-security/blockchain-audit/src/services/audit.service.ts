@@ -65,6 +65,31 @@ export type ManualIncidentCasesResult = {
   cases: ManualIncidentCase[];
 };
 
+export type ResourceEvent = {
+  auditEventId: string;
+  caseId: string;
+  eventId: string;
+  eventType: string;
+  incidentId: string;
+  resourceId: string;
+  alertId: string;
+  performedBy: string;
+  performedRole: string;
+  previousStatus: string;
+  newStatus: string;
+  district: string;
+  notes: string;
+  correlationId: string;
+  timestamp: string;
+};
+
+export type ResourceEventsByCaseIdResult = {
+  caseId: string;
+  includedEventTypes: ["RESOURCE_ASSIGNED", "RESCUE_DISPATCHED"];
+  count: number;
+  events: ResourceEvent[];
+};
+
 type ManualIncidentCreatedEvent = {
   caseId: bigint;
   auditEventId: bigint;
@@ -99,6 +124,11 @@ type AuditEventRecord = {
   correlationId: string;
   timestamp: bigint;
 };
+
+const RESOURCE_EVENT_TYPES = [
+  "RESOURCE_ASSIGNED",
+  "RESCUE_DISPATCHED",
+] as const;
 
 function readManualIncidentCreatedEvent(
   receipt: TransactionReceipt,
@@ -217,6 +247,57 @@ export async function getManualIncidentCasesFromChain(): Promise<ManualIncidentC
     eventType: "MANUAL_INCIDENT_CREATED",
     count: cases.length,
     cases,
+  };
+}
+
+export async function getResourceEventsByCaseIdFromChain(
+  caseId: string,
+): Promise<ResourceEventsByCaseIdResult> {
+  const caseExists = await incidentAuditLogContract.doesCaseExist(caseId);
+
+  if (!caseExists) {
+    throw new CaseNotFoundError();
+  }
+
+  const auditEventIds = await incidentAuditLogContract.getEventIdsByCaseId(caseId);
+
+  const auditEvents = await Promise.all(
+    auditEventIds.map((auditEventId: bigint) =>
+      incidentAuditLogContract
+        .getFunction("getEvent")
+        .staticCall(auditEventId) as Promise<AuditEventRecord>,
+    ),
+  );
+
+  const events: ResourceEvent[] = auditEvents
+    .filter((auditEvent) =>
+      RESOURCE_EVENT_TYPES.includes(
+        auditEvent.eventType as (typeof RESOURCE_EVENT_TYPES)[number],
+      ),
+    )
+    .map((auditEvent) => ({
+      auditEventId: auditEvent.id.toString(),
+      caseId: auditEvent.caseId.toString(),
+      eventId: auditEvent.eventId,
+      eventType: auditEvent.eventType,
+      incidentId: auditEvent.incidentId,
+      resourceId: auditEvent.resourceId,
+      alertId: auditEvent.alertId,
+      performedBy: auditEvent.performedBy,
+      performedRole: auditEvent.performedRole,
+      previousStatus: auditEvent.previousStatus,
+      newStatus: auditEvent.newStatus,
+      district: auditEvent.district,
+      notes: auditEvent.notes,
+      correlationId: auditEvent.correlationId,
+      timestamp: auditEvent.timestamp.toString(),
+    }));
+
+  return {
+    caseId,
+    includedEventTypes: ["RESOURCE_ASSIGNED", "RESCUE_DISPATCHED"],
+    count: events.length,
+    events,
   };
 }
 
