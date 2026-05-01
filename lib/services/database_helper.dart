@@ -53,4 +53,17 @@ class DatabaseHelper {
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
+
+    Future<List<EventModel>> getQueuedEvents() async {
+    final db = await database;
+
+    final result = await db.query(
+      AppConstants.eventsTable,
+      where: 'status = ?',
+      whereArgs: [AppConstants.statusQueued],
+      orderBy: 'timestamp_created ASC',
+    );
+
+    return result.map((map) => EventModel.fromMap(map)).toList();
+  }
 }
