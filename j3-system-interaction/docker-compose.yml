@@ -1,0 +1,71 @@
+version: "3.9"
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: j3-postgres
+    restart: unless-stopped
+    env_file:
+      - ./dms/.env
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U j3user -d j3db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - j3-net
+
+  mock-server:
+    build:
+      context: ./dms
+      dockerfile: Dockerfile.mock
+    env_file:
+      - ./dms/.env
+    container_name: j3-mock-server
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    networks:
+      - j3-net
+
+  dms:
+    build:
+      context: ./dms
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:3000
+        NEXT_PUBLIC_SOCKET_URL: http://localhost:3001
+    container_name: j3-dms
+    restart: unless-stopped
+    env_file:
+      - ./dms/.env
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mock-server:
+        condition: service_started
+    networks:
+      - j3-net
+
+volumes:
+  postgres_data:
+
+networks:
+  j3-net:
+    driver: bridge
+
+
+
+
+
+
+# temporary docker compose file for development, will be removed in the future
+# when we have other teams running their services in docker as well. 
+# For now, this is just to make it easier for us to run the DMS without having to set up a local postgres database and mock server.
