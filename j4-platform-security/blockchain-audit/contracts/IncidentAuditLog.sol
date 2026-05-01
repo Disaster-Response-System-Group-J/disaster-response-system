@@ -28,8 +28,10 @@ contract IncidentAuditLog {
 
   // Mapping to track existing caseIds
   mapping(uint256 => bool) private caseExists;  
+
   // Mapping from caseId to array of auditEventIds
   mapping(uint256 => uint256[]) private eventIdsByCaseId;
+  
   // Mapping from eventType to array of auditEventIds 
   mapping(string => uint256[]) private eventIdsByType; 
 
