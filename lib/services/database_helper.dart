@@ -99,4 +99,15 @@ class DatabaseHelper {
 
     return Sqflite.firstIntValue(result) ?? 0;
   }
+
+    Future<List<EventModel>> getAllEvents() async {
+    final db = await database;
+
+    final result = await db.query(
+      AppConstants.eventsTable,
+      orderBy: 'timestamp_created DESC',
+    );
+
+    return result.map((map) => EventModel.fromMap(map)).toList();
+  }
 }
