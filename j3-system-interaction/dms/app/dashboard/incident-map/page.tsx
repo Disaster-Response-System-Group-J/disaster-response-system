@@ -1,26 +1,32 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // 1. Add useEffect
 import Map, { Marker, NavigationControl, Popup, ViewStateChangeEvent } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Shield, Filter, MapPin, AlertTriangle, X, ChevronDown, CheckCircle2, Clock } from 'lucide-react';
 import { MOCK_CONFIRMED_INCIDENTS } from '@/data/mock-data';
-import { IncidentSeverity, IncidentStatus, DisasterType, ConfirmedIncident } from '@/types';
+import { IncidentSeverity, IncidentStatus, DisasterType, ConfirmedIncident, UserRole } from '@/types';
 import { SRI_LANKA_CENTER, DISTRICT_NAMES } from '@/data/districts';
 import { useAuth } from '@/context/AuthContext';
-import { UserRole } from '@/types';
+import { useSocket } from '@/context/SocketContext'; // 2. Import Socket
 
 const SEVERITY_COLORS: Record<string, string> = {
-  CRITICAL: '#ef4444', // red-500
-  HIGH: '#f97316', // orange-500
-  MEDIUM: '#eab308', // yellow-500
-  LOW: '#3b82f6', // blue-500
+  CRITICAL: '#ef4444', 
+  HIGH: '#f97316', 
+  MEDIUM: '#eab308', 
+  LOW: '#3b82f6', 
+  PENDING: '#a855f7', // Add a purple color for unverified incoming reports
 };
 
 export default function IncidentMapPage() {
   const { user } = useAuth();
+  const socket = useSocket(); // 3. Initialize Socket
+
   const [viewState, setViewState] = useState(SRI_LANKA_CENTER);
-  const [selectedIncident, setSelectedIncident] = useState<ConfirmedIncident | null>(null);
+  const [selectedIncident, setSelectedIncident] = useState<any | null>(null);
+  
+  // 4. Convert mock data to state so we can push new pins to it
+  const [mapPins, setMapPins] = useState<any[]>(MOCK_CONFIRMED_INCIDENTS);
 
   // Filters
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
@@ -30,7 +36,38 @@ export default function IncidentMapPage() {
 
   const enforcedDistrict = user?.role === UserRole.ADMIN ? 'ALL' : (user as any)?.assignedDistrict || 'ALL';
 
-  const filteredIncidents = MOCK_CONFIRMED_INCIDENTS.filter(inc => {
+  // 5. Listen for incoming reports to drop new pins
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleNewReport = (report: any) => {
+      // Ensure the report has coordinates before mapping it
+      if (report.latitude && report.longitude) {
+        const newPin = {
+          incidentId: report.reportId,
+          disasterType: report.disasterType,
+          severity: 'PENDING', // Assign our new custom severity
+          status: 'UNVERIFIED',
+          latitude: report.latitude,
+          longitude: report.longitude,
+          title: `SOS Report: ${report.disasterType}`,
+          district: report.district,
+          description: report.description
+        };
+        
+        setMapPins(prev => [...prev, newPin]);
+      }
+    };
+
+    socket.on('dashboard:new-report', handleNewReport);
+
+    return () => {
+      socket.off('dashboard:new-report', handleNewReport);
+    };
+  }, [socket]);
+
+  // 6. Update the filter to use `mapPins` state instead of the static mock array
+  const filteredIncidents = mapPins.filter(inc => {
     if (typeFilter !== 'ALL' && inc.disasterType !== typeFilter) return false;
     if (severityFilter !== 'ALL' && inc.severity !== severityFilter) return false;
     if (districtFilter !== 'ALL' && inc.district !== districtFilter) return false;
