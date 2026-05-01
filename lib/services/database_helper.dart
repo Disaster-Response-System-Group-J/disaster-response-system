@@ -66,4 +66,22 @@ class DatabaseHelper {
 
     return result.map((map) => EventModel.fromMap(map)).toList();
   }
+
+    Future<int> updateEventStatus({
+    required String eventId,
+    required String status,
+    String? timestampSubmitted,
+  }) async {
+    final db = await database;
+
+    return await db.update(
+      AppConstants.eventsTable,
+      {
+        'status': status,
+        'timestamp_submitted': timestampSubmitted,
+      },
+      where: 'event_id = ?',
+      whereArgs: [eventId],
+    );
+  }
 }
