@@ -84,4 +84,19 @@ class DatabaseHelper {
       whereArgs: [eventId],
     );
   }
+
+    Future<int> getQueueCount() async {
+    final db = await database;
+
+    final result = await db.rawQuery(
+      '''
+      SELECT COUNT(*) as count
+      FROM ${AppConstants.eventsTable}
+      WHERE status = ?
+      ''',
+      [AppConstants.statusQueued],
+    );
+
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
 }
