@@ -53,4 +53,25 @@ io.on('connection', (socket) => {
       lastSeenMinutes: 0
     });
   }, 5000);
+
+  socket.on('client:update-report-status', (data) => {
+    console.log(`[Socket] Report ${data.reportId} updated to ${data.status} by officer`);
+    
+    // Broadcast this update to ALL OTHER connected clients
+    socket.broadcast.emit('dashboard:report-updated', {
+      reportId: data.reportId,
+      verificationStatus: data.status,
+      reviewedAt: new Date().toISOString()
+    });
+  });
+
+  socket.on('client:update-resource-status', (data) => {
+    console.log(`[Socket] Resource ${data.resourceId} updated to ${data.status}`);
+    
+    socket.broadcast.emit('dashboard:resource-updated', {
+      resourceId: data.resourceId,
+      status: data.status,
+      lastUpdated: data.lastUpdated
+    });
+  });
 });

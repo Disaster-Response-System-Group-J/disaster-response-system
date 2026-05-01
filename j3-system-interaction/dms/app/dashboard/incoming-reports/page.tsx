@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { FileText, CheckCircle2, XCircle, Copy, Eye, MapPin, Clock, Camera, AlertTriangle } from 'lucide-react';
+import { FileText, CheckCircle2, XCircle, Copy, Eye, MapPin, Clock, Camera, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { MOCK_INCOMING_REPORTS } from '@/data/mock-data';
-import { VerificationStatus, ReportSource, IncomingReport } from '@/types';
+import { VerificationStatus, ReportSource, IncomingReport, UserRole } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { useSocket } from '@/context/SocketContext';
 
@@ -24,12 +24,14 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 export default function IncomingReportsPage() {
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
   const socket = useSocket();
   const [reports, setReports] = useState<IncomingReport[]>(MOCK_INCOMING_REPORTS);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [sourceFilter, setSourceFilter] = useState<string>('ALL');
   const [selectedReport, setSelectedReport] = useState<IncomingReport | null>(null);
+
+  const enforcedDistrict = user?.role === UserRole.ADMIN ? 'ALL' : (user as any)?.assignedDistrict || 'ALL';
 
   // WebSocket Integration for Real-Time Updates
   useEffect(() => {
@@ -38,29 +40,44 @@ export default function IncomingReportsPage() {
     const handleNewReport = (newReport: IncomingReport) => {
       setReports((prevReports) => [newReport, ...prevReports]);
     };
+    const handleReportUpdated = (data: { reportId: string, verificationStatus: VerificationStatus, reviewedAt: string }) => {
+      setReports(prev => prev.map(r => 
+        r.reportId === data.reportId 
+          ? { ...r, verificationStatus: data.verificationStatus, reviewedAt: data.reviewedAt } 
+          : r
+      ));
+      setSelectedReport(current => current?.reportId === data.reportId ? null : current);
+    };
 
     socket.on('dashboard:new-report', handleNewReport);
+    socket.on('dashboard:report-updated', handleReportUpdated);
 
     return () => {
       socket.off('dashboard:new-report', handleNewReport);
+      socket.off('dashboard:report-updated', handleReportUpdated);
     };
   }, [socket]);
 
   const filtered = reports.filter(r => {
     if (statusFilter !== 'ALL' && r.verificationStatus !== statusFilter) return false;
     if (sourceFilter !== 'ALL' && r.source !== sourceFilter) return false;
+    if (enforcedDistrict !== 'ALL' && r.district !== enforcedDistrict) return false;
     return true;
   });
 
   const pendingCount = reports.filter(r => r.verificationStatus === VerificationStatus.PENDING_REVIEW).length;
 
   const handleAction = (reportId: string, action: 'verify' | 'reject' | 'duplicate') => {
+    const statusMap = { verify: VerificationStatus.VERIFIED, reject: VerificationStatus.REJECTED, duplicate: VerificationStatus.DUPLICATE };
+    const newStatus = statusMap[action];
     setReports(prev => prev.map(r => {
       if (r.reportId !== reportId) return r;
-      const statusMap = { verify: VerificationStatus.VERIFIED, reject: VerificationStatus.REJECTED, duplicate: VerificationStatus.DUPLICATE };
-      return { ...r, verificationStatus: statusMap[action], reviewedAt: new Date().toISOString() };
+      return { ...r, verificationStatus: newStatus, reviewedAt: new Date().toISOString() };
     }));
     setSelectedReport(null);
+    if (socket) {
+      socket.emit('client:update-report-status', { reportId, status: newStatus });
+    }
   };
 
   return (
@@ -68,9 +85,17 @@ export default function IncomingReportsPage() {
       <div className="p-8 max-w-[1400px] mx-auto">
         <div className="flex items-end justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-extrabold tracking-tight mb-2">Incoming Reports</h1>
+            <div className="flex items-center gap-3 mb-2">
+              <h1 className="text-3xl font-extrabold tracking-tight">Incoming Reports</h1>
+              {/* Show a restriction badge for non-admins */}
+              {enforcedDistrict !== 'ALL' && (
+                <span className="flex items-center gap-1.5 px-3 py-1 bg-blue-500/10 border border-blue-500/30 rounded-lg text-xs font-bold text-blue-400">
+                  <MapPin size={12} /> {enforcedDistrict} Zone Only
+                </span>
+              )}
+            </div>
             <p className="text-sm text-slate-400">
-              <span className="text-orange-400 font-bold">{pendingCount}</span> reports pending review
+              <span className="text-orange-400 font-bold">{pendingCount}</span> reports pending review in your jurisdiction
             </p>
           </div>
           <div className="flex items-center gap-3">

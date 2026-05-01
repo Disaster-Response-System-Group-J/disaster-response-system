@@ -7,6 +7,8 @@ import { Shield, Filter, MapPin, AlertTriangle, X, ChevronDown, CheckCircle2, Cl
 import { MOCK_CONFIRMED_INCIDENTS } from '@/data/mock-data';
 import { IncidentSeverity, IncidentStatus, DisasterType, ConfirmedIncident } from '@/types';
 import { SRI_LANKA_CENTER, DISTRICT_NAMES } from '@/data/districts';
+import { useAuth } from '@/context/AuthContext';
+import { UserRole } from '@/types';
 
 const SEVERITY_COLORS: Record<string, string> = {
   CRITICAL: '#ef4444', // red-500
@@ -16,6 +18,7 @@ const SEVERITY_COLORS: Record<string, string> = {
 };
 
 export default function IncidentMapPage() {
+  const { user } = useAuth();
   const [viewState, setViewState] = useState(SRI_LANKA_CENTER);
   const [selectedIncident, setSelectedIncident] = useState<ConfirmedIncident | null>(null);
 
@@ -25,10 +28,13 @@ export default function IncidentMapPage() {
   const [districtFilter, setDistrictFilter] = useState<string>('ALL');
   const [showFilters, setShowFilters] = useState(false);
 
+  const enforcedDistrict = user?.role === UserRole.ADMIN ? 'ALL' : (user as any)?.assignedDistrict || 'ALL';
+
   const filteredIncidents = MOCK_CONFIRMED_INCIDENTS.filter(inc => {
     if (typeFilter !== 'ALL' && inc.disasterType !== typeFilter) return false;
     if (severityFilter !== 'ALL' && inc.severity !== severityFilter) return false;
     if (districtFilter !== 'ALL' && inc.district !== districtFilter) return false;
+    if (enforcedDistrict !== 'ALL' && inc.district !== enforcedDistrict) return false;
     return true;
   });
 
@@ -129,6 +135,13 @@ export default function IncidentMapPage() {
               <ChevronDown size={14} className={`transition-transform ${showFilters ? 'rotate-180' : ''}`} />
             </div>
           </div>
+          
+          {/* Add the restriction badge right below the Map Controls header if restricted */}
+          {enforcedDistrict !== 'ALL' && (
+            <div className="bg-blue-500/10 border-b border-blue-500/20 px-4 py-2 flex items-center justify-center gap-2 text-[10px] font-bold text-blue-400 tracking-widest uppercase">
+              <MapPin size={12} /> Restricted to {enforcedDistrict}
+            </div>
+          )}
 
           {showFilters && (
             <div className="p-4 space-y-4">
