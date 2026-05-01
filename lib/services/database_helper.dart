@@ -2,6 +2,7 @@ import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../utils/constants.dart';
+import '../models/event_model.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._internal();
@@ -41,5 +42,15 @@ class DatabaseHelper {
         timestamp_submitted TEXT
       )
     ''');
+  }
+
+    Future<int> saveEvent(EventModel event) async {
+    final db = await database;
+
+    return await db.insert(
+      AppConstants.eventsTable,
+      event.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 }
