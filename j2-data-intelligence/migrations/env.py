@@ -10,7 +10,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from app.core.config import DATABASE_URL  # noqa: E402
 from app.db.base import Base  # noqa: E402
-from app.models import intelligence_record  # noqa: F401,E402
+from app import models as _models  # noqa: F401,E402
 
 config = context.config
 config.set_main_option("sqlalchemy.url", DATABASE_URL)
