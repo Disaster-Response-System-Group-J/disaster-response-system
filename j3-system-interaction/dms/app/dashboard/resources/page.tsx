@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Truck, Search, Shield, MapPin, Activity, CheckCircle2, XCircle, AlertTriangle, ChevronDown } from 'lucide-react';
 import { MOCK_RESOURCES } from '@/data/mock-data';
 import { ResourceType, ResourceStatus } from '@/types';
 import { useAuth } from '@/context/AuthContext';
+import { UserRole } from '@/types';
 import { DISTRICT_NAMES } from '@/data/districts';
+import { useSocket } from '@/context/SocketContext'; // 1. Added socket import
 
 const STATUS_STYLES: Record<string, string> = {
   AVAILABLE: 'bg-green-500/10 text-green-400 border-green-500/20',
@@ -24,26 +26,59 @@ const TYPE_ICONS: Record<string, string> = {
 };
 
 export default function ResourcesPage() {
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
+  const socket = useSocket(); // 2. Initialize socket
+  
   const [resources, setResources] = useState(MOCK_RESOURCES);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [districtFilter, setDistrictFilter] = useState<string>('ALL');
 
+  const enforcedDistrict = user?.role === UserRole.ADMIN ? 'ALL' : (user as any)?.assignedDistrict || 'ALL';
+
+  // 3. Listen for other users updating resources
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleResourceUpdated = (data: { resourceId: string, status: ResourceStatus, lastUpdated: string }) => {
+      setResources(prev => prev.map(r => 
+        r.resourceId === data.resourceId 
+          ? { ...r, status: data.status, lastUpdated: data.lastUpdated } 
+          : r
+      ));
+    };
+
+    socket.on('dashboard:resource-updated', handleResourceUpdated);
+
+    return () => {
+      socket.off('dashboard:resource-updated', handleResourceUpdated);
+    };
+  }, [socket]);
+
   const filtered = resources.filter(r => {
     if (search && !r.name.toLowerCase().includes(search.toLowerCase()) && !r.resourceId.toLowerCase().includes(search.toLowerCase())) return false;
     if (typeFilter !== 'ALL' && r.type !== typeFilter) return false;
     if (statusFilter !== 'ALL' && r.status !== statusFilter) return false;
     if (districtFilter !== 'ALL' && r.district !== districtFilter) return false;
+    if (enforcedDistrict !== 'ALL' && r.district !== enforcedDistrict) return false;
     return true;
   });
 
-  const availableCount = resources.filter(r => r.status === ResourceStatus.AVAILABLE).length;
-  const assignedCount = resources.filter(r => r.status === ResourceStatus.ASSIGNED || r.status === ResourceStatus.BUSY).length;
+  const availableCount = filtered.filter(r => r.status === ResourceStatus.AVAILABLE).length;
+  const assignedCount = filtered.filter(r => r.status === ResourceStatus.ASSIGNED || r.status === ResourceStatus.BUSY).length;
 
+  // 4. Update local state AND emit to server
   const handleStatusUpdate = (id: string, newStatus: ResourceStatus) => {
-    setResources(prev => prev.map(r => r.resourceId === id ? { ...r, status: newStatus, lastUpdated: new Date().toISOString() } : r));
+    const timestamp = new Date().toISOString();
+    
+    // Optimistic UI update
+    setResources(prev => prev.map(r => r.resourceId === id ? { ...r, status: newStatus, lastUpdated: timestamp } : r));
+    
+    // Broadcast to server
+    if (socket) {
+      socket.emit('client:update-resource-status', { resourceId: id, status: newStatus, lastUpdated: timestamp });
+    }
   };
 
   return (
@@ -51,7 +86,14 @@ export default function ResourcesPage() {
       <div className="p-8 max-w-[1400px] mx-auto">
         <div className="flex items-end justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-extrabold tracking-tight mb-2">Resource Tracking</h1>
+            <div className="flex items-center gap-3 mb-2">
+              <h1 className="text-3xl font-extrabold tracking-tight">Resource Tracking</h1>
+              {enforcedDistrict !== 'ALL' && (
+                <span className="flex items-center gap-1.5 px-3 py-1 bg-blue-500/10 border border-blue-500/30 rounded-lg text-xs font-bold text-blue-400">
+                  <MapPin size={12} /> {enforcedDistrict} Zone Only
+                </span>
+              )}
+            </div>
             <p className="text-sm text-slate-400 flex items-center gap-4">
               <span className="flex items-center gap-1.5"><CheckCircle2 size={14} className="text-green-400" /> {availableCount} Available</span>
               <span className="flex items-center gap-1.5"><Activity size={14} className="text-blue-400" /> {assignedCount} Assigned/Busy</span>

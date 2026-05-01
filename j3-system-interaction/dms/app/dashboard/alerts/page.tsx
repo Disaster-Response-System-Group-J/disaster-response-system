@@ -6,6 +6,8 @@ import { MOCK_ALERTS } from '@/data/mock-data';
 import { IncidentSeverity, AlertType } from '@/types';
 import { DISTRICT_NAMES } from '@/data/districts';
 import { useSocket } from '@/context/SocketContext';
+import { useAuth } from '@/context/AuthContext';
+import { UserRole } from '@/types';
 
 const SEVERITY_STYLES: Record<string, string> = {
   CRITICAL: 'bg-red-500/10 text-red-400 border-red-500/30',
@@ -27,6 +29,7 @@ type Alert = typeof MOCK_ALERTS[0];
 
 export default function AlertsPage() {
   const socket = useSocket();
+  const { user } = useAuth();
   const [alerts, setAlerts] = useState<Alert[]>(MOCK_ALERTS);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
@@ -47,11 +50,14 @@ export default function AlertsPage() {
     };
   }, [socket]);
 
+  const enforcedDistrict = user?.role === UserRole.ADMIN ? 'ALL' : (user as any)?.assignedDistrict || 'ALL';
+
   const filtered = alerts.filter(a => {
     if (search && !a.title.toLowerCase().includes(search.toLowerCase()) && !a.description.toLowerCase().includes(search.toLowerCase())) return false;
     if (typeFilter !== 'ALL' && a.type !== typeFilter) return false;
     if (severityFilter !== 'ALL' && a.severity !== severityFilter) return false;
     if (districtFilter !== 'ALL' && a.district !== districtFilter) return false;
+    if (enforcedDistrict !== 'ALL' && a.district !== enforcedDistrict) return false;
     return true;
   });
 
@@ -60,7 +66,14 @@ export default function AlertsPage() {
       <div className="p-8 max-w-[1400px] mx-auto">
         <div className="flex items-end justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-extrabold tracking-tight mb-2">System Alerts</h1>
+            <div className="flex items-center gap-3 mb-2">
+              <h1 className="text-3xl font-extrabold tracking-tight">System Alerts</h1>
+              {enforcedDistrict !== 'ALL' && (
+                <span className="flex items-center gap-1.5 px-3 py-1 bg-blue-500/10 border border-blue-500/30 rounded-lg text-xs font-bold text-blue-400">
+                  <MapPin size={12} /> {enforcedDistrict} Zone Only
+                </span>
+              )}
+            </div>
             <p className="text-sm text-slate-400">Monitor risk warnings, public alerts, and system notifications.</p>
           </div>
         </div>
