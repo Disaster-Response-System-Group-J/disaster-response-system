@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import { SocketProvider } from '@/context/SocketContext';
 import { AuthProvider } from '@/context/AuthContext';
+import GlobalSocketListener from '@/components/auth/GlobalSocketListener';
+import { Toaster } from 'sonner';
 import './globals.css';
 
 const geistSans = Geist({
@@ -26,7 +28,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#0a0f16] text-white`}>
         <AuthProvider> 
           <SocketProvider>
+            <GlobalSocketListener /> 
             {children}
+            <Toaster 
+              theme="dark" 
+              position="top-right" 
+              richColors 
+              closeButton
+              toastOptions={{
+                style: { background: '#131924', borderColor: '#1e293b' }
+              }}
+            />
           </SocketProvider>
         </AuthProvider>
       </body>
