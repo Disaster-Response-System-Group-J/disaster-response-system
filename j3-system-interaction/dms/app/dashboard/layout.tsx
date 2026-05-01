@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Shield, LayoutGrid, Map as MapIcon, FileText, Truck, AlertTriangle,
-  BarChart2, Settings, HelpCircle, Bell, UserCircle, LogOut, Users,
+  BarChart2, Settings, HelpCircle, Bell, UserCircle, LogOut, Users, RadioTower, BrainCircuit,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import AuthGuard from '@/components/auth/AuthGuard';
@@ -17,6 +17,8 @@ const NAV_ITEMS = [
   { href: '/dashboard/resources', label: 'RESOURCE TRACKING', icon: Truck, permission: 'view:resources' },
   { href: '/dashboard/alerts', label: 'ALERTS', icon: AlertTriangle, permission: 'view:alerts' },
   { href: '/dashboard/analytics', label: 'ANALYTICS', icon: BarChart2, permission: 'view:analytics' },
+  { href: '/dashboard/sensors', label: 'SENSORS', icon: RadioTower, permission: 'view:sensors' },
+  { href: '/dashboard/predictions', label: 'PREDICTIONS', icon: BrainCircuit, permission: 'view:predictions' },
   { href: '/dashboard/admin', label: 'ADMIN PANEL', icon: Users, permission: 'manage:users' },
 ];
 

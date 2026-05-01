@@ -259,6 +259,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     'view:resources',
     'view:alerts',
     'view:analytics',
+    'view:sensors',
+    'view:predictions',
     'create:incident',
   ],
   [UserRole.RESOURCE_MANAGER]: [
@@ -269,6 +271,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     'update:resource-status',
     'view:alerts',
     'view:analytics',
+    'view:sensors',
+    'view:predictions',
   ],
   [UserRole.ADMIN]: [
     'view:dashboard',
@@ -281,6 +285,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     'update:resource-status',
     'view:alerts',
     'view:analytics',
+    'view:sensors',
+    'view:predictions',
     'manage:users',
     'manage:settings',
     'create:incident',
