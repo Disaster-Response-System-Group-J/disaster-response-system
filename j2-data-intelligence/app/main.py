@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
 from app.api.routes import router as intelligence_router
-from app.schemas.intelligence import HealthResponse
+from app.schemas.common import HealthResponse
 
 app = FastAPI(title="J2 Data Intelligence API", version="0.1.0")
 
