@@ -41,4 +41,16 @@ io.on('connection', (socket) => {
       source: "J2 Risk Engine"
     });
   }, 35000);
+
+  // Simulate J1: Sensor Telemetry Updates every 5 seconds
+  setInterval(() => {
+    const mockSensorIds = ['SNS-KEL-001', 'SNS-KAL-014', 'SNS-ATT-005', 'SNS-GIN-021'];
+    socket.emit('sensor:telemetry-update', {
+      id: mockSensorIds[Math.floor(Math.random() * mockSensorIds.length)],
+      battery: Math.floor(Math.random() * 100), 
+      status: Math.random() > 0.8 ? 'OFFLINE' : 'ONLINE', 
+      latestValue: `${(Math.random() * 10).toFixed(1)} m`,
+      lastSeenMinutes: 0
+    });
+  }, 5000);
 });

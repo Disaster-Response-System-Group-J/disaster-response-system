@@ -1,7 +1,8 @@
 'use client';
 
-import { ReactNode, useMemo, useState } from 'react';
+import { ReactNode, useMemo, useState, useEffect } from 'react';
 import { Activity, Battery, MapPin, Pencil, Plus, RadioTower, Search, Trash2, WifiOff, X } from 'lucide-react';
+import { useSocket } from '@/context/SocketContext';
 
 type SensorStatus = 'ONLINE' | 'OFFLINE' | 'MAINTENANCE';
 type SensorMetric = 'Water Level' | 'Rainfall' | 'River Flow' | 'Soil Moisture';
@@ -33,6 +34,7 @@ const STATUS_STYLES: Record<SensorStatus, string> = {
 };
 
 export default function SensorsPage() {
+  const socket = useSocket();
   const [sensors, setSensors] = useState(SENSOR_NODES);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | SensorStatus>('ALL');
@@ -49,6 +51,25 @@ export default function SensorsPage() {
     lastSeenMinutes: 0,
     latestValue: '',
   });
+
+  // WebSocket Integration for Real-Time Sensor Updates
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleTelemetryUpdate = (update: Partial<SensorNode>) => {
+      setSensors((prev) => 
+        prev.map((sensor) => 
+          sensor.id === update.id ? { ...sensor, ...update } : sensor
+        )
+      );
+    };
+
+    socket.on('sensor:telemetry-update', handleTelemetryUpdate);
+
+    return () => {
+      socket.off('sensor:telemetry-update', handleTelemetryUpdate);
+    };
+  }, [socket]);
 
   const filteredSensors = useMemo(
     () =>
