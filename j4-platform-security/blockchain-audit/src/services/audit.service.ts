@@ -90,6 +90,31 @@ export type ResourceEventsByCaseIdResult = {
   events: ResourceEvent[];
 };
 
+export type CaseEvent = {
+  auditEventId: string;
+  caseId: string;
+  eventId: string;
+  eventType: string;
+  incidentId: string;
+  resourceId: string;
+  alertId: string;
+  performedBy: string;
+  performedRole: string;
+  previousStatus: string;
+  newStatus: string;
+  district: string;
+  notes: string;
+  correlationId: string;
+  timestamp: string;
+};
+
+export type CaseEventsResult = {
+  caseId: string;
+  appliedFilter: string[];
+  count: number;
+  events: CaseEvent[];
+};
+
 type ManualIncidentCreatedEvent = {
   caseId: bigint;
   auditEventId: bigint;
@@ -129,6 +154,44 @@ const RESOURCE_EVENT_TYPES = [
   "RESOURCE_ASSIGNED",
   "RESCUE_DISPATCHED",
 ] as const;
+
+function mapAuditEventRecordToCaseEvent(auditEvent: AuditEventRecord): CaseEvent {
+  return {
+    auditEventId: auditEvent.id.toString(),
+    caseId: auditEvent.caseId.toString(),
+    eventId: auditEvent.eventId,
+    eventType: auditEvent.eventType,
+    incidentId: auditEvent.incidentId,
+    resourceId: auditEvent.resourceId,
+    alertId: auditEvent.alertId,
+    performedBy: auditEvent.performedBy,
+    performedRole: auditEvent.performedRole,
+    previousStatus: auditEvent.previousStatus,
+    newStatus: auditEvent.newStatus,
+    district: auditEvent.district,
+    notes: auditEvent.notes,
+    correlationId: auditEvent.correlationId,
+    timestamp: auditEvent.timestamp.toString(),
+  };
+}
+
+async function getAuditEventsByCaseId(caseId: string): Promise<AuditEventRecord[]> {
+  const caseExists = await incidentAuditLogContract.doesCaseExist(caseId);
+
+  if (!caseExists) {
+    throw new CaseNotFoundError();
+  }
+
+  const auditEventIds = await incidentAuditLogContract.getEventIdsByCaseId(caseId);
+
+  return Promise.all(
+    auditEventIds.map((auditEventId: bigint) =>
+      incidentAuditLogContract
+        .getFunction("getEvent")
+        .staticCall(auditEventId) as Promise<AuditEventRecord>,
+    ),
+  );
+}
 
 function readManualIncidentCreatedEvent(
   receipt: TransactionReceipt,
@@ -253,21 +316,7 @@ export async function getManualIncidentCasesFromChain(): Promise<ManualIncidentC
 export async function getResourceEventsByCaseIdFromChain(
   caseId: string,
 ): Promise<ResourceEventsByCaseIdResult> {
-  const caseExists = await incidentAuditLogContract.doesCaseExist(caseId);
-
-  if (!caseExists) {
-    throw new CaseNotFoundError();
-  }
-
-  const auditEventIds = await incidentAuditLogContract.getEventIdsByCaseId(caseId);
-
-  const auditEvents = await Promise.all(
-    auditEventIds.map((auditEventId: bigint) =>
-      incidentAuditLogContract
-        .getFunction("getEvent")
-        .staticCall(auditEventId) as Promise<AuditEventRecord>,
-    ),
-  );
+  const auditEvents = await getAuditEventsByCaseId(caseId);
 
   const events: ResourceEvent[] = auditEvents
     .filter((auditEvent) =>
@@ -275,27 +324,31 @@ export async function getResourceEventsByCaseIdFromChain(
         auditEvent.eventType as (typeof RESOURCE_EVENT_TYPES)[number],
       ),
     )
-    .map((auditEvent) => ({
-      auditEventId: auditEvent.id.toString(),
-      caseId: auditEvent.caseId.toString(),
-      eventId: auditEvent.eventId,
-      eventType: auditEvent.eventType,
-      incidentId: auditEvent.incidentId,
-      resourceId: auditEvent.resourceId,
-      alertId: auditEvent.alertId,
-      performedBy: auditEvent.performedBy,
-      performedRole: auditEvent.performedRole,
-      previousStatus: auditEvent.previousStatus,
-      newStatus: auditEvent.newStatus,
-      district: auditEvent.district,
-      notes: auditEvent.notes,
-      correlationId: auditEvent.correlationId,
-      timestamp: auditEvent.timestamp.toString(),
-    }));
+    .map(mapAuditEventRecordToCaseEvent);
 
   return {
     caseId,
     includedEventTypes: ["RESOURCE_ASSIGNED", "RESCUE_DISPATCHED"],
+    count: events.length,
+    events,
+  };
+}
+
+export async function getCaseEventsFromChain(
+  caseId: string,
+  eventTypes: string[] = [],
+): Promise<CaseEventsResult> {
+  const auditEvents = await getAuditEventsByCaseId(caseId);
+
+  const events = auditEvents
+    .map(mapAuditEventRecordToCaseEvent)
+    .filter((event) =>
+      eventTypes.length === 0 ? true : eventTypes.includes(event.eventType),
+    );
+
+  return {
+    caseId,
+    appliedFilter: eventTypes,
     count: events.length,
     events,
   };

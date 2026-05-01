@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import {
   createAuditCase,
+  getCaseEvents,
   getManualIncidentCases,
   getResourceEventsByCaseId,
   logAuditEvent,
@@ -10,6 +11,7 @@ import {
 const auditRouter = Router();
 
 auditRouter.get("/cases", getManualIncidentCases);
+auditRouter.get("/cases/:caseId/events", getCaseEvents);
 auditRouter.get("/cases/:caseId/resource-events", getResourceEventsByCaseId);
 auditRouter.post("/cases", createAuditCase);
 auditRouter.post("/events", logAuditEvent);

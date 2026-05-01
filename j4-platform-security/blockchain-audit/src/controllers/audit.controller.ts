@@ -3,6 +3,7 @@ import type { Request, Response } from "express";
 import {
   CaseNotFoundError,
   createManualIncidentAuditCase,
+  getCaseEventsFromChain,
   getManualIncidentCasesFromChain,
   getResourceEventsByCaseIdFromChain,
   type CreateAuditCaseInput,
@@ -131,6 +132,50 @@ export async function getManualIncidentCases(
       error instanceof Error
         ? error.message
         : "Failed to get manual incident cases";
+
+    return response.status(500).json(errorResponse(message));
+  }
+}
+
+function getEventTypesFilter(value: unknown): string[] {
+  const rawValue = Array.isArray(value) ? value.join(",") : value;
+
+  if (typeof rawValue !== "string") {
+    return [];
+  }
+
+  return rawValue
+    .split(",")
+    .map((eventType) => eventType.trim())
+    .filter((eventType) => eventType !== "");
+}
+
+export async function getCaseEvents(request: Request, response: Response) {
+  const caseIdParam = Array.isArray(request.params.caseId)
+    ? request.params.caseId[0]
+    : request.params.caseId;
+
+  const caseId = getPositiveInteger(caseIdParam);
+
+  if (!caseId) {
+    return response
+      .status(400)
+      .json(errorResponse("caseId must be a positive integer"));
+  }
+
+  const eventTypes = getEventTypesFilter(request.query.eventTypes);
+
+  try {
+    const result = await getCaseEventsFromChain(caseId, eventTypes);
+
+    return response.status(200).json(successResponse(result));
+  } catch (error) {
+    if (error instanceof CaseNotFoundError) {
+      return response.status(404).json(errorResponse("caseId does not exist"));
+    }
+
+    const message =
+      error instanceof Error ? error.message : "Failed to get case events";
 
     return response.status(500).json(errorResponse(message));
   }
