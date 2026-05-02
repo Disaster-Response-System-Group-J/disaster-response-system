@@ -1,14 +1,8 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import 'package:uuid/uuid.dart';
 
-import '../models/event_model.dart';
-import '../services/database_helper.dart';
+import '../services/offline_queue_manager.dart';
 import '../services/gps_service.dart';
 import '../services/image_service.dart';
-import '../utills/constants.dart';
 import '../widgets/form_widgets.dart';
 
 class DataReportForm extends StatefulWidget {
@@ -54,10 +48,6 @@ class _DataReportFormState extends State<DataReportForm> {
     });
 
     try {
-      final eventId = const Uuid().v4();
-      final timestamp = DateFormat("yyyy-MM-ddTHH:mm:ss'Z'")
-          .format(DateTime.now().toUtc());
-
       final payload = <String, dynamic>{
         'data_type': _selectedType,
         'description': _descriptionController.text.trim(),
@@ -65,22 +55,14 @@ class _DataReportFormState extends State<DataReportForm> {
         'photo_attached': false,
       };
 
-      final event = EventModel(
-        eventId: eventId,
-        type: 'DATA_REPORT',
-        data: jsonEncode(payload),
-        status: AppConstants.statusQueued,
-        timestampCreated: timestamp,
-      );
-
-      await DatabaseHelper.instance.saveEvent(event);
+      await OfflineQueueManager().addEvent(payload, 'DATA_REPORT');
 
       if (!mounted) {
         return;
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Data report saved to queue')),
+        const SnackBar(content: Text('Saved locally')),
       );
 
       _formKey.currentState!.reset();
