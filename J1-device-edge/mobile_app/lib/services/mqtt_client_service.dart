@@ -54,7 +54,7 @@ class MqttClientService {
 
     client.publishMessage(
       MqttConfig.topic,
-      MqttQos.atLeastOnce, // QoS 1
+      MqttQos.atLeastOnce,
       builder.payload!,
     );
 

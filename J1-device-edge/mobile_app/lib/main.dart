@@ -6,16 +6,11 @@ import 'services/sync_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // 🔹 Day 1: Test SQLite
   await Day1DatabaseTest.runTest();
-
-  // 🔹 Day 2: Test MQTT
   final mqttService = MqttClientService();
   await mqttService.connect();
   mqttService.publish("Test message from J1");
 
-  //   Day 3: sync queued events (handled in SyncService)
   final syncService = SyncService();
   await syncService.start();
 

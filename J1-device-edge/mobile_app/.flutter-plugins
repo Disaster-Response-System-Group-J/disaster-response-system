@@ -1,4 +1,9 @@
 # This is a generated file; do not edit or check into version control.
+geolocator=/home/virusan/.pub-cache/hosted/pub.dev/geolocator-13.0.4/
+geolocator_android=/home/virusan/.pub-cache/hosted/pub.dev/geolocator_android-4.6.2/
+geolocator_apple=/home/virusan/.pub-cache/hosted/pub.dev/geolocator_apple-2.3.13/
+geolocator_web=/home/virusan/.pub-cache/hosted/pub.dev/geolocator_web-4.1.3/
+geolocator_windows=/home/virusan/.pub-cache/hosted/pub.dev/geolocator_windows-0.2.5/
 sqflite=/home/virusan/.pub-cache/hosted/pub.dev/sqflite-2.4.1/
 sqflite_android=/home/virusan/.pub-cache/hosted/pub.dev/sqflite_android-2.4.0/
 sqflite_darwin=/home/virusan/.pub-cache/hosted/pub.dev/sqflite_darwin-2.4.1+1/
