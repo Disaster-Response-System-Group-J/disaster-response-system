@@ -1,9 +1,7 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 
 import '../services/database_helper.dart';
-import '../models/event_model.dart';
+import '../models/request_model.dart';
 
 class MyRequestsScreen extends StatefulWidget {
   const MyRequestsScreen({super.key});
@@ -24,11 +22,11 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
     return SafeArea(
       child: RefreshIndicator(
         onRefresh: _refresh,
-        child: FutureBuilder<List<EventModel>>(
-          future: _databaseHelper.getAllEvents(),
+        child: FutureBuilder<List<RequestModel>>(
+          future: _databaseHelper.getRequests(),
           builder: (context, snapshot) {
-            final List<EventModel> events =
-                snapshot.data ?? const <EventModel>[];
+            final List<RequestModel> requests =
+                snapshot.data ?? const <RequestModel>[];
 
             return ListView(
               physics: const AlwaysScrollableScrollPhysics(),
@@ -51,7 +49,7 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
                       child: CircularProgressIndicator(),
                     ),
                   )
-                else if (events.isEmpty)
+                else if (requests.isEmpty)
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 48),
                     child: Center(
@@ -59,16 +57,16 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
                     ),
                   )
                 else
-                  ...events.map(
-                    (event) => Card(
+                  ...requests.map(
+                    (request) => Card(
                       margin: const EdgeInsets.only(bottom: 12),
                       child: ListTile(
-                        title: Text(_eventTitle(event)),
+                        title: Text(request.type),
                         subtitle: Text(
-                          '${_summaryFor(event)}\nCreated: ${event.timestampCreated}',
+                          '${request.description}\nLocation: ${request.location}',
                         ),
                         isThreeLine: true,
-                        trailing: _StatusBadge(status: event.status),
+                        trailing: _StatusBadge(status: request.status),
                       ),
                     ),
                   ),
@@ -78,39 +76,6 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
         ),
       ),
     );
-  }
-
-  String _eventTitle(EventModel event) {
-    return switch (event.type) {
-      'HELP_REQUEST' => 'Help Request',
-      'DATA_REPORT' => 'Data Report',
-      _ => event.type,
-    };
-  }
-
-  String _summaryFor(EventModel event) {
-    try {
-      final data = jsonDecode(event.data);
-      if (data is Map<String, dynamic>) {
-        final requestType = data['request_type'] ?? data['data_type'];
-        final description = data['description'];
-        final location = data['location'];
-
-        final parts = <String>[
-          if (requestType != null) 'Type: $requestType',
-          if (location != null) 'Location: $location',
-          if (description != null) 'Description: $description',
-        ];
-
-        if (parts.isNotEmpty) {
-          return parts.join(' | ');
-        }
-      }
-    } catch (_) {
-      // Fall back to the raw payload below.
-    }
-
-    return event.data;
   }
 }
 
