@@ -67,6 +67,8 @@ services:
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin123
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
     ports:
       - "8180:8080"
     healthcheck:
@@ -92,16 +94,23 @@ services:
       timeout: 5s
       retries: 5
 
+  # ── PostgreSQL Exporter (Metrics for Prometheus) ─────────────────────────
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    environment:
+      DATA_SOURCE_NAME: postgresql://disaster:disaster123@postgres:5432/disasterdb?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "9187:9187"
+
   # ── Vault (Secrets Management) ────────────────────────────────────────────
   vault:
     image: hashicorp/vault:latest
-    environment:
-      VAULT_DEV_ROOT_TOKEN_ID: dev-root-token
-      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+    command: server -dev -dev-root-token-id=dev-root-token -dev-listen-address=0.0.0.0:8200
     ports:
       - "8200:8200"
-    cap_add:
-      - IPC_LOCK
     healthcheck:
       test: ["CMD", "vault", "status"]
       interval: 10s
@@ -118,6 +127,8 @@ services:
     depends_on:
       kong:
         condition: service_healthy
+      postgres-exporter:
+        condition: service_started
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
       interval: 10s
@@ -133,6 +144,8 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: admin123
     volumes:
       - grafana-data:/var/lib/grafana
+      - ./j4-platform-security/grafana/provisioning:/etc/grafana/provisioning
+      - ./j4-platform-security/grafana/dashboards:/var/lib/grafana/dashboards
     depends_on:
       prometheus:
         condition: service_healthy

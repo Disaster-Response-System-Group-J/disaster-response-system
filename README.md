@@ -106,6 +106,10 @@ Once `docker compose up -d` completes, the following are available:
 | **Prometheus** | http://localhost:9090 | — | Metrics collection & querying |
 | **PostgreSQL** | `localhost:5432` | `disaster` / `disaster123` | Shared application database (dev only) |
 
+Grafana loads a prebuilt dashboard automatically after startup:
+
+- `Disaster Response System Overview` at `http://localhost:3000/d/drs-overview/disaster-response-system-overview`
+
 > ⚠️ **Important:** The credentials above are for **local development only**. Never use these in a production environment.
 
 ---
