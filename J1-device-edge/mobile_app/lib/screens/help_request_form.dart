@@ -1,14 +1,8 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import 'package:uuid/uuid.dart';
 
-import '../models/event_model.dart';
-import '../services/database_helper.dart';
+import '../services/offline_queue_manager.dart';
 import '../services/gps_service.dart';
 import '../services/image_service.dart';
-import '../utills/constants.dart';
 import '../widgets/form_widgets.dart';
 
 class HelpRequestForm extends StatefulWidget {
@@ -57,9 +51,6 @@ class _HelpRequestFormState extends State<HelpRequestForm> {
     });
 
     try {
-      final eventId = const Uuid().v4();
-      final timestamp = DateFormat("yyyy-MM-ddTHH:mm:ss'Z'")
-          .format(DateTime.now().toUtc());
       final peopleCount = int.tryParse(_peopleCountController.text) ?? 1;
 
       final payload = <String, dynamic>{
@@ -72,22 +63,14 @@ class _HelpRequestFormState extends State<HelpRequestForm> {
         'photo_attached': false,
       };
 
-      final event = EventModel(
-        eventId: eventId,
-        type: 'HELP_REQUEST',
-        data: jsonEncode(payload),
-        status: AppConstants.statusQueued,
-        timestampCreated: timestamp,
-      );
-
-      await DatabaseHelper.instance.saveEvent(event);
+      await OfflineQueueManager().addEvent(payload, 'HELP_REQUEST');
 
       if (!mounted) {
         return;
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Saved offline, syncing when possible')),
+        const SnackBar(content: Text('Saved locally')),
       );
 
       _formKey.currentState!.reset();
