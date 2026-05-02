@@ -47,6 +47,7 @@ app.*.map.json
 .env
 .env.local
 .env.*.local
+*.apk
 
 # OS
 .DS_Store
