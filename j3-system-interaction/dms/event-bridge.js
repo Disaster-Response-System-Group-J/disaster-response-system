@@ -9,7 +9,7 @@ const io = new Server(3001, {
 // 2. Initialize Kafka Client 
 const kafka = new Kafka({
   clientId: 'j3-event-bridge',
-  brokers: ['localhost:9092']
+  brokers: [process.env.KAFKA_BROKER || 'localhost:9092']
 });
 
 const consumer = kafka.consumer({ groupId: 'j3-dashboard-group' });
