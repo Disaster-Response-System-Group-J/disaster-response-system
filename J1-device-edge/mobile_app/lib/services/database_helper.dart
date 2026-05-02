@@ -3,6 +3,7 @@ import 'package:sqflite/sqflite.dart';
 
 import '../utills/constants.dart';
 import '../models/event_model.dart';
+import '../models/request_model.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._internal();
@@ -12,9 +13,7 @@ class DatabaseHelper {
   DatabaseHelper._internal();
 
   Future<Database> get database async {
-    if (_database != null) {
-      return _database!;
-    }
+    if (_database != null) return _database!;
 
     _database = await _initDatabase();
     return _database!;
@@ -28,6 +27,7 @@ class DatabaseHelper {
       path,
       version: AppConstants.databaseVersion,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -44,7 +44,11 @@ class DatabaseHelper {
     ''');
   }
 
-    Future<int> saveEvent(EventModel event) async {
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+  
+  }
+
+  Future<int> saveEvent(EventModel event) async {
     final db = await database;
 
     return await db.insert(
@@ -54,7 +58,7 @@ class DatabaseHelper {
     );
   }
 
-    Future<List<EventModel>> getQueuedEvents() async {
+  Future<List<EventModel>> getQueuedEvents() async {
     final db = await database;
 
     final result = await db.query(
@@ -67,7 +71,36 @@ class DatabaseHelper {
     return result.map((map) => EventModel.fromMap(map)).toList();
   }
 
-    Future<int> updateEventStatus({
+  Future<List<EventModel>> getSubmittedEvents() async {
+    final db = await database;
+
+    final result = await db.query(
+      AppConstants.eventsTable,
+      where: 'status = ?',
+      whereArgs: [AppConstants.statusSubmitted],
+      orderBy: 'timestamp_submitted DESC',
+    );
+
+    return result.map((map) => EventModel.fromMap(map)).toList();
+  }
+
+  Future<List<EventModel>> getAllEvents() async {
+    final db = await database;
+
+    final result = await db.query(
+      AppConstants.eventsTable,
+      orderBy: 'timestamp_created DESC',
+    );
+
+    return result.map((map) => EventModel.fromMap(map)).toList();
+  }
+
+  Future<List<RequestModel>> getRequests() async {
+    final events = await getAllEvents();
+    return events.map(RequestModel.fromEvent).toList();
+  }
+
+  Future<int> updateEventStatus({
     required String eventId,
     required String status,
     String? timestampSubmitted,
@@ -85,7 +118,7 @@ class DatabaseHelper {
     );
   }
 
-    Future<int> getQueueCount() async {
+  Future<int> getQueueCount() async {
     final db = await database;
 
     final result = await db.rawQuery(
@@ -100,14 +133,24 @@ class DatabaseHelper {
     return Sqflite.firstIntValue(result) ?? 0;
   }
 
-    Future<List<EventModel>> getAllEvents() async {
+  Future<int> deleteEvent(String eventId) async {
     final db = await database;
 
-    final result = await db.query(
+    return await db.delete(
       AppConstants.eventsTable,
-      orderBy: 'timestamp_created DESC',
+      where: 'event_id = ?',
+      whereArgs: [eventId],
     );
+  }
 
-    return result.map((map) => EventModel.fromMap(map)).toList();
+  Future<int> clearAllEvents() async {
+    final db = await database;
+    return await db.delete(AppConstants.eventsTable);
+  }
+
+  Future<void> closeDatabase() async {
+    final db = await database;
+    await db.close();
+    _database = null;
   }
 }
