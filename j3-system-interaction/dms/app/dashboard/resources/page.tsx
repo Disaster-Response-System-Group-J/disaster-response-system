@@ -1,13 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Truck, Search, Shield, MapPin, Activity, CheckCircle2, XCircle, AlertTriangle, ChevronDown } from 'lucide-react';
+import { 
+  Truck, Search, MapPin, Activity, CheckCircle2, 
+  XCircle, ChevronDown, Home 
+} from 'lucide-react';
 import { MOCK_RESOURCES, MOCK_CONFIRMED_INCIDENTS } from '@/data/mock-data';
-import { ResourceType, ResourceStatus, IncidentStatus } from '@/types';
+import { ResourceType, ResourceStatus, IncidentStatus, UserRole } from '@/types';
 import { useAuth } from '@/context/AuthContext';
-import { UserRole } from '@/types';
 import { DISTRICT_NAMES } from '@/data/districts';
-import { useSocket } from '@/context/SocketContext'; // 1. Added socket import
+import { useSocket } from '@/context/SocketContext';
 
 const STATUS_STYLES: Record<string, string> = {
   AVAILABLE: 'bg-green-500/10 text-green-400 border-green-500/20',
@@ -17,47 +19,56 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 const TYPE_ICONS: Record<string, string> = {
-  RESCUE_TEAM: '👷',
-  BOAT: '⛵',
+  RESCUE_TEAM: '🚁',
+  BOAT: '🚤',
   AMBULANCE: '🚑',
-  SHELTER: '🏠',
+  SHELTER: '⛺',
   MEDICAL_TEAM: '⚕️',
   FOOD_WATER: '📦',
 };
 
 export default function ResourcesPage() {
   const { hasPermission, user } = useAuth();
-  const socket = useSocket(); // 2. Initialize socket
-  
+  const socket = useSocket();
+
   const [resources, setResources] = useState(MOCK_RESOURCES);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [districtFilter, setDistrictFilter] = useState<string>('ALL');
-
+  
   const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.includes('NATIONAL')) ? 'ALL' : (user as any)?.assignedDistrict || 'ALL';
 
+  // State for the dispatch modal
   const [assignModal, setAssignModal] = useState<string | null>(null);
   const [selectedIncidentId, setSelectedIncidentId] = useState<string>('');
+
+  // State for Shelter Management Modal
+  const [shelterModal, setShelterModal] = useState<string | null>(null);
+  const [shelterForm, setShelterForm] = useState({ capacity: 0, currentLoad: 0 });
 
   const activeIncidents = MOCK_CONFIRMED_INCIDENTS.filter(
     i => i.status === IncidentStatus.ACTIVE || i.status === IncidentStatus.UNDER_RESPONSE
   );
 
-  // 3. Listen for other users updating resources
   useEffect(() => {
     if (!socket) return;
-
-    const handleResourceUpdated = (data: { resourceId: string, status: ResourceStatus, lastUpdated: string }) => {
+    const handleResourceUpdated = (data: any) => {
       setResources(prev => prev.map(r => 
         r.resourceId === data.resourceId 
-          ? { ...r, status: data.status, lastUpdated: data.lastUpdated } 
+          ? { 
+              ...r, 
+              status: data.status, 
+              lastUpdated: data.lastUpdated,
+              ...(data.clearAssignment && { assignedIncident: undefined, assignedIncidentTitle: undefined }),
+              ...(data.assignedIncident && { assignedIncident: data.assignedIncident, assignedIncidentTitle: data.assignedIncidentTitle }),
+              ...(data.capacity !== undefined && { capacity: data.capacity, currentLoad: data.currentLoad })
+            } 
           : r
       ));
     };
 
     socket.on('dashboard:resource-updated', handleResourceUpdated);
-
     return () => {
       socket.off('dashboard:resource-updated', handleResourceUpdated);
     };
@@ -75,12 +86,10 @@ export default function ResourcesPage() {
   const availableCount = filtered.filter(r => r.status === ResourceStatus.AVAILABLE).length;
   const assignedCount = filtered.filter(r => r.status === ResourceStatus.ASSIGNED || r.status === ResourceStatus.BUSY).length;
 
-  // 4. Update local state AND emit to server
   const handleStatusUpdate = (id: string, newStatus: ResourceStatus) => {
     const timestamp = new Date().toISOString();
     const clearAssignment = newStatus === ResourceStatus.AVAILABLE || newStatus === ResourceStatus.OUT_OF_SERVICE;
     
-    // Optimistic UI update
     setResources(prev => prev.map(r => r.resourceId === id ? { 
       ...r, 
       status: newStatus, 
@@ -88,7 +97,6 @@ export default function ResourcesPage() {
       ...(clearAssignment && { assignedIncident: undefined, assignedIncidentTitle: undefined })
     } : r));
     
-    // Broadcast to server
     if (socket) {
       socket.emit('client:update-resource-status', { 
         resourceId: id, 
@@ -99,7 +107,6 @@ export default function ResourcesPage() {
     }
   };
 
-  // NEW: Handle dispatching a resource to an incident
   const handleDispatch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!assignModal || !selectedIncidentId) return;
@@ -129,6 +136,39 @@ export default function ResourcesPage() {
 
     setAssignModal(null);
     setSelectedIncidentId('');
+  };
+
+  const openShelterModal = (resource: any) => {
+    setShelterModal(resource.resourceId);
+    setShelterForm({ 
+      capacity: resource.capacity || 0, 
+      currentLoad: resource.currentLoad || 0 
+    });
+  };
+
+  const handleShelterUpdate = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!shelterModal) return;
+
+    const timestamp = new Date().toISOString();
+
+    setResources(prev => prev.map(r => r.resourceId === shelterModal ? {
+      ...r,
+      capacity: shelterForm.capacity,
+      currentLoad: shelterForm.currentLoad,
+      lastUpdated: timestamp
+    } : r));
+
+    if (socket) {
+      socket.emit('client:update-resource-status', {
+        resourceId: shelterModal,
+        capacity: shelterForm.capacity,
+        currentLoad: shelterForm.currentLoad,
+        lastUpdated: timestamp
+      });
+    }
+
+    setShelterModal(null);
   };
 
   return (
@@ -231,12 +271,22 @@ export default function ResourcesPage() {
                             </button>
                           ))}
                           
-                          {/* NEW: Dispatch Button */}
+                          {/* Dispatch Button */}
                           {hasPermission('dispatch:resources') && r.status !== ResourceStatus.ASSIGNED && r.status !== ResourceStatus.OUT_OF_SERVICE && (
                             <div className="pt-1 mt-1 border-t border-slate-700">
                               <button onClick={() => setAssignModal(r.resourceId)}
                                 className="w-full text-left px-3 py-2 text-xs font-bold text-blue-400 hover:bg-slate-800 rounded transition-colors">
                                 Dispatch to Incident...
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Manage Shelter Button */}
+                          {hasPermission('manage:shelters') && r.type === ResourceType.SHELTER && (
+                            <div className="pt-1 mt-1 border-t border-slate-700">
+                              <button onClick={() => openShelterModal(r)}
+                                className="w-full text-left px-3 py-2 text-xs font-bold text-teal-400 hover:bg-slate-800 rounded transition-colors">
+                                Manage Shelter Data...
                               </button>
                             </div>
                           )}
@@ -258,7 +308,7 @@ export default function ResourcesPage() {
         </div>
       </div>
 
-      {/* NEW: Dispatch Modal */}
+      {/* Dispatch Modal */}
       {assignModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#131924] border border-slate-700 rounded-xl w-full max-w-md shadow-2xl overflow-hidden">
@@ -294,6 +344,66 @@ export default function ResourcesPage() {
           </div>
         </div>
       )}
+
+      {/* Shelter Management Modal */}
+      {shelterModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#131924] border border-slate-700 rounded-xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="p-4 border-b border-slate-700 flex items-center justify-between">
+              <h3 className="font-bold text-white flex items-center gap-2"><Home size={18} className="text-teal-400" /> Manage Shelter</h3>
+              <button onClick={() => setShelterModal(null)} className="text-slate-400 hover:text-white"><XCircle size={18} /></button>
+            </div>
+            <form onSubmit={handleShelterUpdate} className="p-6">
+              <p className="text-xs text-slate-400 mb-6">
+                Update capacity and current occupancy for shelter <span className="font-bold text-teal-400">{shelterModal}</span>.
+              </p>
+              
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-2">Max Capacity</label>
+                  <input 
+                    type="number" required min="1"
+                    value={shelterForm.capacity} 
+                    onChange={e => setShelterForm({...shelterForm, capacity: parseInt(e.target.value) || 0})}
+                    className="w-full bg-[#0a0f16] border border-slate-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-teal-500 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-2">Current Occupancy</label>
+                  <input 
+                    type="number" required min="0" max={shelterForm.capacity}
+                    value={shelterForm.currentLoad} 
+                    onChange={e => setShelterForm({...shelterForm, currentLoad: parseInt(e.target.value) || 0})}
+                    className="w-full bg-[#0a0f16] border border-slate-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-teal-500 text-white"
+                  />
+                </div>
+              </div>
+
+              {/* Visual Indicator */}
+              <div className="mb-8">
+                <div className="flex justify-between text-[10px] font-bold mb-2">
+                  <span className="text-slate-500">Occupancy Level</span>
+                  <span className={shelterForm.currentLoad / (shelterForm.capacity || 1) > 0.9 ? 'text-red-400' : 'text-teal-400'}>
+                    {Math.round((shelterForm.currentLoad / (shelterForm.capacity || 1)) * 100)}%
+                  </span>
+                </div>
+                <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full rounded-full transition-all ${shelterForm.currentLoad / (shelterForm.capacity || 1) > 0.9 ? 'bg-red-500' : 'bg-teal-500'}`} 
+                    style={{ width: `${Math.min((shelterForm.currentLoad / (shelterForm.capacity || 1)) * 100, 100)}%` }} 
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button type="button" onClick={() => setShelterModal(null)} className="flex-1 py-2.5 bg-slate-800 rounded-lg text-xs font-bold text-slate-300 hover:bg-slate-700 transition-colors">Cancel</button>
+                <button type="submit" className="flex-1 py-2.5 bg-teal-600 rounded-lg text-xs font-bold text-white hover:bg-teal-500 transition-colors">Save Updates</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
