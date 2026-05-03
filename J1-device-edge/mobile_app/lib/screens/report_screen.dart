@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'data_report_form.dart';
 import 'help_request_form.dart';
+import '../widgets/offline_banner.dart';
 
 class ReportScreen extends StatefulWidget {
   const ReportScreen({super.key});
@@ -21,6 +22,7 @@ class _ReportScreenState extends State<ReportScreen> {
         children: [
           Text('Report', style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: 8),
+          const OfflineBanner(),
           Text(
             'Switch between a help request and a field data report.',
             style: Theme.of(context).textTheme.bodyMedium,

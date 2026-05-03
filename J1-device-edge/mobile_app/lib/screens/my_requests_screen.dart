@@ -37,6 +37,7 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 8),
+                const OfflineBanner(),
                 Text(
                   'All locally stored events from SQLite.',
                   style: Theme.of(context).textTheme.bodyMedium,
