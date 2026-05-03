@@ -67,7 +67,7 @@ class MqttClientService {
     client.updates!.listen((messages) {
       final recMess = messages[0].payload as MqttPublishMessage;
       final payloadBytes = recMess.payload.message;
-      final payload = payloadBytes == null ? '' : utf8.decode(payloadBytes);
+      final payload = utf8.decode(payloadBytes);
 
       print('Received message: $payload');
       onMessage?.call(payload);
