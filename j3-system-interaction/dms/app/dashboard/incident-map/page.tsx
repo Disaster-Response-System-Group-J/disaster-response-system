@@ -19,7 +19,7 @@ const SEVERITY_COLORS: Record<string, string> = {
 };
 
 export default function IncidentMapPage() {
-  const { user } = useAuth();
+  const { user, hasPermission} = useAuth();
   const socket = useSocket(); // 3. Initialize Socket
 
   const [viewState, setViewState] = useState(SRI_LANKA_CENTER);
@@ -34,7 +34,23 @@ export default function IncidentMapPage() {
   const [districtFilter, setDistrictFilter] = useState<string>('ALL');
   const [showFilters, setShowFilters] = useState(false);
 
-const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.includes('NATIONAL')) ? 'ALL' : (user as any)?.assignedDistrict || 'ALL';
+  const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.includes('NATIONAL')) ? 'ALL' : (user as any)?.assignedDistrict || 'ALL';
+
+  const handleStatusUpdate = (incidentId: string, newStatus: IncidentStatus) => {
+    // Optimistic UI update
+    setMapPins(prev => prev.map(inc => 
+      inc.incidentId === incidentId ? { ...inc, status: newStatus } : inc
+    ));
+    
+    if (selectedIncident?.incidentId === incidentId) {
+      setSelectedIncident({ ...selectedIncident, status: newStatus });
+    }
+
+    // Emit to backend
+    if (socket) {
+      socket.emit('client:update-incident-status', { incidentId, status: newStatus, timestamp: new Date().toISOString() });
+    }
+  };
   // 5. Listen for incoming reports to drop new pins
   useEffect(() => {
     if (!socket) return;
@@ -139,9 +155,21 @@ const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.inc
                 <h3 className="text-sm font-bold mb-1">{selectedIncident.title}</h3>
                 <p className="text-[10px] text-slate-400 mb-3 flex items-center gap-1"><MapPin size={10} /> {selectedIncident.district}</p>
                 <div className="space-y-2 mb-4 text-xs">
-                  <div className="flex justify-between text-slate-300">
+                  <div className="flex justify-between items-center text-slate-300">
                     <span className="text-slate-500">Status</span>
-                    <span className="font-semibold">{selectedIncident.status.replace('_', ' ')}</span>
+                    {hasPermission('update:incident-status') ? (
+                      <select 
+                        value={selectedIncident.status}
+                        onChange={(e) => handleStatusUpdate(selectedIncident.incidentId, e.target.value as IncidentStatus)}
+                        className="bg-[#0a0f16] border border-slate-700 text-xs font-semibold text-slate-200 rounded px-2 py-1 outline-none focus:border-blue-500 cursor-pointer"
+                      >
+                        {Object.values(IncidentStatus).map(s => (
+                          <option key={s} value={s}>{s.replace('_', ' ')}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="font-semibold">{selectedIncident.status.replace('_', ' ')}</span>
+                    )}
                   </div>
                   <div className="flex justify-between text-slate-300">
                     <span className="text-slate-500">Affected</span>
