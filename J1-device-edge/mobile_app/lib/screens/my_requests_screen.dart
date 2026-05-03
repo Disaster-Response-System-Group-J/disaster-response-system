@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/database_helper.dart';
 import '../models/request_model.dart';
+import '../widgets/offline_banner.dart';
 
 class MyRequestsScreen extends StatefulWidget {
   const MyRequestsScreen({super.key});
