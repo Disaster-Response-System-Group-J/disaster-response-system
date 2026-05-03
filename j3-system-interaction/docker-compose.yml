@@ -1,5 +1,5 @@
 services:
-  # 1. Primary Database (Kept your exact setup)
+  # 1. Primary Database
   postgres:
     image: postgres:16-alpine
     container_name: j3-postgres
@@ -18,20 +18,21 @@ services:
     networks:
       - j3-net
 
-  # 2. Apache Kafka (The Central Message Broker)
+  # 2. Apache Kafka (KRaft mode, dual-listener: EXTERNAL for host, INTERNAL for containers)
   kafka:
     image: apache/kafka:latest
     container_name: j4-kafka
     restart: unless-stopped
     ports:
-      - "9092:9092"
+      - "9092:9092"   # host access
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_LISTENERS: EXTERNAL://:9092,INTERNAL://:29092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: EXTERNAL://localhost:9092,INTERNAL://kafka:29092
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT,INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
@@ -39,7 +40,40 @@ services:
     networks:
       - j3-net
 
-  # 3. Next.js Command Center (Kept your exact setup)
+  # 3. Event Bridge (Kafka <-> Socket.IO relay, port 3001)
+  event-bridge:
+    build:
+      context: ./dms
+      dockerfile: Dockerfile.mock
+    container_name: j3-event-bridge
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      KAFKA_BROKER: kafka:29092
+    depends_on:
+      kafka:
+        condition: service_started
+    networks:
+      - j3-net
+
+  # 4. Mock Producer (feeds test SOS/sensor/alert data into Kafka)
+  mock-producer:
+    build:
+      context: ./dms
+      dockerfile: Dockerfile.mock
+    container_name: j3-mock-producer
+    restart: unless-stopped
+    command: ["node", "mock-producer.js"]
+    environment:
+      KAFKA_BROKER: kafka:29092
+    depends_on:
+      kafka:
+        condition: service_started
+    networks:
+      - j3-net
+
+  # 5. Next.js Command Center
   dms:
     build:
       context: ./dms
@@ -58,6 +92,8 @@ services:
         condition: service_healthy
       kafka:
         condition: service_started
+      event-bridge:
+        condition: service_started
     networks:
       - j3-net
 
@@ -67,7 +103,3 @@ volumes:
 networks:
   j3-net:
     driver: bridge
-
-# temporary docker compose file for development, will be removed in the future
-# when we have other teams running their services in docker as well. 
-# For now, this is just to make it easier for us to run the DMS without having to set up a local postgres database and mock server.
