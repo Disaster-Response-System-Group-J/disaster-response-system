@@ -5,7 +5,7 @@ import Map, { Marker, NavigationControl, Popup, ViewStateChangeEvent } from 'rea
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Shield, Filter, MapPin, AlertTriangle, X, ChevronDown, CheckCircle2, Clock } from 'lucide-react';
 import { MOCK_CONFIRMED_INCIDENTS } from '@/data/mock-data';
-import { IncidentSeverity, IncidentStatus, DisasterType, ConfirmedIncident, UserRole } from '@/types';
+import { IncidentSeverity, IncidentStatus, DISASTER_TYPES, ConfirmedIncident, UserRole } from '@/types';
 import { SRI_LANKA_CENTER, DISTRICT_NAMES } from '@/data/districts';
 import { useAuth } from '@/context/AuthContext';
 import { useSocket } from '@/context/SocketContext'; // 2. Import Socket
@@ -186,7 +186,7 @@ export default function IncidentMapPage() {
                 <label className="block text-[10px] font-bold text-slate-400 mb-2 tracking-widest uppercase">DISASTER TYPE</label>
                 <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="w-full bg-[#0a0f16] border border-slate-700 rounded-lg px-3 py-2 text-xs font-semibold text-slate-300 focus:outline-none">
                   <option value="ALL">All Types</option>
-                  {Object.values(DisasterType).map(t => <option key={t} value={t}>{t}</option>)}
+                  {Object.values(DISASTER_TYPES).map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
               <div>

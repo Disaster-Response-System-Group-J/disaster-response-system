@@ -11,11 +11,17 @@ export enum UserRole {
   ADMIN = 'ADMIN',
 }
 
-export enum DisasterType {
-  FLOOD = 'FLOOD',
-  LANDSLIDE = 'LANDSLIDE',
-  OTHER = 'OTHER',
-}
+// ── Enums ────────────────────────────────────────────────────
+
+// Core disaster types (always available)
+export const DISASTER_TYPES = {
+  FLOOD: 'FLOOD',
+  LANDSLIDE: 'LANDSLIDE',
+  DROUGHT: 'DROUGHT',
+  OTHER: 'OTHER', // For admin-defined disasters
+} as const;
+
+export type DisasterType = typeof DISASTER_TYPES[keyof typeof DISASTER_TYPES] | string; // Allow custom disaster types
 
 export enum ReportSource {
   J1_SOS_APP = 'J1_SOS_APP',
@@ -182,7 +188,9 @@ export interface DashboardSummary {
   incidents: {
     floods: number;
     landslides: number;
+    droughts: number;
     other: number;
+    [key: string]: number; // Allow for custom disaster types
   };
   resources: {
     availableTeams: { current: number; total: number };

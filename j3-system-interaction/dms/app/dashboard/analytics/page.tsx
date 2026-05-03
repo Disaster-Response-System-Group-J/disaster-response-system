@@ -28,13 +28,13 @@ const districtData = DISTRICT_NAMES
   .sort((a, b) => b.incidents - a.incidents);
 
 const trendData = [
-  { day: 'Mon', floods: 2, landslides: 0 },
-  { day: 'Tue', floods: 3, landslides: 1 },
-  { day: 'Wed', floods: 5, landslides: 1 },
-  { day: 'Thu', floods: 4, landslides: 2 },
-  { day: 'Fri', floods: 6, landslides: 2 },
-  { day: 'Sat', floods: 8, landslides: 3 },
-  { day: 'Sun', floods: 5, landslides: 2 },
+  { day: 'Mon', floods: 2, landslides: 0, droughts: 0, other: 1 },
+  { day: 'Tue', floods: 3, landslides: 1, droughts: 0, other: 0 },
+  { day: 'Wed', floods: 5, landslides: 1, droughts: 1, other: 0 },
+  { day: 'Thu', floods: 4, landslides: 2, droughts: 1, other: 1 },
+  { day: 'Fri', floods: 6, landslides: 2, droughts: 2, other: 0 },
+  { day: 'Sat', floods: 8, landslides: 3, droughts: 1, other: 1 },
+  { day: 'Sun', floods: 5, landslides: 2, droughts: 1, other: 0 },
 ];
 
 export default function AnalyticsPage() {
@@ -122,6 +122,8 @@ export default function AnalyticsPage() {
                 />
                 <Line type="monotone" dataKey="floods" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4, fill: '#3b82f6' }} name="Floods" />
                 <Line type="monotone" dataKey="landslides" stroke="#f97316" strokeWidth={3} dot={{ r: 4, fill: '#f97316' }} name="Landslides" />
+                <Line type="monotone" dataKey="droughts" stroke="#eab308" strokeWidth={3} dot={{ r: 4, fill: '#eab308' }} name="Droughts" />
+                <Line type="monotone" dataKey="other" stroke="#8b5cf6" strokeWidth={3} dot={{ r: 4, fill: '#8b5cf6' }} name="Other" />
               </LineChart>
             </ResponsiveContainer>
           </div>

@@ -123,9 +123,10 @@ export default function DashboardPage() {
                     <TrendingUp className="w-3 h-3 mr-1" /> +{data.activeIncidentsChange} in 24h
                   </span>
                 </div>
-                <div className="grid grid-cols-3 gap-3 pt-4 border-t border-slate-800/50">
+                <div className="grid grid-cols-4 gap-3 pt-4 border-t border-slate-800/50">
                   <Stat label="FLOODS" value={data.incidents.floods} />
                   <Stat label="LANDSLIDES" value={data.incidents.landslides} />
+                  <Stat label="DROUGHTS" value={data.incidents.droughts} />
                   <Stat label="OTHER" value={data.incidents.other} />
                 </div>
               </div>

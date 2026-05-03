@@ -1,6 +1,6 @@
 import {
   IncomingReport, ConfirmedIncident, Resource, Alert, ShelterInfo, EmergencyContact, User,
-  UserRole, DisasterType, ReportSource, VerificationStatus, IncidentStatus, IncidentSeverity,
+  UserRole, DISASTER_TYPES, ReportSource, VerificationStatus, IncidentStatus, IncidentSeverity,
   ResourceType, ResourceStatus, AlertType, DashboardSummary,
 } from '@/types';
 
@@ -14,21 +14,21 @@ export const MOCK_USERS: (User & { password: string, assignedDistrict?: string }
 // ── Mock Incoming Reports ────────────────────────────────────
 export const MOCK_INCOMING_REPORTS: IncomingReport[] = [
   {
-    reportId: 'RPT-001', source: ReportSource.J3_PUBLIC_PORTAL, disasterType: DisasterType.FLOOD,
+    reportId: 'RPT-001', source: ReportSource.J3_PUBLIC_PORTAL, disasterType: DISASTER_TYPES.FLOOD,
     district: 'Ratnapura', latitude: 6.6828, longitude: 80.4025,
     description: 'Severe flooding near Kalu Ganga river. Water level rising rapidly. Several houses submerged in Ratnapura town area.',
     contact: '+94 71 234 5678', mediaUrls: ['/uploads/flood-ratnapura-01.jpg'],
     verificationStatus: VerificationStatus.PENDING_REVIEW, createdAt: '2026-04-27T08:30:00Z',
   },
   {
-    reportId: 'RPT-002', source: ReportSource.J1_SOS_APP, disasterType: DisasterType.LANDSLIDE,
+    reportId: 'RPT-002', source: ReportSource.J1_SOS_APP, disasterType: DISASTER_TYPES.LANDSLIDE,
     district: 'Kegalle', latitude: 7.2513, longitude: 80.3464,
     description: 'SOS: Landslide blocking Kegalle-Colombo road near Mawanella.',
     contact: '', mediaUrls: [], sosId: 'SOS-4421', sosType: 'LANDSLIDE', deviceId: 'DEV-889',
     verificationStatus: VerificationStatus.PENDING_REVIEW, createdAt: '2026-04-27T09:15:00Z',
   },
   {
-    reportId: 'RPT-003', source: ReportSource.J3_PUBLIC_PORTAL, disasterType: DisasterType.FLOOD,
+    reportId: 'RPT-003', source: ReportSource.J3_PUBLIC_PORTAL, disasterType: DISASTER_TYPES.FLOOD,
     district: 'Colombo', latitude: 6.9350, longitude: 79.8538,
     description: 'Flash flooding in Kaduwela area. Roads impassable. Families stranded on rooftops.',
     contact: '+94 77 987 6543', mediaUrls: ['/uploads/flood-kaduwela-01.jpg', '/uploads/flood-kaduwela-02.jpg'],
@@ -36,14 +36,14 @@ export const MOCK_INCOMING_REPORTS: IncomingReport[] = [
     reviewedBy: 'OFF-001', reviewedAt: '2026-04-27T08:00:00Z',
   },
   {
-    reportId: 'RPT-004', source: ReportSource.J1_SOS_APP, disasterType: DisasterType.FLOOD,
+    reportId: 'RPT-004', source: ReportSource.J1_SOS_APP, disasterType: DISASTER_TYPES.FLOOD,
     district: 'Kalutara', latitude: 6.5854, longitude: 80.0817,
     description: 'SOS: Water entering homes in Kalutara North. Urgent evacuation needed.',
     contact: '+94 76 111 2233', mediaUrls: [], sosId: 'SOS-4422', sosType: 'FLOOD', deviceId: 'DEV-112',
     verificationStatus: VerificationStatus.PENDING_REVIEW, createdAt: '2026-04-27T10:00:00Z',
   },
   {
-    reportId: 'RPT-005', source: ReportSource.WEATHER_API, disasterType: DisasterType.FLOOD,
+    reportId: 'RPT-005', source: ReportSource.WEATHER_API, disasterType: DISASTER_TYPES.FLOOD,
     district: 'Gampaha', latitude: 7.0840, longitude: 80.0098,
     description: 'Automated alert: Attanagalu Oya water level exceeded danger mark at 5.2m.',
     contact: '', mediaUrls: [],
@@ -51,28 +51,28 @@ export const MOCK_INCOMING_REPORTS: IncomingReport[] = [
     reviewedBy: 'OFF-001', reviewedAt: '2026-04-27T06:45:00Z',
   },
   {
-    reportId: 'RPT-006', source: ReportSource.J3_PUBLIC_PORTAL, disasterType: DisasterType.LANDSLIDE,
+    reportId: 'RPT-006', source: ReportSource.J3_PUBLIC_PORTAL, disasterType: DISASTER_TYPES.LANDSLIDE,
     district: 'Badulla', latitude: 6.9934, longitude: 81.0550,
     description: 'Minor earth slip near Haputale tea plantations. No casualties reported yet but road partially blocked.',
     contact: '+94 72 555 6677', mediaUrls: ['/uploads/slip-badulla-01.jpg'],
     verificationStatus: VerificationStatus.PENDING_REVIEW, createdAt: '2026-04-27T11:20:00Z',
   },
   {
-    reportId: 'RPT-007', source: ReportSource.J1_SENSOR_SYSTEM, disasterType: DisasterType.FLOOD,
+    reportId: 'RPT-007', source: ReportSource.J1_SENSOR_SYSTEM, disasterType: DISASTER_TYPES.FLOOD,
     district: 'Galle', latitude: 6.0535, longitude: 80.2210,
     description: 'Sensor alert: Gin Ganga water level at 4.8m — approaching critical threshold.',
     contact: '', mediaUrls: [],
     verificationStatus: VerificationStatus.VERIFIED, createdAt: '2026-04-27T09:50:00Z',
   },
   {
-    reportId: 'RPT-008', source: ReportSource.J3_PUBLIC_PORTAL, disasterType: DisasterType.FLOOD,
+    reportId: 'RPT-008', source: ReportSource.J3_PUBLIC_PORTAL, disasterType: DISASTER_TYPES.FLOOD,
     district: 'Matara', latitude: 5.9485, longitude: 80.5353,
     description: 'Duplicate report — same flooding event as RPT-007 in Galle downstream.',
     contact: '+94 71 999 8877', mediaUrls: [],
     verificationStatus: VerificationStatus.DUPLICATE, createdAt: '2026-04-27T10:30:00Z',
   },
   {
-    reportId: 'RPT-009', source: ReportSource.OFFICER_CREATED, disasterType: DisasterType.LANDSLIDE,
+    reportId: 'RPT-009', source: ReportSource.OFFICER_CREATED, disasterType: DISASTER_TYPES.LANDSLIDE,
     district: 'Nuwara Eliya', latitude: 6.9497, longitude: 80.7891,
     description: 'Field observation: Crack formation spotted on hillside near Ramboda. Risk of major landslide.',
     contact: '', mediaUrls: [],
@@ -80,72 +80,115 @@ export const MOCK_INCOMING_REPORTS: IncomingReport[] = [
     reviewedBy: 'OFF-001', reviewedAt: '2026-04-27T12:00:00Z',
   },
   {
-    reportId: 'RPT-010', source: ReportSource.J3_PUBLIC_PORTAL, disasterType: DisasterType.FLOOD,
+    reportId: 'RPT-010', source: ReportSource.J3_PUBLIC_PORTAL, disasterType: DISASTER_TYPES.FLOOD,
     district: 'Colombo', latitude: 6.9100, longitude: 79.8900,
     description: 'False report — area confirmed dry by field team.',
     contact: '+94 70 000 1122', mediaUrls: [],
     verificationStatus: VerificationStatus.REJECTED, createdAt: '2026-04-27T08:10:00Z',
     officerNotes: 'Field team confirmed no flooding. Area is dry.',
   },
+  {
+    reportId: 'RPT-011', source: ReportSource.J3_PUBLIC_PORTAL, disasterType: DISASTER_TYPES.DROUGHT,
+    district: 'Anuradhapura', latitude: 8.3114, longitude: 80.4037,
+    description: 'Severe water shortage in Anuradhapura district. Wells drying up, crops failing.',
+    contact: '+94 25 222 3344', mediaUrls: ['/uploads/drought-anuradhapura-01.jpg'],
+    verificationStatus: VerificationStatus.PENDING_REVIEW, createdAt: '2026-04-27T14:00:00Z',
+  },
+  {
+    reportId: 'RPT-012', source: ReportSource.WEATHER_API, disasterType: DISASTER_TYPES.DROUGHT,
+    district: 'Polonnaruwa', latitude: 7.9403, longitude: 81.0188,
+    description: 'Drought conditions worsening. 60 consecutive days without rainfall. Water rationing implemented.',
+    contact: '', mediaUrls: [],
+    verificationStatus: VerificationStatus.CONVERTED_TO_INCIDENT, createdAt: '2026-04-27T13:30:00Z',
+  },
+  {
+    reportId: 'RPT-013', source: ReportSource.J3_PUBLIC_PORTAL, disasterType: 'CYCLONE',
+    district: 'Trincomalee', latitude: 8.5874, longitude: 81.2152,
+    description: 'Cyclone approaching eastern coast. Strong winds and heavy rain expected.',
+    contact: '+94 26 222 4455', mediaUrls: [],
+    verificationStatus: VerificationStatus.VERIFIED, createdAt: '2026-04-27T15:00:00Z',
+    reviewedBy: 'ADM-001', reviewedAt: '2026-04-27T15:15:00Z',
+  },
 ];
 
 // ── Mock Confirmed Incidents ─────────────────────────────────
 export const MOCK_CONFIRMED_INCIDENTS: ConfirmedIncident[] = [
   {
-    incidentId: 'INC-001', sourceReports: ['RPT-003'], disasterType: DisasterType.FLOOD,
+    incidentId: 'INC-001', sourceReports: ['RPT-003'], disasterType: DISASTER_TYPES.FLOOD,
     district: 'Colombo', severity: IncidentSeverity.CRITICAL, status: IncidentStatus.ACTIVE,
     latitude: 6.9350, longitude: 79.8538, title: 'Flash Flooding — Kaduwela',
     description: 'Severe flash flooding in Kaduwela area affecting 3,500 people. Multiple evacuations underway.',
     publicVisibility: true, affectedPeople: 3500, createdAt: '2026-04-27T08:05:00Z', updatedAt: '2026-04-27T11:00:00Z',
   },
   {
-    incidentId: 'INC-002', sourceReports: ['RPT-005'], disasterType: DisasterType.FLOOD,
+    incidentId: 'INC-002', sourceReports: ['RPT-005'], disasterType: DISASTER_TYPES.FLOOD,
     district: 'Gampaha', severity: IncidentSeverity.HIGH, status: IncidentStatus.UNDER_RESPONSE,
     latitude: 7.0840, longitude: 80.0098, title: 'Attanagalu Oya Overflow',
     description: 'Attanagalu Oya exceeded danger level. Low-lying areas in Gampaha flooded.',
     publicVisibility: true, affectedPeople: 5200, createdAt: '2026-04-27T06:50:00Z', updatedAt: '2026-04-27T10:30:00Z',
   },
   {
-    incidentId: 'INC-003', sourceReports: [], disasterType: DisasterType.FLOOD,
+    incidentId: 'INC-003', sourceReports: [], disasterType: DISASTER_TYPES.FLOOD,
     district: 'Ratnapura', severity: IncidentSeverity.CRITICAL, status: IncidentStatus.ACTIVE,
     latitude: 6.6828, longitude: 80.4025, title: 'Kalu Ganga Basin Flooding',
     description: 'Major flooding along Kalu Ganga. Ratnapura town partially submerged. 12,450 affected.',
     publicVisibility: true, affectedPeople: 12450, createdAt: '2026-04-26T22:00:00Z', updatedAt: '2026-04-27T11:30:00Z',
   },
   {
-    incidentId: 'INC-004', sourceReports: [], disasterType: DisasterType.LANDSLIDE,
+    incidentId: 'INC-004', sourceReports: [], disasterType: DISASTER_TYPES.LANDSLIDE,
     district: 'Kegalle', severity: IncidentSeverity.HIGH, status: IncidentStatus.UNDER_RESPONSE,
     latitude: 7.2200, longitude: 80.3200, title: 'Mawanella Landslide',
     description: 'Major landslide on Kegalle-Colombo road near Mawanella. Road completely blocked.',
     publicVisibility: true, affectedPeople: 800, createdAt: '2026-04-27T05:30:00Z', updatedAt: '2026-04-27T09:00:00Z',
   },
   {
-    incidentId: 'INC-005', sourceReports: [], disasterType: DisasterType.FLOOD,
+    incidentId: 'INC-005', sourceReports: [], disasterType: DISASTER_TYPES.FLOOD,
     district: 'Kalutara', severity: IncidentSeverity.MEDIUM, status: IncidentStatus.ACTIVE,
     latitude: 6.5500, longitude: 80.0500, title: 'Kalu Ganga Downstream Flooding',
     description: 'Moderate flooding in Kalutara low-lying areas from Kalu Ganga overflow.',
     publicVisibility: true, affectedPeople: 2100, createdAt: '2026-04-27T07:00:00Z', updatedAt: '2026-04-27T10:00:00Z',
   },
   {
-    incidentId: 'INC-006', sourceReports: ['RPT-007'], disasterType: DisasterType.FLOOD,
+    incidentId: 'INC-006', sourceReports: ['RPT-007'], disasterType: DISASTER_TYPES.FLOOD,
     district: 'Galle', severity: IncidentSeverity.MEDIUM, status: IncidentStatus.ACTIVE,
     latitude: 6.0535, longitude: 80.2210, title: 'Gin Ganga Rising — Galle',
     description: 'Gin Ganga approaching critical levels in Galle. Precautionary evacuations initiated.',
     publicVisibility: true, affectedPeople: 1800, createdAt: '2026-04-27T10:00:00Z', updatedAt: '2026-04-27T11:00:00Z',
   },
   {
-    incidentId: 'INC-007', sourceReports: [], disasterType: DisasterType.LANDSLIDE,
+    incidentId: 'INC-007', sourceReports: [], disasterType: DISASTER_TYPES.LANDSLIDE,
     district: 'Badulla', severity: IncidentSeverity.LOW, status: IncidentStatus.RESOLVED,
     latitude: 7.0000, longitude: 81.0600, title: 'Minor Slip — Haputale Road',
     description: 'Minor earth slip cleared. Road reopened to traffic.',
     publicVisibility: false, affectedPeople: 50, createdAt: '2026-04-26T14:00:00Z', updatedAt: '2026-04-27T06:00:00Z',
   },
   {
-    incidentId: 'INC-008', sourceReports: ['RPT-009'], disasterType: DisasterType.LANDSLIDE,
+    incidentId: 'INC-008', sourceReports: ['RPT-009'], disasterType: DISASTER_TYPES.LANDSLIDE,
     district: 'Nuwara Eliya', severity: IncidentSeverity.HIGH, status: IncidentStatus.ACTIVE,
     latitude: 6.9497, longitude: 80.7891, title: 'Ramboda Landslide Risk',
     description: 'Active hillside crack formation near Ramboda. Precautionary evacuation of 15 families.',
     publicVisibility: true, affectedPeople: 75, createdAt: '2026-04-27T12:10:00Z', updatedAt: '2026-04-27T12:10:00Z',
+  },
+  {
+    incidentId: 'INC-009', sourceReports: ['RPT-012'], disasterType: DISASTER_TYPES.DROUGHT,
+    district: 'Polonnaruwa', severity: IncidentSeverity.HIGH, status: IncidentStatus.ACTIVE,
+    latitude: 7.9403, longitude: 81.0188, title: 'Severe Drought — Polonnaruwa',
+    description: 'Extended drought period affecting agriculture and water supply. 60+ days without rain.',
+    publicVisibility: true, affectedPeople: 8500, createdAt: '2026-04-27T13:45:00Z', updatedAt: '2026-04-27T14:30:00Z',
+  },
+  {
+    incidentId: 'INC-010', sourceReports: ['RPT-011'], disasterType: DISASTER_TYPES.DROUGHT,
+    district: 'Anuradhapura', severity: IncidentSeverity.MEDIUM, status: IncidentStatus.UNDER_RESPONSE,
+    latitude: 8.3114, longitude: 80.4037, title: 'Water Crisis — Anuradhapura',
+    description: 'Critical water shortage in Anuradhapura. Wells drying up, water rationing in effect.',
+    publicVisibility: true, affectedPeople: 3200, createdAt: '2026-04-27T14:15:00Z', updatedAt: '2026-04-27T15:00:00Z',
+  },
+  {
+    incidentId: 'INC-011', sourceReports: ['RPT-013'], disasterType: 'CYCLONE',
+    district: 'Trincomalee', severity: IncidentSeverity.CRITICAL, status: IncidentStatus.ACTIVE,
+    latitude: 8.5874, longitude: 81.2152, title: 'Cyclone Threat — Eastern Coast',
+    description: 'Category 3 cyclone approaching Trincomalee coast. Winds up to 150km/h expected.',
+    publicVisibility: true, affectedPeople: 15000, createdAt: '2026-04-27T15:30:00Z', updatedAt: '2026-04-27T15:30:00Z',
   },
 ];
 
@@ -204,18 +247,18 @@ export const MOCK_EMERGENCY_CONTACTS: EmergencyContact[] = [
 
 // ── Mock Dashboard Summary ───────────────────────────────────
 export const MOCK_DASHBOARD_SUMMARY: DashboardSummary = {
-  activeIncidents: 7,
+  activeIncidents: 10,
   activeIncidentsChange: 3,
-  criticalAlerts: 3,
-  pendingReports: 4,
-  peopleAffected: 25975,
-  peopleAffectedChange: 12,
+  criticalAlerts: 4,
+  pendingReports: 6,
+  peopleAffected: 42200,
+  peopleAffectedChange: 15,
   inShelters: 2095,
-  incidents: { floods: 5, landslides: 2, other: 0 },
+  incidents: { floods: 5, landslides: 2, droughts: 2, other: 1, CYCLONE: 1 },
   resources: {
     availableTeams: { current: 2, total: 12 },
     activeShelters: { current: 6, total: 7 },
     heavyMachinery: { current: 0, total: 3 },
   },
-  recentAlerts: [],
+  recentAlerts: MOCK_ALERTS.filter(a => a.isActive).slice(0, 4), // Include recent active alerts
 };

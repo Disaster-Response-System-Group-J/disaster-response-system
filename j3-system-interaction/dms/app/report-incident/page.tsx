@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react';
 import Link from 'next/link';
 import { Shield, AlertTriangle, Upload, MapPin, X, CheckCircle2, ArrowLeft, Camera, Video } from 'lucide-react';
-import { DisasterType } from '@/types';
+import { DISASTER_TYPES } from '@/types';
 import { DISTRICT_NAMES } from '@/data/districts';
 
 export default function ReportIncidentPage() {
@@ -94,9 +94,9 @@ export default function ReportIncidentPage() {
               <select value={form.disasterType} onChange={e => setForm({ ...form, disasterType: e.target.value })} required
                 className="w-full bg-[#131924] border border-slate-800/80 rounded-lg px-4 py-3.5 text-sm text-slate-200 focus:outline-none focus:border-blue-500/50 transition-all appearance-none cursor-pointer">
                 <option value="">Select type...</option>
-                <option value={DisasterType.FLOOD}>🌊 Flood</option>
-                <option value={DisasterType.LANDSLIDE}>⛰️ Landslide</option>
-                <option value={DisasterType.OTHER}>⚠️ Other</option>
+                <option value={DISASTER_TYPES.FLOOD}>🌊 Flood</option>
+                <option value={DISASTER_TYPES.LANDSLIDE}>⛰️ Landslide</option>
+                <option value={DISASTER_TYPES.OTHER}>⚠️ Other</option>
               </select>
             </div>
 
