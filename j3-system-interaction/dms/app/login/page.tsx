@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Shield, Eye, EyeOff, User, Lock, ArrowRight } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
@@ -20,14 +20,20 @@ const ROLE_LABELS: Record<string, string> = {
 export default function LoginPage() {
   const { login, isAuthenticated } = useAuth();
   const router = useRouter();
+  
   const [email, setEmail] = useState('');
   const [passkey, setPasskey] = useState('');
   const [showPasskey, setShowPasskey] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.replace('/dashboard');
+    }
+  }, [isAuthenticated, router]);
+
   if (isAuthenticated) {
-    router.replace('/dashboard');
     return null;
   }
 
@@ -35,6 +41,7 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     setIsLoading(true);
+
     try {
       await login(email, passkey);
       router.push('/dashboard');
@@ -48,7 +55,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-[#0a0f16] flex flex-col md:flex-row text-white font-sans">
-      {/* Left — Branding */}
+      {/* Left - Branding */}
       <div className="flex-1 flex flex-col justify-between p-12 lg:p-24 relative z-10 border-r border-slate-800/50">
         <div>
           <div className="flex items-center gap-3 mb-24">
@@ -78,14 +85,14 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* Right — Form */}
+      {/* Right - Form */}
       <div className="flex-1 flex items-center justify-center p-8 lg:p-24 relative bg-[#0a0f16]">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3/4 h-3/4 bg-blue-900/10 blur-[100px] rounded-full pointer-events-none" />
-
+        
         <div className="w-full max-w-[440px] relative">
           <div className="bg-[#111620] border border-slate-800/80 rounded-xl overflow-hidden relative shadow-2xl shadow-black/50">
             <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-blue-500 to-transparent opacity-80" />
-
+            
             <div className="p-10">
               <h2 className="text-2xl font-semibold text-white mb-2 tracking-tight">Secure Authentication</h2>
               <p className="text-slate-400 text-sm mb-8">Enter your credentials to access the command grid.</p>
@@ -112,7 +119,9 @@ export default function LoginPage() {
                       <User size={18} />
                     </div>
                     <input
-                      type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                       placeholder="admin@dmc.gov.lk"
                       className="w-full bg-[#0a0f16] border border-slate-800/80 rounded-lg pl-12 pr-4 py-3.5 text-slate-200 placeholder-slate-600 text-sm focus:outline-none focus:border-blue-500/50 transition-all font-medium"
                       required
@@ -130,13 +139,18 @@ export default function LoginPage() {
                       <Lock size={18} />
                     </div>
                     <input
-                      type={showPasskey ? 'text' : 'password'} value={passkey}
-                      onChange={(e) => setPasskey(e.target.value)} placeholder="••••••••"
+                      type={showPasskey ? 'text' : 'password'}
+                      value={passkey}
+                      onChange={(e) => setPasskey(e.target.value)}
+                      placeholder="••••••••••••"
                       className="w-full bg-[#0a0f16] border border-slate-800/80 rounded-lg pl-12 pr-12 py-3.5 text-slate-200 placeholder-slate-600 text-sm focus:outline-none focus:border-blue-500/50 transition-all tracking-widest"
                       required
                     />
-                    <button type="button" onClick={() => setShowPasskey(!showPasskey)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors">
+                    <button
+                      type="button"
+                      onClick={() => setShowPasskey(!showPasskey)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+                    >
                       {showPasskey ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                   </div>
@@ -148,8 +162,11 @@ export default function LoginPage() {
                   </div>
                 )}
 
-                <button type="submit" disabled={isLoading || !email || !passkey}
-                  className="w-full bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-400 hover:to-blue-600 disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-500 text-white font-semibold py-4 rounded-lg transition-all mt-4 text-sm tracking-wide flex items-center justify-center gap-2 group">
+                <button
+                  type="submit"
+                  disabled={isLoading || !email || !passkey}
+                  className="w-full bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-400 hover:to-blue-600 disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-500 text-white font-semibold py-4 rounded-lg transition-all mt-4 text-sm tracking-wide flex items-center justify-center gap-2 group"
+                >
                   {isLoading ? 'INITIALIZING SESSION...' : 'INITIALIZE SESSION'}
                   {!isLoading && <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform opacity-70" />}
                 </button>
@@ -157,7 +174,7 @@ export default function LoginPage() {
 
               <div className="mt-6 text-center">
                 <Link href="/" className="text-xs text-slate-500 hover:text-blue-400 transition-colors">
-                  ← Back to Public Portal
+                    Back to Public Portal
                 </Link>
               </div>
             </div>
