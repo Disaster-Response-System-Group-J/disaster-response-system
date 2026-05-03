@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { Truck, Search, Shield, MapPin, Activity, CheckCircle2, XCircle, AlertTriangle, ChevronDown } from 'lucide-react';
-import { MOCK_RESOURCES } from '@/data/mock-data';
-import { ResourceType, ResourceStatus } from '@/types';
+import { MOCK_RESOURCES, MOCK_CONFIRMED_INCIDENTS } from '@/data/mock-data';
+import { ResourceType, ResourceStatus, IncidentStatus } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { UserRole } from '@/types';
 import { DISTRICT_NAMES } from '@/data/districts';
@@ -35,7 +35,14 @@ export default function ResourcesPage() {
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [districtFilter, setDistrictFilter] = useState<string>('ALL');
 
-const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.includes('NATIONAL')) ? 'ALL' : (user as any)?.assignedDistrict || 'ALL';
+  const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.includes('NATIONAL')) ? 'ALL' : (user as any)?.assignedDistrict || 'ALL';
+
+  const [assignModal, setAssignModal] = useState<string | null>(null);
+  const [selectedIncidentId, setSelectedIncidentId] = useState<string>('');
+
+  const activeIncidents = MOCK_CONFIRMED_INCIDENTS.filter(
+    i => i.status === IncidentStatus.ACTIVE || i.status === IncidentStatus.UNDER_RESPONSE
+  );
 
   // 3. Listen for other users updating resources
   useEffect(() => {
@@ -71,14 +78,57 @@ const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.inc
   // 4. Update local state AND emit to server
   const handleStatusUpdate = (id: string, newStatus: ResourceStatus) => {
     const timestamp = new Date().toISOString();
+    const clearAssignment = newStatus === ResourceStatus.AVAILABLE || newStatus === ResourceStatus.OUT_OF_SERVICE;
     
     // Optimistic UI update
-    setResources(prev => prev.map(r => r.resourceId === id ? { ...r, status: newStatus, lastUpdated: timestamp } : r));
+    setResources(prev => prev.map(r => r.resourceId === id ? { 
+      ...r, 
+      status: newStatus, 
+      lastUpdated: timestamp,
+      ...(clearAssignment && { assignedIncident: undefined, assignedIncidentTitle: undefined })
+    } : r));
     
     // Broadcast to server
     if (socket) {
-      socket.emit('client:update-resource-status', { resourceId: id, status: newStatus, lastUpdated: timestamp });
+      socket.emit('client:update-resource-status', { 
+        resourceId: id, 
+        status: newStatus, 
+        lastUpdated: timestamp,
+        ...(clearAssignment && { clearAssignment: true })
+      });
     }
+  };
+
+  // NEW: Handle dispatching a resource to an incident
+  const handleDispatch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!assignModal || !selectedIncidentId) return;
+
+    const incident = activeIncidents.find(i => i.incidentId === selectedIncidentId);
+    if (!incident) return;
+
+    const timestamp = new Date().toISOString();
+
+    setResources(prev => prev.map(r => r.resourceId === assignModal ? { 
+      ...r, 
+      status: ResourceStatus.ASSIGNED, 
+      assignedIncident: incident.incidentId, 
+      assignedIncidentTitle: incident.title,
+      lastUpdated: timestamp 
+    } : r));
+
+    if (socket) {
+      socket.emit('client:update-resource-status', {
+        resourceId: assignModal,
+        status: ResourceStatus.ASSIGNED,
+        assignedIncident: incident.incidentId,
+        assignedIncidentTitle: incident.title,
+        lastUpdated: timestamp
+      });
+    }
+
+    setAssignModal(null);
+    setSelectedIncidentId('');
   };
 
   return (
@@ -173,13 +223,23 @@ const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.inc
                         <button className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-xs font-semibold text-slate-300 transition-colors flex items-center gap-1">
                           Update <ChevronDown size={12} />
                         </button>
-                        <div className="absolute right-0 top-full mt-1 w-36 bg-[#181f2c] border border-slate-700 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10 p-1">
+                        <div className="absolute right-0 top-full mt-1 w-40 bg-[#181f2c] border border-slate-700 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10 p-1">
                           {Object.values(ResourceStatus).map(s => (
                             <button key={s} onClick={() => handleStatusUpdate(r.resourceId, s as ResourceStatus)}
                               className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white rounded transition-colors">
-                              {s.replace('_', ' ')}
+                              Mark {s.replace('_', ' ')}
                             </button>
                           ))}
+                          
+                          {/* NEW: Dispatch Button */}
+                          {hasPermission('dispatch:resources') && r.status !== ResourceStatus.ASSIGNED && r.status !== ResourceStatus.OUT_OF_SERVICE && (
+                            <div className="pt-1 mt-1 border-t border-slate-700">
+                              <button onClick={() => setAssignModal(r.resourceId)}
+                                className="w-full text-left px-3 py-2 text-xs font-bold text-blue-400 hover:bg-slate-800 rounded transition-colors">
+                                Dispatch to Incident...
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -197,6 +257,43 @@ const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.inc
           </table>
         </div>
       </div>
+
+      {/* NEW: Dispatch Modal */}
+      {assignModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#131924] border border-slate-700 rounded-xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="p-4 border-b border-slate-700 flex items-center justify-between">
+              <h3 className="font-bold text-white">Dispatch Resource</h3>
+              <button onClick={() => setAssignModal(null)} className="text-slate-400 hover:text-white"><XCircle size={18} /></button>
+            </div>
+            <form onSubmit={handleDispatch} className="p-6">
+              <p className="text-xs text-slate-400 mb-4">
+                Select an active incident to dispatch resource <span className="font-bold text-blue-400">{assignModal}</span>.
+              </p>
+              <div className="mb-6">
+                <label className="block text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-2">Target Incident</label>
+                <select 
+                  required
+                  value={selectedIncidentId} 
+                  onChange={e => setSelectedIncidentId(e.target.value)}
+                  className="w-full bg-[#0a0f16] border border-slate-700 rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-blue-500 text-white"
+                >
+                  <option value="" disabled>Select an incident...</option>
+                  {activeIncidents.map(inc => (
+                    <option key={inc.incidentId} value={inc.incidentId}>
+                      {inc.district} - {inc.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-3">
+                <button type="button" onClick={() => setAssignModal(null)} className="flex-1 py-2.5 bg-slate-800 rounded-lg text-xs font-bold text-slate-300 hover:bg-slate-700 transition-colors">Cancel</button>
+                <button type="submit" disabled={!selectedIncidentId} className="flex-1 py-2.5 bg-blue-600 disabled:bg-slate-700 disabled:text-slate-500 rounded-lg text-xs font-bold text-white hover:bg-blue-500 transition-colors">Confirm Dispatch</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
