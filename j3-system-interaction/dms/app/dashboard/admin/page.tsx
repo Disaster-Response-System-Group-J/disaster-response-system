@@ -15,9 +15,14 @@ type AdminUser = typeof MOCK_USERS[0] & { status: 'ACTIVE' | 'SUSPENDED' };
 const INITIAL_USERS: AdminUser[] = MOCK_USERS.map(u => ({ ...u, status: 'ACTIVE' }));
 
 const ROLE_STYLES: Record<string, string> = {
-  [UserRole.ADMIN]: 'bg-red-500/10 text-red-400 border-red-500/20',
-  [UserRole.OFFICER]: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-  [UserRole.RESOURCE_MANAGER]: 'bg-teal-500/10 text-teal-400 border-teal-500/20',
+  [UserRole.SYSTEM_ADMIN]: 'bg-red-500/10 text-red-400 border-red-500/20',
+  [UserRole.INCIDENT_COMMANDER_NATIONAL]: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+  [UserRole.INCIDENT_COMMANDER_ZONAL]: 'bg-fuchsia-500/10 text-fuchsia-400 border-fuchsia-500/20',
+  [UserRole.OPERATIONS_OFFICER_NATIONAL]: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+  [UserRole.OPERATIONS_OFFICER_ZONAL]: 'bg-sky-500/10 text-sky-400 border-sky-500/20',
+  [UserRole.RESOURCE_MANAGER_NATIONAL]: 'bg-teal-500/10 text-teal-400 border-teal-500/20',
+  [UserRole.RESOURCE_MANAGER_ZONAL]: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  [UserRole.PUBLIC_USER]: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
 };
 
 export default function AdminPanelPage() {
@@ -28,7 +33,7 @@ export default function AdminPanelPage() {
   const [isCreating, setIsCreating] = useState(false);
   
   // Form State
-  const [formData, setFormData] = useState({ name: '', email: '', role: UserRole.OFFICER });
+  const [formData, setFormData] = useState({ name: '', email: '', role: UserRole.OPERATIONS_OFFICER_ZONAL });
   const [actionMessage, setActionMessage] = useState('');
 
   // Disaster Management State
@@ -106,7 +111,8 @@ export default function AdminPanelPage() {
   };
 
   const startCreate = () => {
-    setFormData({ name: '', email: '', role: UserRole.OFFICER });
+    // FIXED: Updated UserRole.OFFICER to the new valid enum UserRole.OPERATIONS_OFFICER_ZONAL
+    setFormData({ name: '', email: '', role: UserRole.OPERATIONS_OFFICER_ZONAL });
     setSelectedUser(null);
     setIsCreating(true);
     setIsEditing(false);
@@ -233,9 +239,13 @@ export default function AdminPanelPage() {
                       <div>
                         <label className="block text-[10px] font-bold text-slate-400 mb-1.5 tracking-widest uppercase">System Role</label>
                         <select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value as UserRole})} className="w-full bg-[#0a0f16] border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
-                          <option value={UserRole.ADMIN}>Administrator</option>
-                          <option value={UserRole.OFFICER}>Incident Officer</option>
-                          <option value={UserRole.RESOURCE_MANAGER}>Resource Manager</option>
+                          <option value={UserRole.SYSTEM_ADMIN}>System Administrator</option>
+                          <option value={UserRole.INCIDENT_COMMANDER_NATIONAL}>National Incident Commander</option>
+                          <option value={UserRole.INCIDENT_COMMANDER_ZONAL}>Zonal Incident Commander</option>
+                          <option value={UserRole.OPERATIONS_OFFICER_NATIONAL}>National Operations Officer</option>
+                          <option value={UserRole.OPERATIONS_OFFICER_ZONAL}>Zonal Operations Officer</option>
+                          <option value={UserRole.RESOURCE_MANAGER_NATIONAL}>National Resource Manager</option>
+                          <option value={UserRole.RESOURCE_MANAGER_ZONAL}>Zonal Resource Manager</option>
                         </select>
                       </div>
                       <div className="pt-4 mt-4 border-t border-slate-800">

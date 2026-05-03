@@ -31,8 +31,7 @@ export default function IncomingReportsPage() {
   const [sourceFilter, setSourceFilter] = useState<string>('ALL');
   const [selectedReport, setSelectedReport] = useState<IncomingReport | null>(null);
 
-  const enforcedDistrict = user?.role === UserRole.ADMIN ? 'ALL' : (user as any)?.assignedDistrict || 'ALL';
-
+const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.includes('NATIONAL')) ? 'ALL' : (user as any)?.assignedDistrict || 'ALL';
   // WebSocket Integration for Real-Time Updates
   useEffect(() => {
     if (!socket) return;

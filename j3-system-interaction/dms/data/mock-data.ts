@@ -6,10 +6,10 @@ import {
 
 // ── Mock Users ───────────────────────────────────────────────
 export const MOCK_USERS: (User & { password: string, assignedDistrict?: string })[] = [
-  { id: 'ADM-001', email: 'admin@dmc.gov.lk', name: 'Kamal Perera', role: UserRole.ADMIN, password: 'admin123', assignedDistrict: 'ALL' },
-  { id: 'OFF-001', email: 'officer@dmc.gov.lk', name: 'Nimal Silva', role: UserRole.OFFICER, password: 'officer123', assignedDistrict: 'Colombo' },
-  { id: 'RM-001', email: 'resource@dmc.gov.lk', name: 'Sunil Fernando', role: UserRole.RESOURCE_MANAGER, password: 'resource123', assignedDistrict: 'ALL' },
-  { id: 'ADM-002', email: 'admin@gmail.com', name: 'Incident Commander', role: UserRole.ADMIN, password: 'admin123', assignedDistrict: 'ALL' },
+  { id: 'ADM-001', email: 'admin@dmc.gov.lk', name: 'Kamal Perera', role: UserRole.SYSTEM_ADMIN, password: 'admin123', assignedDistrict: 'ALL' },
+  { id: 'OFF-001', email: 'officer@dmc.gov.lk', name: 'Nimal Silva', role: UserRole.OPERATIONS_OFFICER_ZONAL, password: 'officer123', assignedDistrict: 'Colombo' },
+  { id: 'RM-001', email: 'resource@dmc.gov.lk', name: 'Sunil Fernando', role: UserRole.RESOURCE_MANAGER_NATIONAL, password: 'resource123', assignedDistrict: 'ALL' },
+  { id: 'IC-001', email: 'commander@dmc.gov.lk', name: 'Incident Commander', role: UserRole.INCIDENT_COMMANDER_NATIONAL, password: 'admin123', assignedDistrict: 'ALL' },
 ];
 // ── Mock Incoming Reports ────────────────────────────────────
 export const MOCK_INCOMING_REPORTS: IncomingReport[] = [

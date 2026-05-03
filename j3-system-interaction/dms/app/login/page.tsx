@@ -8,9 +8,13 @@ import Link from 'next/link';
 import { UserRole } from '@/types';
 
 const ROLE_LABELS: Record<string, string> = {
-  [UserRole.ADMIN]: 'Administrator',
-  [UserRole.OFFICER]: 'Incident Officer',
-  [UserRole.RESOURCE_MANAGER]: 'Resource Manager',
+  [UserRole.SYSTEM_ADMIN]: 'System Administrator',
+  [UserRole.INCIDENT_COMMANDER_NATIONAL]: 'National Incident Commander',
+  [UserRole.INCIDENT_COMMANDER_ZONAL]: 'Zonal Incident Commander',
+  [UserRole.OPERATIONS_OFFICER_NATIONAL]: 'National Operations Officer',
+  [UserRole.OPERATIONS_OFFICER_ZONAL]: 'Zonal Operations Officer',
+  [UserRole.RESOURCE_MANAGER_NATIONAL]: 'National Resource Manager',
+  [UserRole.RESOURCE_MANAGER_ZONAL]: 'Zonal Resource Manager',
 };
 
 export default function LoginPage() {
@@ -90,9 +94,10 @@ export default function LoginPage() {
               <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-4 mb-6">
                 <p className="text-[10px] font-bold text-blue-400 tracking-widest uppercase mb-2">DEMO ACCOUNTS</p>
                 <div className="space-y-1 text-[11px] text-slate-400">
-                  <p><span className="text-slate-300">Admin:</span> admin@dmc.gov.lk / admin123</p>
-                  <p><span className="text-slate-300">Officer:</span> officer@dmc.gov.lk / officer123</p>
-                  <p><span className="text-slate-300">Resource Mgr:</span> resource@dmc.gov.lk / resource123</p>
+                  <p><span className="text-slate-300">System Admin:</span> admin@dmc.gov.lk / admin123</p>
+                  <p><span className="text-slate-300">Incident Cmdr (Nat):</span> commander@dmc.gov.lk / admin123</p>
+                  <p><span className="text-slate-300">Ops Officer (Zonal):</span> officer@dmc.gov.lk / officer123</p>
+                  <p><span className="text-slate-300">Resource Mgr (Nat):</span> resource@dmc.gov.lk / resource123</p>
                 </div>
               </div>
 

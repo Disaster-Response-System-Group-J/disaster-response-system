@@ -34,8 +34,7 @@ export default function IncidentMapPage() {
   const [districtFilter, setDistrictFilter] = useState<string>('ALL');
   const [showFilters, setShowFilters] = useState(false);
 
-  const enforcedDistrict = user?.role === UserRole.ADMIN ? 'ALL' : (user as any)?.assignedDistrict || 'ALL';
-
+const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.includes('NATIONAL')) ? 'ALL' : (user as any)?.assignedDistrict || 'ALL';
   // 5. Listen for incoming reports to drop new pins
   useEffect(() => {
     if (!socket) return;

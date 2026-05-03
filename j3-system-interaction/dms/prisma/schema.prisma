@@ -23,11 +23,15 @@ model User {
   reviewedReports IncomingReport[] @relation("ReviewedBy")
 }
 
-enum Role {
+eenum Role {
   PUBLIC_USER
-  OFFICER
-  RESOURCE_MANAGER
-  ADMIN
+  INCIDENT_COMMANDER_NATIONAL
+  INCIDENT_COMMANDER_ZONAL
+  OPERATIONS_OFFICER_NATIONAL
+  OPERATIONS_OFFICER_ZONAL
+  RESOURCE_MANAGER_NATIONAL
+  RESOURCE_MANAGER_ZONAL
+  SYSTEM_ADMIN
 }
 
 // ------------------------------------------------------

@@ -35,7 +35,7 @@ export default function ResourcesPage() {
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [districtFilter, setDistrictFilter] = useState<string>('ALL');
 
-  const enforcedDistrict = user?.role === UserRole.ADMIN ? 'ALL' : (user as any)?.assignedDistrict || 'ALL';
+const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.includes('NATIONAL')) ? 'ALL' : (user as any)?.assignedDistrict || 'ALL';
 
   // 3. Listen for other users updating resources
   useEffect(() => {
