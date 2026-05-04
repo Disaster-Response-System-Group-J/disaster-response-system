@@ -45,3 +45,9 @@ target/
 *.key
 *.p12
 secrets/
+
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+

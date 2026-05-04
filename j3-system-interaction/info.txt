@@ -1,1 +1,20 @@
 J3 implementations 
+
+1. from project root, run the following command (this creates the mock kafka server and run the frontend server)
+
+cd j3-system-interaction
+docker compose up --build 
+
+# open 2 terminals for server and frontend
+
+1. run the mock producer (feeds data into kafka) 
+cd j3-system-interaction/dms
+node mock-server.js
+
+2. run kafka conncetion (retrives data from kafka and send to frontend)
+cd j3-system-interaction/dms 
+node event-bridge.js
+
+admin 
+email: admin@gmail.com
+pwd: admin123
