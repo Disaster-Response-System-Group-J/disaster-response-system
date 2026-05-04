@@ -32,6 +32,15 @@ export default defineConfig({
       type: "edr-simulated",
       chainType: "l1",
     },
+    localhost: {
+      type: "http",
+      url: "http://127.0.0.1:8545",
+    },
+    docker: {
+      type: "http",
+      url: "http://hardhat-node:8545",
+    },
+
     hardhatOp: {
       type: "edr-simulated",
       chainType: "op",
