@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../models/event_model.dart';
-import '../screens/map_view.dart';
 import '../services/database_helper.dart';
 import '../widgets/offline_banner.dart';
 
@@ -46,21 +45,6 @@ class _GiveHelpScreenState extends State<GiveHelpScreen> {
                 Text(
                   'Open help requests from the local queue. Tap a request to inspect it or claim it.',
                   style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (context) => const MapView(),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.map_outlined),
-                    label: const Text('Open Incident Map'),
-                  ),
                 ),
                 const SizedBox(height: 16),
                 if (snapshot.connectionState == ConnectionState.waiting)

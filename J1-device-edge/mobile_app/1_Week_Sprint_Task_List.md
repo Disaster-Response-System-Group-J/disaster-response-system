@@ -150,18 +150,13 @@
 
 ---
 
-### **Day 5 (Friday): Give Help Screen, Map & Testing**
+### **Day 5 (Friday): Give Help Screen & Testing**
 
 #### Person 1 (UI Lead):
-- [ ] Add map dependency: `flutter pub add google_maps_flutter`
 - [ ] Build `give_help_screen.dart`:
   - [ ] List of open help requests (from MQTT subscription)
   - [ ] "I Can Help" button
   - [ ] Claim functionality
-- [ ] Build `map_view.dart` (MVP):
-  - [ ] User location (blue dot)
-  - [ ] Help request pins (red/orange)
-  - [ ] Tap pin → show details
 - [ ] Polish all screens:
   - [ ] Add error messages (red text)
   - [ ] Loading spinners on submit
@@ -218,7 +213,7 @@
 - [ ] Day 2: Help Request form + form components
 - [ ] Day 3: Data Report form + My Requests screen
 - [ ] Day 4: GPS integration on both forms
-- [ ] Day 5: Give Help screen + Map + Polish
+- [ ] Day 5: Give Help screen + Polish
 
 **Track B: Offline Indicators**
 - [ ] Day 2: Status bar (Online/Offline + queue count)
@@ -291,7 +286,6 @@ Use this each day:
 
 ### **Day 5 (EOD):**
 - Give Help screen working ✓
-- Map working ✓
 - All E2E tests passing ✓
 - Ready for demo ✓
 
@@ -334,7 +328,7 @@ Use this each day:
 ## Dependency List (Add on Day 1)
 
 ```bash
-flutter pub add sqflite uuid intl mqtt5_client geolocator google_maps_flutter
+flutter pub add sqflite uuid intl mqtt5_client geolocator
 ```
 
 ---
@@ -361,7 +355,6 @@ j1_disaster_response/
 │   │   ├── data_report_form.dart
 │   │   ├── give_help_screen.dart
 │   │   ├── my_requests_screen.dart
-│   │   ├── map_view.dart
 │   │   ├── settings_screen.dart
 │   ├── widgets/
 │   │   ├── form_widgets.dart
@@ -395,7 +388,6 @@ By end of Friday:
 - [ ] App survives force-close (data not lost)
 - [ ] GPS works on both forms
 - [ ] Give Help screen shows requests
-- [ ] Map displays incidents
 - [ ] Zero data loss in any scenario
 
 **Ready to hand off to J2 for MQTT integration** ✓
@@ -412,7 +404,6 @@ By end of Friday:
 **Nice-to-Have (Days 4-5):**
 - GPS integration
 - Give Help screen
-- Map view
 
 **Can Do Post-Week:**
 - Final polish
