@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../services/offline_queue_manager.dart';
 import '../services/gps_service.dart';
-import '../services/image_service.dart';
 import '../widgets/form_widgets.dart';
 
 class DataReportForm extends StatefulWidget {
@@ -52,7 +51,6 @@ class _DataReportFormState extends State<DataReportForm> {
         'data_type': _selectedType,
         'description': _descriptionController.text.trim(),
         'location': _locationController.text.trim(),
-        'photo_attached': false,
       };
 
       await OfflineQueueManager().addEvent(payload, 'DATA_REPORT');
@@ -179,22 +177,6 @@ class _DataReportFormState extends State<DataReportForm> {
               icon: Icon(_locating ? Icons.gps_fixed : Icons.my_location),
               label: Text(_locating ? 'Locating...' : 'Capture GPS Location'),
             ),
-          ),
-          const SizedBox(height: 12),
-          CustomPhotoButton(
-            label: 'Add Photo (UI only)',
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Photo capture will be added later'),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Images will be compressed below ${ImageService.formatSize(2 * 1024 * 1024)} before upload.',
-            style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: 16),
           SizedBox(

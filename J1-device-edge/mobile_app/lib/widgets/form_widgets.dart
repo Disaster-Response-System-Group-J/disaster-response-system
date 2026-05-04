@@ -127,26 +127,3 @@ class CustomToggle extends StatelessWidget {
     );
   }
 }
-
-class CustomPhotoButton extends StatelessWidget {
-  const CustomPhotoButton({
-    super.key,
-    required this.label,
-    required this.onPressed,
-  });
-
-  final String label;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton.icon(
-        onPressed: onPressed,
-        icon: const Icon(Icons.photo_camera_outlined),
-        label: Text(label),
-      ),
-    );
-  }
-}

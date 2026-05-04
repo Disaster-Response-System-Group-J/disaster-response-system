@@ -42,12 +42,10 @@
   - [ ] CustomDropdown
   - [ ] CustomNumberInput
   - [ ] CustomToggle
-  - [ ] CustomPhotoButton (UI only, no camera yet)
 - [ ] Create `status_bar.dart` showing Online/Offline + queue count
 - [ ] Build `help_request_form.dart`:
   - [ ] Type, Description, People count, Mobility, Injuries toggles
   - [ ] Location field (placeholder for GPS)
-  - [ ] Photo button (UI only)
   - [ ] Submit button → calls Person 2's function
 - [ ] Integrate forms into Report screen (toggle between Help Request & Data Report)
 - [ ] Test: Forms display and validate
@@ -76,7 +74,7 @@
 
 #### Person 1 (UI Lead):
 - [ ] Build `data_report_form.dart`:
-  - [ ] Data Type dropdown, Description, Photo button
+  - [ ] Data Type dropdown, Description
   - [ ] Location field (will be mandatory GPS)
   - [ ] Timestamp auto-set (UTC when form opens)
   - [ ] Submit button
@@ -112,7 +110,7 @@
 
 ---
 
-### **Day 4 (Thursday): GPS & Image Compression**
+### **Day 4 (Thursday): GPS**
 
 #### Person 1 (UI Lead):
 - [ ] Add GPS dependency: `flutter pub add geolocator`
@@ -126,12 +124,7 @@
 - [ ] Update Data Report form:
   - [ ] Make GPS mandatory (cannot submit without)
   - [ ] Show error if GPS unavailable
-- [ ] Add image compression dependency: `flutter pub add image`
-- [ ] Create `image_service.dart`:
-  - [ ] Compress image to <2 MB
-  - [ ] JPEG quality 0.7-0.8
-  - [ ] Show warning if compression needed
-- [ ] Test: GPS capture works, images compress
+- [ ] Test: GPS capture works
 
 #### Person 2 (Backend/Sync Lead):
 - [ ] Create `offline_queue_manager.dart`:
@@ -149,7 +142,7 @@
 - [ ] Test: Submit form offline → kill app → relaunch → verify data still queued
 
 **EOD Standup (15 min):**
-- Person 1 shows: GPS working, images compress <2 MB
+- Person 1 shows: GPS working
 - Person 2 shows: Offline queue survives app close
 - Test: Submit form offline, close app, relaunch, see it sync
 
@@ -179,7 +172,6 @@
   - [ ] Kill app mid-sync
   - [ ] Relaunch → verify all sync
   - [ ] Test with network toggle
-  - [ ] Test image uploads
 
 #### Person 2 (Backend/Sync Lead):
 - [ ] Implement `claim_request.dart`:
@@ -203,7 +195,6 @@
 **Full E2E Testing Both:**
 - [ ] Offline scenario: 10 forms offline → close → relaunch → all sync ✓
 - [ ] Network toggle: Submit offline, toggle network, verify auto-sync ✓
-- [ ] Image upload: Submit with image, verify <2 MB ✓
 - [ ] GPS: Both mandatory and fallback modes work ✓
 - [ ] Concurrency: Rapid submissions have unique IDs ✓
 - [ ] Performance: 100 queued events sync in <5 sec ✓
@@ -231,7 +222,6 @@
 
 **Track B: Offline Indicators**
 - [ ] Day 2: Status bar (Online/Offline + queue count)
-- [ ] Day 4: Image compression
 - [ ] Day 5: Offline banner + badges
 
 ---
@@ -297,7 +287,6 @@ Use this each day:
 
 ### **Day 4 (EOD):**
 - GPS working on both forms ✓
-- Image compression working ✓
 - Offline queue tested ✓
 
 ### **Day 5 (EOD):**
@@ -322,25 +311,19 @@ Use this each day:
    - [ ] Turn WiFi back on
    - [ ] Verify event syncs to MQTT
 
-2. **Image Compression Test**
-   - [ ] Take/upload 10 MB photo
-   - [ ] Verify app compresses to <2 MB
-   - [ ] Submit form
-   - [ ] Check image quality acceptable
-
-3. **GPS Mandatory Test**
+2. **GPS Mandatory Test**
    - [ ] Open Data Report form
    - [ ] Deny GPS permission
    - [ ] Try to submit
    - [ ] See error: "GPS signal required"
 
-4. **Queue Count Test**
+3. **Queue Count Test**
    - [ ] Submit 5 forms offline
    - [ ] See status bar show "5 pending"
    - [ ] Each form syncs
    - [ ] See count decrease: 4, 3, 2, 1, 0
 
-5. **Network Reconnect Test**
+4. **Network Reconnect Test**
    - [ ] Submit form while offline
    - [ ] Toggle WiFi ON/OFF rapidly
    - [ ] Verify no data loss
@@ -351,7 +334,7 @@ Use this each day:
 ## Dependency List (Add on Day 1)
 
 ```bash
-flutter pub add sqflite uuid intl mqtt5_client geolocator image google_maps_flutter
+flutter pub add sqflite uuid intl mqtt5_client geolocator google_maps_flutter
 ```
 
 ---
@@ -370,7 +353,6 @@ j1_disaster_response/
 │   │   ├── sync_service.dart
 │   │   ├── network_service.dart
 │   │   ├── gps_service.dart
-│   │   ├── image_service.dart
 │   │   ├── event_schema.dart
 │   ├── screens/
 │   │   ├── home_screen.dart
@@ -412,7 +394,6 @@ By end of Friday:
 - [ ] Network returns → events auto-sync
 - [ ] App survives force-close (data not lost)
 - [ ] GPS works on both forms
-- [ ] Images compress <2 MB
 - [ ] Give Help screen shows requests
 - [ ] Map displays incidents
 - [ ] Zero data loss in any scenario
@@ -430,7 +411,6 @@ By end of Friday:
 
 **Nice-to-Have (Days 4-5):**
 - GPS integration
-- Image compression
 - Give Help screen
 - Map view
 

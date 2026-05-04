@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../services/offline_queue_manager.dart';
 import '../services/gps_service.dart';
-import '../services/image_service.dart';
 import '../widgets/form_widgets.dart';
 
 class HelpRequestForm extends StatefulWidget {
@@ -60,7 +59,6 @@ class _HelpRequestFormState extends State<HelpRequestForm> {
         'mobility_support_required': _mobilitySupport,
         'injuries_reported': _injuries,
         'location': _locationController.text.trim(),
-        'photo_attached': false,
       };
 
       await OfflineQueueManager().addEvent(payload, 'HELP_REQUEST');
@@ -226,22 +224,6 @@ class _HelpRequestFormState extends State<HelpRequestForm> {
                 _injuries = value;
               });
             },
-          ),
-          const SizedBox(height: 8),
-          CustomPhotoButton(
-            label: 'Add Photo (UI only)',
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Photo capture will be added later'),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Images will be compressed below ${ImageService.formatSize(2 * 1024 * 1024)} before upload.',
-            style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: 16),
           SizedBox(
