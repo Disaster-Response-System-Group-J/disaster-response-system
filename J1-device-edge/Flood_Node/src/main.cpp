@@ -27,12 +27,15 @@ void setup() {
     pinMode(TRIG_PIN, OUTPUT);
     pinMode(ECHO_PIN, INPUT);
 
+    // LoRa setup temporarily disabled for sensor testing
+    /*
     LoRa.setPins(ss, rst, dio0);
     if (!LoRa.begin(433E6)) { // Set to 433MHz / 868MHz / 915MHz depending on your module
         Serial.println("Starting LoRa failed!");
         while (1);
     }
     Serial.println("LoRa Initialized OK!");
+    */
 }
 
 float measureDistance() {
@@ -71,13 +74,20 @@ void loop() {
     String jsonString;
     serializeJson(doc, jsonString);
 
-    Serial.print("Sending packet: ");
-    Serial.println(jsonString);
+    Serial.println("--- SENSOR READINGS ---");
+    Serial.print("Temperature: "); Serial.print(temp); Serial.println(" °C");
+    Serial.print("Humidity:    "); Serial.print(hum); Serial.println(" %");
+    Serial.print("Water Depth: "); Serial.print(depth); Serial.println(" cm");
+    Serial.print("JSON Output: "); Serial.println(jsonString);
+    Serial.println("-----------------------\n");
 
+    // LoRa transmission temporarily disabled
+    /*
     // Send packet
     LoRa.beginPacket();
     LoRa.print(jsonString);
     LoRa.endPacket();
+    */
 
     delay(5000); // Send data every 5 seconds
 }
