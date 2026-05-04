@@ -27,15 +27,12 @@ void setup() {
     pinMode(TRIG_PIN, OUTPUT);
     pinMode(ECHO_PIN, INPUT);
 
-    // LoRa setup temporarily disabled for sensor testing
-    /*
     LoRa.setPins(ss, rst, dio0);
     if (!LoRa.begin(433E6)) { // Set to 433MHz / 868MHz / 915MHz depending on your module
         Serial.println("Starting LoRa failed!");
         while (1);
     }
     Serial.println("LoRa Initialized OK!");
-    */
 }
 
 float measureDistance() {
@@ -50,9 +47,18 @@ float measureDistance() {
     return duration * 0.034 / 2;
 }
 
+unsigned long lastDHTReadTime = 0;
+float temp = NAN;
+float hum = NAN;
+
 void loop() {
-    float temp = dht.readTemperature();
-    float hum = dht.readHumidity();
+    // DHT11 requires at least 2 seconds between reads
+    if (millis() - lastDHTReadTime >= 2000 || lastDHTReadTime == 0) {
+        temp = dht.readTemperature();
+        hum = dht.readHumidity();
+        lastDHTReadTime = millis();
+    }
+    
     float depth = measureDistance();
 
     // Prepare JSON
@@ -81,13 +87,10 @@ void loop() {
     Serial.print("JSON Output: "); Serial.println(jsonString);
     Serial.println("-----------------------\n");
 
-    // LoRa transmission temporarily disabled
-    /*
     // Send packet
     LoRa.beginPacket();
     LoRa.print(jsonString);
     LoRa.endPacket();
-    */
 
-    delay(5000); // Send data every 5 seconds
+    delay(2000); // 2000ms delay to limit LoRa packet spam
 }
