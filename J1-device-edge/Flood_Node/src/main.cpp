@@ -88,9 +88,11 @@ void loop() {
     Serial.println("-----------------------\n");
 
     // Send packet
+    Serial.println("Initiating LoRa transmission...");
     LoRa.beginPacket();
     LoRa.print(jsonString);
     LoRa.endPacket();
+    Serial.println("✅ LoRa packet transmitted successfully!\n");
 
     delay(2000); // 2000ms delay to limit LoRa packet spam
 }

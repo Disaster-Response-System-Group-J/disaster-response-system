@@ -84,8 +84,10 @@ void loop() {
         Serial.print("JSON Output: "); Serial.println(jsonString);
 
         // Send packet
+        Serial.println("Initiating LoRa transmission...");
         LoRa.beginPacket();
         LoRa.print(jsonString);
         LoRa.endPacket();
+        Serial.println("✅ LoRa packet transmitted successfully!\n");
     }
 }

@@ -45,22 +45,31 @@ void reconnect() {
 
 void setup() {
     Serial.begin(115200);
-    setup_wifi();
-    client.setServer(mqtt_server, 1883);
+    delay(2000); // Give the Serial Monitor 2 seconds to connect
+    Serial.println("\n====================================");
+    Serial.println("   Starting Central Gateway Node ");
+    Serial.println("====================================");
+    
+    // Temporarily disabled WiFi and MQTT for LoRa testing
+    // setup_wifi();
+    // client.setServer(mqtt_server, 1883);
 
     LoRa.setPins(ss, rst, dio0);
     if (!LoRa.begin(433E6)) {
-        Serial.println("Starting LoRa failed!");
+        Serial.println("❌ Starting LoRa failed! Check wiring.");
         while (1);
     }
-    Serial.println("LoRa Initialized OK!");
+    Serial.println("✅ LoRa Gateway Initialized OK! Waiting for packets...");
 }
 
 void loop() {
+    // Temporarily disabled MQTT connection check
+    /*
     if (!client.connected()) {
         reconnect();
     }
     client.loop();
+    */
 
     int packetSize = LoRa.parsePacket();
     if (packetSize) {
@@ -69,8 +78,10 @@ void loop() {
             receivedData += (char)LoRa.read();
         }
         
-        Serial.print("Received packet: ");
+        Serial.print("\n📥 [LoRa] Received packet: ");
         Serial.println(receivedData);
+        Serial.print("   RSSI: ");
+        Serial.println(LoRa.packetRssi());
 
         // Parse JSON to route to correct topic
         JsonDocument doc;
@@ -88,13 +99,14 @@ void loop() {
             }
 
             if (topic != "") {
-                client.publish(topic.c_str(), receivedData.c_str());
-                Serial.println("Published to topic: " + topic);
+                // client.publish(topic.c_str(), receivedData.c_str());
+                Serial.print("   ✅ [MQTT Disabled] Would publish to MQTT topic: ");
+                Serial.println(topic);
             } else {
-                Serial.println("Unknown node or type. Packet ignored.");
+                Serial.println("   ⚠️ Unknown node or type. Packet ignored.");
             }
         } else {
-            Serial.println("Failed to parse JSON packet");
+            Serial.println("   ❌ Failed to parse JSON packet");
         }
     }
 }
