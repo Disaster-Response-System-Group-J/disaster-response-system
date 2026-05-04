@@ -10,11 +10,13 @@ class SyncService {
   final MqttClientService mqttService = MqttClientService();
 
   Timer? _timer;
+  bool _syncing = false;
 
   Future<void> start() async {
-    await mqttService.connect();
-
     listenNetwork();
+
+    // Connect in a bounded way so startup can't hang on MQTT.
+    await mqttService.connect(timeout: const Duration(seconds: 5));
 
     _timer = Timer.periodic(const Duration(seconds: 10), (timer) {
       syncQueuedEvents();
@@ -33,6 +35,10 @@ class SyncService {
   }
 
   Future<void> syncQueuedEvents() async {
+    if (_syncing) {
+      return;
+    }
+    _syncing = true;
     try {
       final isOnline = await NetworkService.isOnline();
 
@@ -53,9 +59,12 @@ class SyncService {
 
       for (var event in queuedEvents) {
         await _sendEvent(event);
+        await Future<void>.delayed(Duration.zero);
       }
     } catch (e) {
       print('Sync error: $e');
+    } finally {
+      _syncing = false;
     }
   }
 
@@ -65,6 +74,14 @@ class SyncService {
 
     while (retryCount < maxRetries) {
       try {
+        if (!mqttService.isConnected) {
+          await mqttService.connect(timeout: const Duration(seconds: 5));
+        }
+
+        if (!mqttService.isConnected) {
+          throw Exception('MQTT not connected');
+        }
+
         mqttService.publish(event.data);
 
         await dbHelper.updateEventStatus(

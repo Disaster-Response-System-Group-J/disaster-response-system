@@ -15,6 +15,7 @@ class StatusBar extends StatefulWidget {
 class _StatusBarState extends State<StatusBar> {
   final DatabaseHelper _databaseHelper = DatabaseHelper.instance;
   Timer? _timer;
+  bool _refreshing = false;
 
   bool _isOnline = false;
   int _queueCount = 0;
@@ -23,9 +24,14 @@ class _StatusBarState extends State<StatusBar> {
   @override
   void initState() {
     super.initState();
-    _refreshStatus();
-    _timer = Timer.periodic(const Duration(seconds: 5), (_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
       _refreshStatus();
+      _timer = Timer.periodic(const Duration(seconds: 5), (_) {
+        _refreshStatus();
+      });
     });
   }
 
@@ -36,10 +42,21 @@ class _StatusBarState extends State<StatusBar> {
   }
 
   Future<void> _refreshStatus() async {
-    final online = await NetworkService.isOnline();
-    final queueCount = await _databaseHelper.getQueueCount();
+    if (_refreshing) {
+      return;
+    }
+    _refreshing = true;
+
+    final results = await Future.wait<dynamic>([
+      NetworkService.isOnline(),
+      _databaseHelper.getQueueCount(),
+    ]);
+
+    final online = results[0] as bool;
+    final queueCount = results[1] as int;
 
     if (!mounted) {
+      _refreshing = false;
       return;
     }
 
@@ -48,6 +65,8 @@ class _StatusBarState extends State<StatusBar> {
       _queueCount = queueCount;
       _lastUpdated = DateTime.now();
     });
+
+    _refreshing = false;
   }
 
   @override

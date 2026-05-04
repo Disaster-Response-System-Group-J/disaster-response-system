@@ -1,6 +1,19 @@
 import 'package:geolocator/geolocator.dart';
 
 class GpsService {
+  /// Lightweight startup warm-up.
+  ///
+  /// Intentionally does NOT call `requestPermission()` to avoid prompting the
+  /// user during app startup.
+  static Future<void> warmUp() async {
+    try {
+      await Geolocator.isLocationServiceEnabled();
+      await Geolocator.checkPermission();
+    } catch (_) {
+      // Ignore warm-up failures; GPS is optional until explicitly used.
+    }
+  }
+
   static Future<bool> isLocationServiceEnabled() async {
     return Geolocator.isLocationServiceEnabled();
   }

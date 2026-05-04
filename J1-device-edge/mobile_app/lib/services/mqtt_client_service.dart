@@ -10,36 +10,36 @@ class MqttClientService {
   final StreamController<bool> _connectionStateController =
       StreamController<bool>.broadcast();
 
-  late MqttServerClient client;
+  MqttServerClient? client;
 
   Stream<bool> get connectionStateStream => _connectionStateController.stream;
 
   bool get isConnected =>
-      client.connectionStatus?.state == MqttConnectionState.connected;
+      client?.connectionStatus?.state == MqttConnectionState.connected;
 
-  Future<void> connect() async {
+  Future<void> connect({Duration timeout = const Duration(seconds: 5)}) async {
     client = MqttServerClient(MqttConfig.broker, MqttConfig.clientId);
-    client.port = MqttConfig.port;
+    client!.port = MqttConfig.port;
 
-    client.keepAlivePeriod = 20;
-    client.logging(on: true);
-    client.onConnected = _handleConnected;
-    client.onDisconnected = _handleDisconnected;
+    client!.keepAlivePeriod = 20;
+    client!.logging(on: true);
+    client!.onConnected = _handleConnected;
+    client!.onDisconnected = _handleDisconnected;
 
     final connMess = MqttConnectMessage()
         .withClientIdentifier(MqttConfig.clientId)
         .startClean();
 
-    client.connectionMessage = connMess;
+    client!.connectionMessage = connMess;
 
     try {
-      await client.connect();
+      await client!.connect().timeout(timeout);
       print('MQTT Connected');
       _connectionStateController.add(true);
     } catch (e) {
       print('MQTT Connection failed: $e');
       _connectionStateController.add(false);
-      client.disconnect();
+      client?.disconnect();
     }
   }
 
@@ -52,7 +52,7 @@ class MqttClientService {
     final builder = MqttClientPayloadBuilder();
     builder.addString(message);
 
-    client.publishMessage(
+    client!.publishMessage(
       MqttConfig.topic,
       MqttQos.atLeastOnce,
       builder.payload!,
@@ -62,9 +62,18 @@ class MqttClientService {
   }
 
   void subscribe({void Function(String message)? onMessage}) {
-    client.subscribe(MqttConfig.topic, MqttQos.atLeastOnce);
+    if (!isConnected) {
+      return;
+    }
 
-    client.updates!.listen((messages) {
+    client!.subscribe(MqttConfig.topic, MqttQos.atLeastOnce);
+
+    final updates = client!.updates;
+    if (updates == null) {
+      return;
+    }
+
+    updates.listen((messages) {
       final recMess = messages[0].payload as MqttPublishMessage;
       final payloadBytes = recMess.payload.message;
       final payload = utf8.decode(payloadBytes);
@@ -83,6 +92,7 @@ class MqttClientService {
   }
 
   void dispose() {
+    client?.disconnect();
     _connectionStateController.close();
   }
 }

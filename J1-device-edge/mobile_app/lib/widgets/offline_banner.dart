@@ -17,12 +17,20 @@ class _OfflineBannerState extends State<OfflineBanner> {
   Timer? _timer;
   bool _isOnline = true;
   int _queueCount = 0;
+  bool _refreshing = false;
 
   @override
   void initState() {
     super.initState();
-    _refresh();
-    _timer = Timer.periodic(const Duration(seconds: 5), (_) => _refresh());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _refresh();
+      _timer = Timer.periodic(const Duration(seconds: 5), (_) {
+        _refresh();
+      });
+    });
   }
 
   @override
@@ -32,10 +40,21 @@ class _OfflineBannerState extends State<OfflineBanner> {
   }
 
   Future<void> _refresh() async {
-    final online = await NetworkService.isOnline();
-    final queueCount = await _databaseHelper.getQueueCount();
+    if (_refreshing) {
+      return;
+    }
+    _refreshing = true;
+
+    final results = await Future.wait<dynamic>([
+      NetworkService.isOnline(),
+      _databaseHelper.getQueueCount(),
+    ]);
+
+    final online = results[0] as bool;
+    final queueCount = results[1] as int;
 
     if (!mounted) {
+      _refreshing = false;
       return;
     }
 
@@ -43,6 +62,8 @@ class _OfflineBannerState extends State<OfflineBanner> {
       _isOnline = online;
       _queueCount = queueCount;
     });
+
+    _refreshing = false;
   }
 
   @override

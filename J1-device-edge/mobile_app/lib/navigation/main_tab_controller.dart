@@ -33,8 +33,18 @@ class _MainTabControllerState extends State<MainTabController> {
   @override
   void initState() {
     super.initState();
-    _refreshQueueCount();
-    _timer = Timer.periodic(const Duration(seconds: 5), (_) => _refreshQueueCount());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _refreshQueueCount();
+      _timer = Timer.periodic(
+        const Duration(seconds: 5),
+        (_) {
+          _refreshQueueCount();
+        },
+      );
+    });
   }
 
   @override
