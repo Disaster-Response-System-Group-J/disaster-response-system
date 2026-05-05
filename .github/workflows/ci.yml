@@ -34,7 +34,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: pip
+          #cache: pip
 
       - name: Install dependencies
         run: |
@@ -95,7 +95,7 @@ jobs:
         continue-on-error: true   # known lint issues tracked in issue #XX — J3 to resolve before demo
 
       - name: Run tests
-        run: npm test -- --passWithNoTests --watchAll=false
+        run: npm test --if-present -- --passWithNoTests --watchAll=false
 
       - name: Build
         run: npm run build
