@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Shield, AlertTriangle, MapPin, Home, Phone, ArrowRight, Waves, Mountain } from 'lucide-react';
+import { Shield, Home, Phone, ArrowRight, Waves, Mountain } from 'lucide-react';
 
 export default function HomePage() {
   return (
@@ -37,13 +37,12 @@ export default function HomePage() {
               Sri Lanka Disaster<br />Response System
             </h1>
             <p className="text-lg text-slate-400 leading-relaxed mb-10 max-w-xl">
-              Real-time flood and landslide monitoring, incident reporting, and emergency coordination. Report incidents, find shelters, and stay informed.
+              Real-time flood and landslide monitoring and emergency coordination platform for authorized response personnel. Find shelters, emergency contacts, and stay informed on active alerts.
             </p>
             <div className="flex items-center gap-4">
-              <Link href="/report-incident"
-                className="flex items-center gap-2 px-6 py-4 bg-gradient-to-r from-red-500 to-red-700 hover:from-red-400 hover:to-red-600 rounded-xl text-sm font-bold transition-all group shadow-[0_0_30px_rgba(239,68,68,0.2)]">
-                <AlertTriangle size={18} />
-                Report an Incident
+              <Link href="/login"
+                className="flex items-center gap-2 px-6 py-4 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 rounded-xl text-sm font-bold text-blue-400 transition-all group">
+                Official Login
                 <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
               </Link>
               <Link href="/public-alerts"
@@ -57,9 +56,7 @@ export default function HomePage() {
 
       {/* Quick Links Grid */}
       <section className="max-w-7xl mx-auto px-6 pb-24">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <QuickCard href="/report-incident" icon={<AlertTriangle size={24} />} iconBg="bg-red-500/10 border-red-500/20" iconColor="text-red-400"
-            title="Report Incident" desc="Submit detailed incident reports with photos and location." />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <QuickCard href="/public-alerts" icon={<Waves size={24} />} iconBg="bg-blue-500/10 border-blue-500/20" iconColor="text-blue-400"
             title="Public Alerts" desc="View verified flood and landslide warnings across Sri Lanka." />
           <QuickCard href="/shelters" icon={<Home size={24} />} iconBg="bg-teal-500/10 border-teal-500/20" iconColor="text-teal-400"
