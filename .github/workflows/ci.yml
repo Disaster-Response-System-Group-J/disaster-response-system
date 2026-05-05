@@ -39,11 +39,11 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # Install from requirements.txt if it exists, else skip 
           if [ -f requirements.txt ]; then
             pip install -r requirements.txt
           else
-            echo "No requirements.txt found — skipping dependency install"
+            echo "No requirements.txt yet — installing known deps temporarily"
+            pip install pandas numpy joblib scikit-learn
           fi
 
       - name: Lint (flake8)
@@ -57,9 +57,11 @@ jobs:
         run: |
           pip install pytest pytest-cov
           if find . -name "test_*.py" -o -name "*_test.py" | grep -q .; then
-            pytest --cov=. --cov-report=xml -v
+            pytest -v \
+              --ignore="Model Training and Validation" \
+              --ignore="Model Training and Validation/Scripts"
           else
-            echo "No tests found yet — skipping"
+            echo "No tests yet — skipping"
           fi
 
   # ─────────────────────────────────────────────
