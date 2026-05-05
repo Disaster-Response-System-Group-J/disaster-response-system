@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import '../models/event_model.dart';
+import '../utills/constants.dart';
 import 'database_helper.dart';
 import 'mqtt_client_service.dart';
 import 'network_service.dart';
@@ -15,8 +16,15 @@ class SyncService {
   Future<void> start() async {
     listenNetwork();
 
+    // Ensure network polling is running.
+    NetworkService.startListening();
+    unawaited(NetworkService.checkConnection());
+
     // Connect in a bounded way so startup can't hang on MQTT.
     await mqttService.connect(timeout: const Duration(seconds: 5));
+
+    // Attempt an initial flush without blocking startup flows.
+    unawaited(syncQueuedEvents());
 
     _timer = Timer.periodic(const Duration(seconds: 10), (timer) {
       syncQueuedEvents();
@@ -86,7 +94,7 @@ class SyncService {
 
         await dbHelper.updateEventStatus(
           eventId: event.eventId,
-          status: 'SUBMITTED',
+          status: AppConstants.statusSubmitted,
           timestampSubmitted: DateTime.now().toString(),
         );
 

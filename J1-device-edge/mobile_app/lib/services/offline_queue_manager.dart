@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'dart:convert';
 
 import '../models/event_model.dart';
+import '../utills/constants.dart';
 import 'database_helper.dart';
 import 'network_service.dart';
 
@@ -16,7 +17,7 @@ class OfflineQueueManager {
       eventId: eventId,
       type: type,
       data: jsonEncode(data),
-      status: 'QUEUED',
+      status: AppConstants.statusQueued,
       timestampCreated: DateFormat("yyyy-MM-ddTHH:mm:ss'Z'")
           .format(DateTime.now().toUtc()),
       timestampSubmitted: null,
@@ -26,37 +27,8 @@ class OfflineQueueManager {
 
     print('Event queued: $eventId');
 
-    final online = await NetworkService.isOnline();
-
-    if (online) {
-      await syncQueuedEvents();
-    }
-  }
-
-  Future<void> syncQueuedEvents() async {
-    final queuedEvents = await dbHelper.getQueuedEvents();
-
-    if (queuedEvents.isEmpty) {
-      print('No queued events to sync');
-      return;
-    }
-
-    for (final event in queuedEvents) {
-      try {
-        await Future.delayed(const Duration(seconds: 1));
-
-        await dbHelper.updateEventStatus(
-          eventId: event.eventId,
-          status: 'SUBMITTED',
-          timestampSubmitted: DateFormat("yyyy-MM-ddTHH:mm:ss'Z'")
-              .format(DateTime.now().toUtc()),
-        );
-
-        print('Event submitted: ${event.eventId}');
-      } catch (e) {
-        print('Failed to sync event ${event.eventId}: $e');
-      }
-    }
+    // Kick a connection check so SyncService can auto-flush when the broker is reachable.
+    await NetworkService.checkConnection();
   }
 
   Future<int> getQueueCount() async {

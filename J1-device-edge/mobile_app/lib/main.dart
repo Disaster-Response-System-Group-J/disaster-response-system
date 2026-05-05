@@ -41,7 +41,7 @@ class StartupGate extends StatefulWidget {
   State<StartupGate> createState() => _StartupGateState();
 }
 
-class _StartupGateState extends State<StartupGate> {
+class _StartupGateState extends State<StartupGate> with WidgetsBindingObserver {
   _StartupPhase _phase = _StartupPhase.loading;
   String _status = 'Starting…';
   String? _error;
@@ -52,13 +52,24 @@ class _StartupGateState extends State<StartupGate> {
   void initState() {
     super.initState();
 
+    WidgetsBinding.instance.addObserver(this);
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initialize();
     });
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(NetworkService.checkConnection());
+      unawaited(_syncService?.syncQueuedEvents() ?? Future<void>.value());
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _syncService?.stop();
     super.dispose();
   }
