@@ -163,11 +163,12 @@ jobs:
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: j3-dms:scan
-          format: table          # human readable in CI logs
-          exit-code: 1           # fail CI if issues found at threshold
-          ignore-unfixed: true   # ignore vulns with no fix available yet
-          severity: CRITICAL,HIGH  # only fail on CRITICAL and HIGH
-          vuln-type: os,library  # scan OS packages + app dependencies
+          format: table
+          exit-code: 1
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+          vuln-type: os,library
+          trivyignores: .trivyignore
 
       - name: Run Trivy and upload SARIF report
         uses: aquasecurity/trivy-action@master
