@@ -134,6 +134,122 @@ jobs:
           cache-to: type=gha,mode=max
 
   # ─────────────────────────────────────────────
+  # #16 — Trivy Security Scanning
+  # Scans J3 Docker image for vulnerabilities
+  # Other subgroups scanned once they add Dockerfiles
+  # ─────────────────────────────────────────────
+  trivy-scan-j3:
+    name: "J3 · Trivy — Security Scan"
+    runs-on: ubuntu-latest
+    needs: j3-docker-validate    # Only scan if image builds successfully
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image for scanning
+        uses: docker/build-push-action@v5
+        with:
+          context: j3-system-interaction/dms
+          file: j3-system-interaction/dms/Dockerfile
+          push: false
+          load: true             # ← loads image into local Docker daemon so Trivy can scan it
+          tags: j3-dms:scan
+
+      - name: Run Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: j3-dms:scan
+          format: table          # human readable in CI logs
+          exit-code: 1           # fail CI if issues found at threshold
+          ignore-unfixed: true   # ignore vulns with no fix available yet
+          severity: CRITICAL,HIGH  # only fail on CRITICAL and HIGH
+          vuln-type: os,library  # scan OS packages + app dependencies
+
+      - name: Run Trivy and upload SARIF report
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: j3-dms:scan
+          format: sarif
+          output: trivy-j3-results.sarif
+        continue-on-error: true  # upload even if scan found issues
+
+      - name: Upload Trivy results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-j3-results.sarif
+          category: trivy-j3
+        continue-on-error: true  # don't fail if Security tab not enabled
+
+  # ─────────────────────────────────────────────
+  # Trivy filesystem scan — catch secrets/misconfigs
+  # in source code across ALL subgroups
+  # ─────────────────────────────────────────────
+  trivy-scan-filesystem:
+    name: "All · Trivy — Filesystem & Secret Scan"
+    runs-on: ubuntu-latest
+    needs: [j2-ci, j3-ci]       # run after code jobs pass
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Scan filesystem for secrets and misconfigs
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs           # scan the repo itself, not an image
+          scan-ref: .             # scan from root
+          format: table
+          exit-code: 1
+          severity: CRITICAL,HIGH
+          scanners: secret,misconfig   # look for hardcoded secrets + bad configs
+        continue-on-error: true   # warn but don't block — secrets scan can have false positives
+
+      - name: Upload filesystem scan SARIF
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-fs-results.sarif
+        continue-on-error: true
+
+      - name: Upload to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-fs-results.sarif
+          category: trivy-filesystem
+        continue-on-error: true
+
+  # ─────────────────────────────────────────────
+  # Trivy placeholders — J1, J2, J4
+  # Wired in once they add Dockerfiles
+  # ─────────────────────────────────────────────
+  trivy-scan-j1-placeholder:
+    name: "J1 · Trivy — Pending Dockerfile"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Placeholder
+        run: echo "J1 Trivy scan will run once edge service Dockerfile is added"
+
+  trivy-scan-j2-placeholder:
+    name: "J2 · Trivy — Pending Dockerfile"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Placeholder
+        run: echo "J2 Trivy scan will run once data service Dockerfile is added"
+
+  trivy-scan-j4-placeholder:
+    name: "J4 · Trivy — Pending Dockerfile"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Placeholder
+        run: echo "J4 Trivy scan will run once platform Dockerfile is added"
+
+  # ─────────────────────────────────────────────
   # J4 — Platform & Security (K8s manifest validation)
   # ─────────────────────────────────────────────
   j4-k8s-validate:
