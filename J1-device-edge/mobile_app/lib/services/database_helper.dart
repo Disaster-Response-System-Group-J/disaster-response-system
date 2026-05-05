@@ -11,6 +11,7 @@ class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._internal();
 
   static Database? _database;
+  Set<String>? _eventsColumns;
   static const String usersTable = 'users';
   static const String sessionTable = 'auth_session';
   static const String metaTable = 'app_meta';
@@ -35,15 +36,30 @@ class DatabaseHelper {
       onUpgrade: _onUpgrade,
     );
 
+    await _ensureEventsSchema(db);
     await _ensureSeedData(db);
     return db;
   }
 
   Future<void> _onCreate(Database db, int version) async {
     await _createAuthTables(db);
+    await _createEventsTable(db);
+    await _ensureSeedData(db);
+  }
 
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await _createAuthTables(db);
+    }
+
+    await _ensureEventsSchema(db);
+
+    await _ensureSeedData(db);
+  }
+
+  Future<void> _createEventsTable(Database db) async {
     await db.execute('''
-      CREATE TABLE ${AppConstants.eventsTable} (
+      CREATE TABLE IF NOT EXISTS ${AppConstants.eventsTable} (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         event_id TEXT UNIQUE NOT NULL,
         event_type TEXT NOT NULL,
@@ -62,20 +78,138 @@ class DatabaseHelper {
       )
     ''');
 
-    await db.execute('CREATE INDEX idx_events_status ON ${AppConstants.eventsTable}(status)');
-    await db.execute('CREATE INDEX idx_events_user_id ON ${AppConstants.eventsTable}(user_id)');
-    await db.execute('CREATE INDEX idx_events_created_at ON ${AppConstants.eventsTable}(created_at DESC)');
-    await db.execute('CREATE INDEX idx_events_event_id ON ${AppConstants.eventsTable}(event_id)');
-
-    await _ensureSeedData(db);
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_events_status ON ${AppConstants.eventsTable}(status)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_events_user_id ON ${AppConstants.eventsTable}(user_id)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_events_created_at ON ${AppConstants.eventsTable}(created_at DESC)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_events_event_id ON ${AppConstants.eventsTable}(event_id)');
   }
 
-  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 2) {
-      await _createAuthTables(db);
+  Future<void> _ensureEventsSchema(Database db) async {
+    final existingColumns = await _getTableColumns(db, AppConstants.eventsTable);
+    _eventsColumns = existingColumns;
+    if (existingColumns.isEmpty) {
+      await _createEventsTable(db);
+      return;
     }
 
-    await _ensureSeedData(db);
+    final requiredColumns = <String>[
+      'event_id',
+      'event_type',
+      'event_version',
+      'user_id',
+      'device_id',
+      'payload',
+      'metadata',
+      'status',
+      'sync_attempts',
+      'last_sync_error',
+      'last_sync_at',
+      'created_at',
+      'submitted_at',
+    ];
+
+    final missingColumns = requiredColumns
+        .where((column) => !existingColumns.contains(column))
+        .toList();
+
+    if (missingColumns.isEmpty) {
+      await _createEventsTable(db);
+      return;
+    }
+
+    for (final column in missingColumns) {
+      final definition = switch (column) {
+        'event_type' => "TEXT NOT NULL DEFAULT ''",
+        'event_version' => "TEXT NOT NULL DEFAULT '1.0'",
+        'user_id' => "TEXT NOT NULL DEFAULT ''",
+        'device_id' => "TEXT NOT NULL DEFAULT ''",
+        'payload' => "TEXT NOT NULL DEFAULT ''",
+        'metadata' => "TEXT NOT NULL DEFAULT '{}'",
+        'status' => "TEXT NOT NULL DEFAULT 'QUEUED'",
+        'sync_attempts' => 'INTEGER DEFAULT 0',
+        'last_sync_error' => 'TEXT',
+        'last_sync_at' => 'DATETIME',
+        'created_at' => 'TEXT',
+        'submitted_at' => 'DATETIME',
+        _ => 'TEXT',
+      };
+
+      await db.execute(
+        'ALTER TABLE ${AppConstants.eventsTable} ADD COLUMN $column $definition',
+      );
+    }
+
+    if (existingColumns.contains('type')) {
+      await db.rawUpdate('''
+        UPDATE ${AppConstants.eventsTable}
+        SET event_type = COALESCE(NULLIF(event_type, ''), type)
+      ''');
+    }
+
+    if (existingColumns.contains('createdAt')) {
+      await db.rawUpdate('''
+        UPDATE ${AppConstants.eventsTable}
+        SET created_at = COALESCE(NULLIF(created_at, ''), createdAt)
+      ''');
+    } else if (missingColumns.contains('created_at')) {
+      await db.rawUpdate('''
+        UPDATE ${AppConstants.eventsTable}
+        SET created_at = COALESCE(NULLIF(created_at, ''), CURRENT_TIMESTAMP)
+      ''');
+    }
+
+    if (existingColumns.contains('submittedAt')) {
+      await db.rawUpdate('''
+        UPDATE ${AppConstants.eventsTable}
+        SET submitted_at = COALESCE(submitted_at, submittedAt)
+      ''');
+    }
+
+    if (existingColumns.contains('userId')) {
+      await db.rawUpdate('''
+        UPDATE ${AppConstants.eventsTable}
+        SET user_id = COALESCE(NULLIF(user_id, ''), userId)
+      ''');
+    }
+
+    if (existingColumns.contains('deviceId')) {
+      await db.rawUpdate('''
+        UPDATE ${AppConstants.eventsTable}
+        SET device_id = COALESCE(NULLIF(device_id, ''), deviceId)
+      ''');
+    }
+
+    if (existingColumns.contains('eventVersion')) {
+      await db.rawUpdate('''
+        UPDATE ${AppConstants.eventsTable}
+        SET event_version = COALESCE(NULLIF(event_version, ''), eventVersion)
+      ''');
+    }
+
+    if (existingColumns.contains('lastSyncAt')) {
+      await db.rawUpdate('''
+        UPDATE ${AppConstants.eventsTable}
+        SET last_sync_at = COALESCE(last_sync_at, lastSyncAt)
+      ''');
+    }
+
+    if (existingColumns.contains('lastSyncError')) {
+      await db.rawUpdate('''
+        UPDATE ${AppConstants.eventsTable}
+        SET last_sync_error = COALESCE(last_sync_error, lastSyncError)
+      ''');
+    }
+
+    await _createEventsTable(db);
+    _eventsColumns = await _getTableColumns(db, AppConstants.eventsTable);
+  }
+
+  Future<Set<String>> _getTableColumns(Database db, String tableName) async {
+    final result = await db.rawQuery('PRAGMA table_info($tableName)');
+    return result
+        .map((row) => row['name']?.toString() ?? '')
+        .where((name) => name.isNotEmpty)
+        .toSet();
   }
 
   Future<void> _createAuthTables(Database db) async {
@@ -329,22 +463,72 @@ class DatabaseHelper {
 
   Future<int> saveEvent(EventModel event) async {
     final db = await database;
+    final columns = await _getEventColumns();
+    final values = _buildEventInsertMap(event, columns);
+
+    if (event.eventId.trim().isEmpty) {
+      throw Exception('Event ID is required');
+    }
+    if (event.userId.trim().isEmpty) {
+      throw Exception('User ID is required');
+    }
+    if (event.deviceId.trim().isEmpty) {
+      throw Exception('Device ID is required');
+    }
 
     return await db.insert(
       AppConstants.eventsTable,
-      event.toMap(),
+      values,
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
 
+  Future<EventModel?> findEventBySignature({
+    required String eventType,
+    required String userId,
+    required String payload,
+  }) async {
+    final db = await database;
+    final columns = await _getEventColumns();
+    final typeColumn = _pickColumn(columns, ['event_type', 'type']) ?? 'event_type';
+    final userColumn = _pickColumn(columns, ['user_id', 'userId']) ?? 'user_id';
+    final createdColumn = _pickColumn(columns, ['created_at', 'createdAt']) ?? 'created_at';
+    final result = await db.query(
+      AppConstants.eventsTable,
+      where: '''
+        $typeColumn = ? AND
+        $userColumn = ? AND
+        payload = ? AND
+        status IN (?, ?)
+      ''',
+      whereArgs: [
+        eventType,
+        userId,
+        payload,
+        AppConstants.statusQueued,
+        AppConstants.statusSubmitted,
+      ],
+      orderBy: '$createdColumn DESC',
+      limit: 1,
+    );
+
+    if (result.isEmpty) {
+      return null;
+    }
+
+    return EventModel.fromMap(result.first);
+  }
+
   Future<List<EventModel>> getQueuedEvents() async {
     final db = await database;
+    final columns = await _getEventColumns();
+    final createdColumn = _pickColumn(columns, ['created_at', 'createdAt']) ?? 'created_at';
 
     final result = await db.query(
       AppConstants.eventsTable,
       where: 'status = ?',
       whereArgs: [AppConstants.statusQueued],
-      orderBy: 'created_at ASC',
+      orderBy: '$createdColumn ASC',
     );
 
     return result.map((map) => EventModel.fromMap(map)).toList();
@@ -352,12 +536,14 @@ class DatabaseHelper {
 
   Future<List<EventModel>> getSubmittedEvents() async {
     final db = await database;
+    final columns = await _getEventColumns();
+    final submittedColumn = _pickColumn(columns, ['submitted_at', 'submittedAt']) ?? 'submitted_at';
 
     final result = await db.query(
       AppConstants.eventsTable,
       where: 'status = ?',
       whereArgs: [AppConstants.statusSubmitted],
-      orderBy: 'submitted_at DESC',
+      orderBy: '$submittedColumn DESC',
     );
 
     return result.map((map) => EventModel.fromMap(map)).toList();
@@ -365,18 +551,23 @@ class DatabaseHelper {
 
   Future<List<EventModel>> getAllEvents() async {
     final db = await database;
+    final columns = await _getEventColumns();
+    final createdColumn = _pickColumn(columns, ['created_at', 'createdAt']) ?? 'created_at';
 
     final result = await db.query(
       AppConstants.eventsTable,
-      orderBy: 'created_at DESC',
+      orderBy: '$createdColumn DESC',
     );
 
     return result.map((map) => EventModel.fromMap(map)).toList();
   }
 
-  Future<List<RequestModel>> getRequests() async {
+  Future<List<RequestModel>> getRequests({String? userId}) async {
     final events = await getAllEvents();
-    return events.map(RequestModel.fromEvent).toList();
+    final filtered = userId == null
+        ? events
+        : events.where((event) => event.userId == userId).toList();
+    return filtered.map(RequestModel.fromEvent).toList();
   }
 
   Future<int> updateEventStatus({
@@ -387,12 +578,16 @@ class DatabaseHelper {
     int? syncAttempts,
   }) async {
     final db = await database;
+    final columns = await _getEventColumns();
+    final submittedColumn = _pickColumn(columns, ['submitted_at', 'submittedAt']) ?? 'submitted_at';
+    final errorColumn = _pickColumn(columns, ['last_sync_error', 'lastSyncError']) ?? 'last_sync_error';
+    final attemptsColumn = _pickColumn(columns, ['sync_attempts', 'syncAttempts']) ?? 'sync_attempts';
 
     final updateData = {
       'status': status,
-      if (submittedAt != null) 'submitted_at': submittedAt,
-      if (lastSyncError != null) 'last_sync_error': lastSyncError,
-      if (syncAttempts != null) 'sync_attempts': syncAttempts,
+      if (submittedAt != null) submittedColumn: submittedAt,
+      if (lastSyncError != null) errorColumn: lastSyncError,
+      if (syncAttempts != null) attemptsColumn: syncAttempts,
     };
 
     return await db.update(
@@ -405,11 +600,13 @@ class DatabaseHelper {
 
   Future<int> incrementSyncAttempts(String eventId, {String? error}) async {
     final db = await database;
+    final columns = await _getEventColumns();
+    final errorColumn = _pickColumn(columns, ['last_sync_error', 'lastSyncError']) ?? 'last_sync_error';
     return await db.rawUpdate(
       '''
       UPDATE ${AppConstants.eventsTable}
       SET sync_attempts = sync_attempts + 1,
-          last_sync_error = ?,
+          $errorColumn = ?,
           last_sync_at = CURRENT_TIMESTAMP
       WHERE event_id = ?
       ''',
@@ -451,5 +648,101 @@ class DatabaseHelper {
     final db = await database;
     await db.close();
     _database = null;
+  }
+
+  Future<Set<String>> _getEventColumns() async {
+    if (_eventsColumns != null && _eventsColumns!.isNotEmpty) {
+      return _eventsColumns!;
+    }
+
+    final db = await database;
+    _eventsColumns = await _getTableColumns(db, AppConstants.eventsTable);
+    return _eventsColumns!;
+  }
+
+  String? _pickColumn(Set<String> columns, List<String> candidates) {
+    for (final candidate in candidates) {
+      if (columns.contains(candidate)) {
+        return candidate;
+      }
+    }
+    return null;
+  }
+
+  Map<String, dynamic> _buildEventInsertMap(EventModel event, Set<String> columns) {
+    final values = <String, dynamic>{
+      'event_id': event.eventId,
+      'payload': event.data,
+      'status': event.status,
+    };
+
+    if (columns.contains('event_type')) {
+      values['event_type'] = event.type;
+    }
+    if (columns.contains('type')) {
+      values['type'] = event.type;
+    }
+
+    if (columns.contains('created_at')) {
+      values['created_at'] = event.createdAt;
+    }
+    if (columns.contains('createdAt')) {
+      values['createdAt'] = event.createdAt;
+    }
+
+    if (columns.contains('submitted_at')) {
+      values['submitted_at'] = event.submittedAt;
+    }
+    if (columns.contains('submittedAt')) {
+      values['submittedAt'] = event.submittedAt;
+    }
+
+    if (columns.contains('user_id')) {
+      values['user_id'] = event.userId;
+    }
+    if (columns.contains('userId')) {
+      values['userId'] = event.userId;
+    }
+
+    if (columns.contains('device_id')) {
+      values['device_id'] = event.deviceId;
+    }
+    if (columns.contains('deviceId')) {
+      values['deviceId'] = event.deviceId;
+    }
+
+    if (columns.contains('event_version')) {
+      values['event_version'] = event.eventVersion;
+    }
+    if (columns.contains('eventVersion')) {
+      values['eventVersion'] = event.eventVersion;
+    }
+
+    if (columns.contains('sync_attempts')) {
+      values['sync_attempts'] = event.syncAttempts;
+    }
+    if (columns.contains('syncAttempts')) {
+      values['syncAttempts'] = event.syncAttempts;
+    }
+
+    if (columns.contains('last_sync_error')) {
+      values['last_sync_error'] = event.lastSyncError;
+    }
+    if (columns.contains('lastSyncError')) {
+      values['lastSyncError'] = event.lastSyncError;
+    }
+
+    if (columns.contains('last_sync_at')) {
+      values['last_sync_at'] = event.lastSyncAt;
+    }
+    if (columns.contains('lastSyncAt')) {
+      values['lastSyncAt'] = event.lastSyncAt;
+    }
+
+    if (columns.contains('metadata')) {
+      values['metadata'] = event.metadata.isEmpty ? '{}' : event.toMap()['metadata'];
+    }
+
+    return values;
   }
 }

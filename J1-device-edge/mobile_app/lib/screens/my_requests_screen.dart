@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/auth_service.dart';
 import '../services/database_helper.dart';
 import '../models/request_model.dart';
 import '../widgets/offline_banner.dart';
@@ -24,7 +25,9 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
       child: RefreshIndicator(
         onRefresh: _refresh,
         child: FutureBuilder<List<RequestModel>>(
-          future: _databaseHelper.getRequests(),
+          future: _databaseHelper.getRequests(
+            userId: AuthService.instance.currentUser?.id,
+          ),
           builder: (context, snapshot) {
             final List<RequestModel> requests =
                 snapshot.data ?? const <RequestModel>[];

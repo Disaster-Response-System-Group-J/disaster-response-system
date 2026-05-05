@@ -52,18 +52,18 @@ class EventModel {
   factory EventModel.fromMap(Map<String, dynamic> map) {
     return EventModel(
       eventId: map['event_id'] ?? '',
-      type: map['event_type'] ?? '',
-      data: map['payload'] ?? '',
+      type: map['event_type'] ?? map['type'] ?? '',
+      data: map['payload'] ?? map['data'] ?? '',
       status: map['status'] ?? '',
-      createdAt: map['created_at'] ?? '',
-      submittedAt: map['submitted_at'],
-      userId: map['user_id'] ?? '',
-      deviceId: map['device_id'] ?? '',
+      createdAt: map['created_at'] ?? map['createdAt'] ?? '',
+      submittedAt: map['submitted_at'] ?? map['submittedAt'],
+      userId: map['user_id'] ?? map['userId'] ?? '',
+      deviceId: map['device_id'] ?? map['deviceId'] ?? '',
       syncAttempts: map['sync_attempts'] ?? 0,
       lastSyncError: map['last_sync_error'],
       metadata: map['metadata'] != null ? jsonDecode(map['metadata']) : {},
-      eventVersion: map['event_version'] ?? '1.0',
-      lastSyncAt: map['last_sync_at'],
+      eventVersion: map['event_version'] ?? map['eventVersion'] ?? '1.0',
+      lastSyncAt: map['last_sync_at'] ?? map['lastSyncAt'],
     );
   }
 }

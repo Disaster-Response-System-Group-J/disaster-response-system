@@ -24,13 +24,24 @@ class OfflineQueueManager {
     }
 
     final resolvedDeviceId = deviceId ?? await dbHelper.getDeviceId();
+    final payloadJson = jsonEncode(data);
+    final existing = await dbHelper.findEventBySignature(
+      eventType: type,
+      userId: resolvedUserId,
+      payload: payloadJson,
+    );
+    if (existing != null) {
+      print('Duplicate event skipped: ${existing.eventId}');
+      return;
+    }
+
     final eventId = const Uuid().v4();
     final now = DateTime.now().toUtc();
 
     final event = EventModel(
       eventId: eventId,
       type: type,
-      data: jsonEncode(data),
+      data: payloadJson,
       status: AppConstants.statusQueued,
       createdAt: DateFormat("yyyy-MM-ddTHH:mm:ss'Z'").format(now),
       submittedAt: null,
