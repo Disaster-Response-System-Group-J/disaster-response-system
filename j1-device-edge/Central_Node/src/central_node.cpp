@@ -85,8 +85,8 @@ void setup() {
         while (1);
     }
     
-    LoRa.enableCrc();
-    LoRa.setTxPower(20);
+    // LoRa.enableCrc();
+    LoRa.setTxPower(2);
     LoRa.setSpreadingFactor(9);
     LoRa.setSignalBandwidth(125E3);
     LoRa.setCodingRate4(8);

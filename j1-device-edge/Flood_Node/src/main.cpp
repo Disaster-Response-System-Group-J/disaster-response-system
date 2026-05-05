@@ -46,12 +46,13 @@ void setup() {
         while (1);
     }
 
-    LoRa.enableCrc();
+    // LoRa.enableCrc(); // Disabled: CRC drops packets corrupted by RF saturation before the Gateway's JSON recovery can fix them
     
-    // 🔥 CRITICAL FIX: Lowered TX Power from 20 to 12
+    // 🔥 CRITICAL FIX: Lowered TX Power from 20 to 2
     // 20dBm causes extreme RF interference at close range, which physically corrupts 
     // the SPI data lines and crashes the LoRa chip permanently until power cycled.
-    LoRa.setTxPower(12); 
+    // 2dBm minimizes RF saturation at the receiver.
+    LoRa.setTxPower(2); 
     
     LoRa.setSpreadingFactor(9);
     LoRa.setSignalBandwidth(125E3);
