@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'mqtt_config.dart';
-
 class NetworkService {
   static final StreamController<bool> _controller =
       StreamController<bool>.broadcast();
@@ -13,21 +11,18 @@ class NetworkService {
   static bool _checking = false;
   static bool? _lastStatus;
 
-  /// Consider the app "online" when the MQTT broker is reachable.
+  /// Check internet connectivity via HTTP to a reliable endpoint.
   ///
-  /// This is more reliable than checking a public host (like google.com) which
-  /// may be blocked even when the device can reach the broker.
+  /// This is more portable than MQTT broker checks and works for any network.
   static Future<bool> isOnline({
-    Duration timeout = const Duration(seconds: 2),
+    Duration timeout = const Duration(seconds: 5),
   }) async {
     try {
-      final socket = await Socket.connect(
-        MqttConfig.broker,
-        MqttConfig.port,
-        timeout: timeout,
-      );
-      socket.destroy();
-      return true;
+      final request = await HttpClient()
+          .getUrl(Uri.parse('https://www.google.com'))
+          .timeout(timeout);
+      final response = await request.close().timeout(timeout);
+      return response.statusCode == 200;
     } catch (_) {
       return false;
     }
@@ -59,6 +54,7 @@ class NetworkService {
   static Future<void> checkConnection() async {
     await _tick(forceEmit: true);
   }
+
   static void dispose() {
     _timer?.cancel();
     _controller.close();

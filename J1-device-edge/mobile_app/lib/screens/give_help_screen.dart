@@ -43,7 +43,7 @@ class _GiveHelpScreenState extends State<GiveHelpScreen> {
                 const SizedBox(height: 8),
                 const OfflineBanner(),
                 Text(
-                  'Open help requests from the local queue. Tap a request to inspect it or claim it.',
+                  'Open help requests from the local queue. Tap a request to claim it.',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 16),
@@ -161,19 +161,11 @@ class _HelpRequestCard extends StatelessWidget {
             const SizedBox(height: 12),
             Row(
               children: [
-                TextButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Viewed ${requestType.toLowerCase()}')),
-                    );
-                  },
-                  icon: const Icon(Icons.visibility_outlined),
-                  label: const Text('Inspect'),
-                ),
-                const Spacer(),
-                FilledButton(
-                  onPressed: onClaim,
-                  child: const Text('I Can Help'),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: onClaim,
+                    child: const Text('I Can Help'),
+                  ),
                 ),
               ],
             ),
