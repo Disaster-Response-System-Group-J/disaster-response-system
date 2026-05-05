@@ -35,6 +35,9 @@ void setup_wifi() {
     if (WiFi.status() != WL_CONNECTED) {
         Serial.println("\n❌ WiFi failed to connect. Rebooting...");
         delay(1000);
+        WiFi.disconnect(true);
+        WiFi.mode(WIFI_OFF);
+        delay(100);
         ESP.restart();
     }
     
@@ -92,9 +95,23 @@ void setup() {
 }
 
 void loop() {
+    // Watchdog: If no packets received for 45 seconds, reboot!
+    static unsigned long lastPacketTime = millis();
+    if (millis() - lastPacketTime > 45000) {
+        Serial.println("\n⚠️ WATCHDOG: No LoRa packets for 45s. Rebooting to clear radio hang...");
+        delay(1000);
+        WiFi.disconnect(true);
+        WiFi.mode(WIFI_OFF);
+        delay(100);
+        ESP.restart();
+    }
+
     if (WiFi.status() != WL_CONNECTED) {
         Serial.println("\n⚠️ WiFi Connection Lost! Rebooting to recover clean state...");
         delay(1000);
+        WiFi.disconnect(true);
+        WiFi.mode(WIFI_OFF);
+        delay(100);
         ESP.restart(); // Safest way to recover TLS stack on ESP32
     }
 
@@ -111,6 +128,7 @@ void loop() {
 
     int packetSize = LoRa.parsePacket();
     if (packetSize) {
+        lastPacketTime = millis(); // Reset watchdog
         String receivedData = "";
         while (LoRa.available()) {
             receivedData += (char)LoRa.read();
