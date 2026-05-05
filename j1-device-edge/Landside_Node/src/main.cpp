@@ -41,6 +41,8 @@ void setup() {
     Serial.println("====================================");
 
     dht.begin();
+    Wire.begin();
+    Wire.setTimeOut(150);
     
     if (!mpu.begin()) {
         Serial.println("⚠️ Failed to find MPU6050 chip! Sending NULL values for gyro/accel.");
