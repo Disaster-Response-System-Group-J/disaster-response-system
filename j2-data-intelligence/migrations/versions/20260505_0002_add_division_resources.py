@@ -18,13 +18,13 @@ depends_on = None
 def upgrade() -> None:
     op.create_table(
         "DivisionResources",
-        sa.Column("resource_id", sa.Integer(), primary_key=True, autoincrement=True, nullable=False),
-        sa.Column("division_id", sa.Integer(), sa.ForeignKey("Division.division_id"), nullable=True),
-        sa.Column("resource_type", sa.String(100), nullable=False),
-        sa.Column("quantity", sa.Integer(), nullable=False, server_default="0"),
-        sa.Column("status", sa.String(50), nullable=False, server_default="available"),
-        sa.Column("last_updated", sa.DateTime(), nullable=False, server_default=sa.func.now()),
-        sa.UniqueConstraint("division_id", "resource_type", name="uq_division_resources_type"),
+        sa.Column("division_id", sa.Integer(), sa.ForeignKey("Division.division_id"), primary_key=True, nullable=False),
+        sa.Column("hospital_bed_capacity", sa.Integer(), nullable=True),
+        sa.Column("emergency_shelters", sa.Integer(), nullable=True),
+        sa.Column("ambulance_count", sa.Integer(), nullable=True),
+        sa.Column("food_stock_tons", sa.Float(), nullable=True),
+        sa.Column("clean_water_capacity_liters", sa.Float(), nullable=True),
+        sa.Column("power_grid_resilience", sa.Float(), nullable=True),
     )
 
 

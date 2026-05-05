@@ -11,5 +11,6 @@ from app.models.report import Report
 from app.models.active_incident import ActiveIncident
 from app.models.shelter import Shelter
 from app.models.soil_moisture import SoilMoisture
+from app.models.division_resources import DivisionResources
 from app.models.spi_data import SPIData
 from app.models.temperature_data import TemperatureData
