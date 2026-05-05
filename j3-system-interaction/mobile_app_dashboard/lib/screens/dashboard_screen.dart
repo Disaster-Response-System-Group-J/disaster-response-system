@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:mobile_app_dashboard/components/app_drawer.dart';
 import 'package:mobile_app_dashboard/components/nav_bar.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -32,14 +33,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: bgColor,
+      drawer: const AppDrawer(currentRoute: '/dashboard'),
       appBar: AppBar(
         automaticallyImplyLeading: false,
         backgroundColor: Colors.black.withValues(alpha: 0.8),
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.menu, color: Color(0xFF4D8EFF)),
-          onPressed: () {},
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu, color: Color(0xFF4D8EFF)),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
         ),
         centerTitle: true,
         title: Text(

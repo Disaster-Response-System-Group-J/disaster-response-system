@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../components/app_drawer.dart';
 import '../components/nav_bar.dart';
 
 class ResourcesScreen extends StatefulWidget {
@@ -41,14 +42,17 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: bgColor,
+      drawer: const AppDrawer(currentRoute: '/resources'),
       appBar: AppBar(
         automaticallyImplyLeading: false,
         backgroundColor: Colors.black.withValues(alpha: 0.8),
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.menu, color: Color(0xFF4D8EFF)),
-          onPressed: () {},
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu, color: Color(0xFF4D8EFF)),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
         ),
         centerTitle: true,
         title: Text(

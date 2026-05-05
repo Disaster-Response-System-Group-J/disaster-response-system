@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../components/app_drawer.dart';
 import '../components/nav_bar.dart';
 import 'dart:async';
 import '../services/incident_service.dart';
@@ -60,15 +61,18 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
+      drawer: const AppDrawer(currentRoute: '/reports'),
       // ─── Top App Bar ───
       appBar: AppBar(
         automaticallyImplyLeading: false,
         backgroundColor: Colors.black.withValues(alpha: 0.8),
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.menu, color: Color(0xFF4D8EFF)),
-          onPressed: () {},
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu, color: Color(0xFF4D8EFF)),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
         ),
         centerTitle: true,
         title: Text(

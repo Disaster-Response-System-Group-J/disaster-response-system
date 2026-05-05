@@ -16,13 +16,13 @@ class _LoginScreenState extends State<LoginScreen>
   final _serviceIdController = TextEditingController();
   final _passkeyController = TextEditingController();
   bool _obscurePasskey = true;
-  int _selectedRoleIndex = 0; // 0=Officer, 1=Logistics, 2=Admin
+  int _selectedRoleIndex = 0; // 0=Officer, 1=Logistics, 2=Response Officer
   bool _isLoading = false;
 
   late AnimationController _glowController;
   late Animation<double> _glowAnimation;
 
-  final List<String> _roles = ['OFFICER', 'LOGISTICS', 'ADMIN'];
+  final List<String> _roles = ['OFFICER', 'LOGISTICS', 'RESPONSE OFFICER'];
 
   @override
   void initState() {
@@ -282,7 +282,7 @@ class _LoginScreenState extends State<LoginScreen>
   // ─── Role Selector (3 buttons) ───
   Widget _buildRoleSelector() {
     return Row(
-      children: List.generate(3, (index) {
+      children: List.generate(_roles.length, (index) {
         final isSelected = _selectedRoleIndex == index;
         return Expanded(
           child: GestureDetector(
@@ -314,15 +314,19 @@ class _LoginScreenState extends State<LoginScreen>
                     : null,
               ),
               child: Center(
-                child: Text(
-                  _roles[index],
-                  style: GoogleFonts.spaceGrotesk(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 0.7,
-                    color: isSelected
-                        ? AppColors.primary
-                        : AppColors.onSurfaceVariant.withValues(alpha: 0.6),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    _roles[index],
+                    maxLines: 1,
+                    style: GoogleFonts.spaceGrotesk(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 0.7,
+                      color: isSelected
+                          ? AppColors.primary
+                          : AppColors.onSurfaceVariant.withValues(alpha: 0.6),
+                    ),
                   ),
                 ),
               ),

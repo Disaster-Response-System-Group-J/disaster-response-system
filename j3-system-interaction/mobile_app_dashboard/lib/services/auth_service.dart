@@ -2,14 +2,15 @@
 /// Currently uses an in-memory credential store and a lightweight
 /// session model. Replace with secure API calls and token storage
 /// when integrating with the backend.
+library;
 import '../models/user.dart';
 
 class AuthService {
   /// Valid credential pairs: Service ID → Passkey
   static const Map<String, String> _validCredentials = {
-    'CMD-049': 'admin123',
+    'CMD-049': 'command123',
     'LOG-012': 'logistics123',
-    'ADM-001': 'superadmin',
+    'RO-A03': 'response123',
     // Field officers
     'FO-A01': 'zonea001',
     'FO-B02': 'zoneb002',
@@ -19,7 +20,7 @@ class AuthService {
   static const Map<String, Map<String, String>> _profileMap = {
     'CMD-049': {'role': 'OFFICER', 'zone': 'ZONE-A'},
     'LOG-012': {'role': 'LOGISTICS', 'zone': 'LOGISTICS'},
-    'ADM-001': {'role': 'ADMIN', 'zone': 'NATIONAL'},
+    'RO-A03': {'role': 'RESPONSE OFFICER', 'zone': 'ZONE-A'},
     'FO-A01': {'role': 'OFFICER', 'zone': 'ZONE-A'},
     'FO-B02': {'role': 'OFFICER', 'zone': 'ZONE-B'},
   };

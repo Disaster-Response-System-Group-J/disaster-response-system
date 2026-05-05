@@ -5,6 +5,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../components/app_drawer.dart';
 import '../components/nav_bar.dart';
 import '../services/incident_service.dart';
 import '../services/auth_service.dart';
@@ -82,15 +83,18 @@ class _MapScreenState extends State<MapScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surfaceDim,
+      drawer: const AppDrawer(currentRoute: '/map'),
       // ─── Top App Bar ───
       appBar: AppBar(
         automaticallyImplyLeading: false,
         backgroundColor: Colors.black.withValues(alpha: 0.8),
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.menu, color: Color(0xFF4D8EFF)),
-          onPressed: () {},
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu, color: Color(0xFF4D8EFF)),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
         ),
         centerTitle: true,
         title: Text(
@@ -130,7 +134,7 @@ class _MapScreenState extends State<MapScreen> {
                 minZoom: 3.0,
                 maxZoom: 18.0,
                 onPositionChanged: (pos, _) {
-                  if (pos.center != null) _mapCenter = pos.center!;
+                  _mapCenter = pos.center!;
                   _currentZoom = pos.zoom ?? _currentZoom;
                 },
               ),
