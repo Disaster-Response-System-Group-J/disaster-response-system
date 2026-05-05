@@ -59,12 +59,12 @@ void setup() {
         while (1) { delay(10); }
     }
 
-    LoRa.enableCrc();
+    // LoRa.enableCrc();
     
     // 🔥 CRITICAL FIX: Lowered TX Power from 20 to 12
     // 20dBm causes extreme RF interference at close range, which physically corrupts 
     // the SPI data lines and crashes the LoRa chip permanently until power cycled.
-    LoRa.setTxPower(12);
+    LoRa.setTxPower(2);
     
     LoRa.setSpreadingFactor(9);
     LoRa.setSignalBandwidth(125E3);
