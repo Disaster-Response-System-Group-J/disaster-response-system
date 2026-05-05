@@ -13,7 +13,8 @@ from app.db.base import Base  # noqa: E402
 from app import models as _models  # noqa: F401,E402
 
 config = context.config
-config.set_main_option("sqlalchemy.url", DATABASE_URL)
+escaped_database_url = DATABASE_URL.replace("%", "%%")
+config.set_main_option("sqlalchemy.url", escaped_database_url)
 
 target_metadata = Base.metadata
 
