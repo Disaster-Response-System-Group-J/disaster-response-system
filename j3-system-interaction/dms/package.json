@@ -6,9 +6,21 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "prisma": "prisma",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:push": "prisma db push",
+    "prisma:seed": "prisma db seed",
+    "prisma:studio": "prisma studio",
+    "update-populations": "ts-node scripts/update-division-population.ts",
+    "fetch-weather": "ts-node -r dotenv/config scripts/fetch-weather.ts",
+    "compute-features": "ts-node -r dotenv/config scripts/compute-features.ts",
+    "run-predictions": "python3 scripts/run-predictions.py",
+    "forecast-pipeline": "ts-node -r dotenv/config scripts/forecast-pipeline.ts"
   },
   "dependencies": {
+    "csv-parser": "^3.2.0",
     "kafkajs": "^2.2.4",
     "lucide-react": "^0.408.0",
     "maplibre-gl": "^4.7.1",
@@ -22,13 +34,20 @@
     "sonner": "^2.0.7"
   },
   "devDependencies": {
+    "@prisma/client": "^5.0.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
+    "prisma": "^5.0.0",
     "tailwindcss": "^4",
+    "ts-node": "^10.9.1",
     "typescript": "^5"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
   }
 }
