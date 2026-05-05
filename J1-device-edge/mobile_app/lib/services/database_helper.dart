@@ -2,7 +2,9 @@ import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../utills/constants.dart';
+import '../models/confirmed_incident_model.dart';
 import '../models/event_model.dart';
+import '../models/incoming_report_model.dart';
 import '../models/request_model.dart';
 
 class DatabaseHelper {
@@ -468,6 +470,162 @@ class DatabaseHelper {
       where: 'event_id = ?',
       whereArgs: [eventId],
     );
+  }
+
+  Future<int> saveIncomingReport(IncomingReportModel report) async {
+    final db = await database;
+
+    return await db.insert(
+      AppConstants.incomingReportsTable,
+      _incomingReportDbMap(report),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<IncomingReportModel?> getIncomingReportById(String id) async {
+    final db = await database;
+
+    final result = await db.query(
+      AppConstants.incomingReportsTable,
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+
+    if (result.isEmpty) {
+      return null;
+    }
+
+    return IncomingReportModel.fromMap(result.first);
+  }
+
+  Future<List<IncomingReportModel>> getAllIncomingReports() async {
+    final db = await database;
+
+    final result = await db.query(
+      AppConstants.incomingReportsTable,
+      orderBy: 'created_at DESC',
+    );
+
+    return result.map((map) => IncomingReportModel.fromMap(map)).toList();
+  }
+
+  Future<List<IncomingReportModel>> getIncomingReportsByStatus(String verificationStatus) async {
+    final db = await database;
+
+    final result = await db.query(
+      AppConstants.incomingReportsTable,
+      where: 'verification_status = ?',
+      whereArgs: [verificationStatus],
+      orderBy: 'created_at DESC',
+    );
+
+    return result.map((map) => IncomingReportModel.fromMap(map)).toList();
+  }
+
+  Future<int> updateIncomingReport(IncomingReportModel report) async {
+    final db = await database;
+
+    return await db.update(
+      AppConstants.incomingReportsTable,
+      _incomingReportDbMap(report),
+      where: 'id = ?',
+      whereArgs: [report.id],
+    );
+  }
+
+  Future<int> deleteIncomingReport(String id) async {
+    final db = await database;
+
+    return await db.delete(
+      AppConstants.incomingReportsTable,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<int> saveConfirmedIncident(ConfirmedIncidentModel incident) async {
+    final db = await database;
+
+    return await db.insert(
+      AppConstants.confirmedIncidentsTable,
+      _confirmedIncidentDbMap(incident),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<ConfirmedIncidentModel?> getConfirmedIncidentById(String id) async {
+    final db = await database;
+
+    final result = await db.query(
+      AppConstants.confirmedIncidentsTable,
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+
+    if (result.isEmpty) {
+      return null;
+    }
+
+    return ConfirmedIncidentModel.fromMap(result.first);
+  }
+
+  Future<List<ConfirmedIncidentModel>> getAllConfirmedIncidents() async {
+    final db = await database;
+
+    final result = await db.query(
+      AppConstants.confirmedIncidentsTable,
+      orderBy: 'created_at DESC',
+    );
+
+    return result.map((map) => ConfirmedIncidentModel.fromMap(map)).toList();
+  }
+
+  Future<List<ConfirmedIncidentModel>> getConfirmedIncidentsByStatus(String status) async {
+    final db = await database;
+
+    final result = await db.query(
+      AppConstants.confirmedIncidentsTable,
+      where: 'status = ?',
+      whereArgs: [status],
+      orderBy: 'created_at DESC',
+    );
+
+    return result.map((map) => ConfirmedIncidentModel.fromMap(map)).toList();
+  }
+
+  Future<int> updateConfirmedIncident(ConfirmedIncidentModel incident) async {
+    final db = await database;
+
+    return await db.update(
+      AppConstants.confirmedIncidentsTable,
+      _confirmedIncidentDbMap(incident),
+      where: 'id = ?',
+      whereArgs: [incident.id],
+    );
+  }
+
+  Future<int> deleteConfirmedIncident(String id) async {
+    final db = await database;
+
+    return await db.delete(
+      AppConstants.confirmedIncidentsTable,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Map<String, dynamic> _incomingReportDbMap(IncomingReportModel report) {
+    final map = Map<String, dynamic>.from(report.toMap());
+    map['id'] = map.remove('report_id') ?? report.id;
+    return map;
+  }
+
+  Map<String, dynamic> _confirmedIncidentDbMap(ConfirmedIncidentModel incident) {
+    final map = Map<String, dynamic>.from(incident.toMap());
+    map['id'] = map.remove('incident_id') ?? incident.id;
+    return map;
   }
 
   Future<int> getQueueCount() async {
