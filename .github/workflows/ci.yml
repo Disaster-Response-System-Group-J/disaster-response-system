@@ -56,12 +56,14 @@ jobs:
       - name: Run tests (pytest)
         run: |
           pip install pytest pytest-cov
-          if find . -name "test_*.py" -o -name "*_test.py" | grep -q .; then
+          if find . \
+            -path "./Model Training and Validation" -prune -o \
+            -name "test_*.py" -print -o \
+            -name "*_test.py" -print | grep -q .; then
             pytest -v \
-              --ignore="Model Training and Validation" \
-              --ignore="Model Training and Validation/Scripts"
+              --ignore="Model Training and Validation"
           else
-            echo "No tests yet — skipping"
+            echo "No tests outside ignored folders — skipping"
           fi
 
   # ─────────────────────────────────────────────
