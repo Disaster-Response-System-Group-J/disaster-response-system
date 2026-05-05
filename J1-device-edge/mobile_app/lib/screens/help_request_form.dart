@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../services/auth_service.dart';
+import '../services/database_helper.dart';
 import '../services/offline_queue_manager.dart';
 import '../services/gps_service.dart';
 import '../widgets/form_widgets.dart';
@@ -61,7 +63,19 @@ class _HelpRequestFormState extends State<HelpRequestForm> {
         'location': _locationController.text.trim(),
       };
 
-      await OfflineQueueManager().addEvent(payload, 'HELP_REQUEST');
+      final user = AuthService.instance.currentUser;
+      if (user == null) {
+        throw Exception('Please sign in before submitting a request');
+      }
+
+      final deviceId = await DatabaseHelper.instance.getDeviceId();
+
+      await OfflineQueueManager().addEvent(
+        payload,
+        'HELP_REQUEST',
+        userId: user.id,
+        deviceId: deviceId,
+      );
 
       if (!mounted) {
         return;

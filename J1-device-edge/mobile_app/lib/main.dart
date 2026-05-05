@@ -1,7 +1,10 @@
-import 'package:flutter/material.dart';
-import 'navigation/main_tab_controller.dart';
 import 'dart:async';
 
+import 'package:flutter/material.dart';
+
+import 'navigation/main_tab_controller.dart';
+import 'screens/auth_gate.dart';
+import 'services/auth_service.dart';
 import 'services/database_helper.dart';
 import 'services/gps_service.dart';
 import 'services/network_service.dart';
@@ -43,7 +46,7 @@ class StartupGate extends StatefulWidget {
 
 class _StartupGateState extends State<StartupGate> with WidgetsBindingObserver {
   _StartupPhase _phase = _StartupPhase.loading;
-  String _status = 'Starting…';
+  String _status = 'Starting...';
   String? _error;
 
   SyncService? _syncService;
@@ -82,28 +85,33 @@ class _StartupGateState extends State<StartupGate> with WidgetsBindingObserver {
     setState(() {
       _phase = _StartupPhase.loading;
       _error = null;
-      _status = 'Initializing services…';
+      _status = 'Initializing services...';
     });
 
     try {
       setState(() {
-        _status = 'Checking network…';
+        _status = 'Checking network...';
       });
       NetworkService.startListening();
       unawaited(NetworkService.checkConnection());
 
       setState(() {
-        _status = 'Opening local database…';
+        _status = 'Opening local database...';
       });
       await DatabaseHelper.instance.database;
 
       setState(() {
-        _status = 'Warming up GPS…';
+        _status = 'Warming up GPS...';
       });
       unawaited(GpsService.warmUp());
 
       setState(() {
-        _status = 'Connecting sync service…';
+        _status = 'Loading session...';
+      });
+      await AuthService.instance.initialize();
+
+      setState(() {
+        _status = 'Connecting sync service...';
       });
       _syncService ??= SyncService();
       await _syncService!.start();
@@ -129,7 +137,15 @@ class _StartupGateState extends State<StartupGate> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     if (_phase == _StartupPhase.ready) {
-      return const MainTabController();
+      return ValueListenableBuilder(
+        valueListenable: AuthService.instance.currentUserNotifier,
+        builder: (context, user, _) {
+          if (user == null) {
+            return const AuthGate();
+          }
+          return const MainTabController();
+        },
+      );
     }
 
     return Scaffold(

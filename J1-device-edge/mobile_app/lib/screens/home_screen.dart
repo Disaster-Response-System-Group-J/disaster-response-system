@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/auth_service.dart';
 import '../widgets/status_bar.dart';
 import '../widgets/offline_banner.dart';
 
@@ -14,6 +15,29 @@ class HomeScreen extends StatelessWidget {
         children: [
           Text('J1 Dashboard', style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: 16),
+          ValueListenableBuilder(
+            valueListenable: AuthService.instance.currentUserNotifier,
+            builder: (context, user, _) {
+              return Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Signed in',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(user?.name ?? 'No user'),
+                      Text(user?.email ?? 'Not signed in'),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 12),
           const OfflineBanner(),
           const StatusBar(),
           const SizedBox(height: 16),

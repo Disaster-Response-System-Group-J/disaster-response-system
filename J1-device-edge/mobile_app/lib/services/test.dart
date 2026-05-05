@@ -24,8 +24,11 @@ class Day1DatabaseTest {
       type: 'HELP_REQUEST',
       data: jsonEncode(testData),
       status: AppConstants.statusQueued,
-      timestampCreated: DateFormat("yyyy-MM-ddTHH:mm:ss'Z'")
+      createdAt: DateFormat("yyyy-MM-ddTHH:mm:ss'Z'")
           .format(DateTime.now().toUtc()),
+      userId: 'test-user',
+      deviceId: 'test-device',
+      metadata: {},
     );
 
     await DatabaseHelper.instance.saveEvent(event);

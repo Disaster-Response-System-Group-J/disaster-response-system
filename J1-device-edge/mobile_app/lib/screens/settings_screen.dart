@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../services/auth_service.dart';
+
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -18,6 +20,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           Text('Settings', style: Theme.of(context).textTheme.headlineSmall),
+          const SizedBox(height: 12),
+          ValueListenableBuilder(
+            valueListenable: AuthService.instance.currentUserNotifier,
+            builder: (context, user, _) {
+              return Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Account',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(user?.name ?? 'No signed-in user'),
+                      Text(user?.email ?? 'Sign in to continue'),
+                      if (user?.isMock == true) ...[
+                        const SizedBox(height: 8),
+                        const Text('Mock user enabled'),
+                      ],
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: user == null
+                              ? null
+                              : () {
+                                  AuthService.instance.logout();
+                                },
+                          icon: const Icon(Icons.logout),
+                          label: const Text('Sign Out'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
           const SizedBox(height: 12),
           SwitchListTile(
             title: const Text('Enable notifications'),

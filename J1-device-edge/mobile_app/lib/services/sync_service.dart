@@ -23,118 +23,147 @@ class SyncService {
     // Attempt an initial flush without blocking startup flows.
     unawaited(syncQueuedEvents());
 
-    _timer = Timer.periodic(const Duration(seconds: 10), (timer) {
-      syncQueuedEvents();
-    });
+    // Poll every 30 seconds (production-grade)
+    _timer = Timer.periodic(
+      const Duration(seconds: AppConstants.syncPollingIntervalSeconds),
+      (_) => syncQueuedEvents(),
+    );
   }
 
   void listenNetwork() {
     NetworkService.onNetworkChange.listen((isOnline) {
       if (isOnline) {
-        print('Network available, syncing');
+        print('✓ Network available, triggering sync');
         syncQueuedEvents();
       } else {
-        print('Offline mode');
+        print('⚠ Offline - sync postponed');
       }
     });
   }
 
   Future<void> syncQueuedEvents() async {
-    if (_syncing) {
-      return;
-    }
+    if (_syncing) return;
     _syncing = true;
+
     try {
       final isOnline = await NetworkService.isOnline();
-      print('Network status: $isOnline');
-
       if (!isOnline) {
-        print('Offline - skipping sync');
-        _syncing = false;
+        print('⚠ Offline - sync postponed');
         return;
       }
 
-      final List<EventModel> queuedEvents =
-          await dbHelper.getQueuedEvents();
-
-      print('DEBUG: Found ${queuedEvents.length} queued events');
-      
+      final queuedEvents = await dbHelper.getQueuedEvents();
       if (queuedEvents.isEmpty) {
-        print('No queued events to sync');
-        _syncing = false;
+        print('ℹ No queued events');
         return;
       }
 
-      print('Syncing ${queuedEvents.length} events to ${AppConstants.apiBaseUrl}${AppConstants.apiUploadEndpoint}');
-
+      print('🔄 Syncing ${queuedEvents.length} events');
       for (var event in queuedEvents) {
-        print('Sending event: ${event.eventId}');
-        await _sendEvent(event);
-        await Future<void>.delayed(const Duration(milliseconds: 500));
+        await _sendEventWithRetry(event);
       }
     } catch (e) {
-      print('Sync error: $e');
+      print('✗ Sync error: $e');
     } finally {
       _syncing = false;
     }
   }
 
-  Future<void> _sendEvent(EventModel event) async {
-    int retryCount = 0;
-    const maxRetries = 3;
-
-    while (retryCount < maxRetries) {
+  /// Send event with exponential backoff retry (production-grade)
+  /// Exponential backoff: 2s, 4s, 6s, 8s, 10s (max 5 attempts)
+  Future<void> _sendEventWithRetry(EventModel event) async {
+    for (int attempt = 0; attempt < AppConstants.maxSyncRetries; attempt++) {
       try {
-        print('DEBUG: Attempting to send event ${event.eventId} (attempt ${retryCount + 1}/$maxRetries)');
-        
-        final client = HttpClient();
-        final uri = Uri.parse('${AppConstants.apiBaseUrl}${AppConstants.apiUploadEndpoint}');
-        
-        print('DEBUG: POST to $uri');
-        
-        final request = await client.postUrl(uri).timeout(
-          const Duration(seconds: 10),
-        );
-        
-        request.headers.contentType = ContentType.json;
-        
-        final jsonPayload = jsonEncode({
-          'eventId': event.eventId,
-          'type': event.type,
-          'data': event.data,
-          'timestampCreated': event.timestampCreated,
-        });
-        
-        print('DEBUG: Payload: $jsonPayload');
-        request.write(jsonPayload);
-        
-        final response = await request.close().timeout(
-          const Duration(seconds: 10),
-        );
+        final response = await _sendEvent(event);
 
-        print('DEBUG: Response status: ${response.statusCode}');
-
-        if (response.statusCode == 200 || response.statusCode == 201) {
+        if (response == 200 || response == 202) {
+          // ✓ Success (200) or Accepted (202)
           await dbHelper.updateEventStatus(
             eventId: event.eventId,
             status: AppConstants.statusSubmitted,
-            timestampSubmitted: DateTime.now().toString(),
+            submittedAt: DateTime.now().toIso8601String(),
           );
           print('✓ Event synced: ${event.eventId}');
-          return;
+          return; // Exit retry loop
+        } else if (response == 409) {
+          // ⚠ Duplicate - event already processed
+          await dbHelper.updateEventStatus(
+            eventId: event.eventId,
+            status: AppConstants.statusDuplicate,
+            submittedAt: DateTime.now().toIso8601String(),
+          );
+          print('⚠ Duplicate: ${event.eventId}');
+          return; // Exit retry loop
         } else {
-          throw Exception('HTTP ${response.statusCode}');
+          // 5xx or other error - retry
+          throw HttpException('HTTP $response');
         }
       } catch (e) {
-        retryCount++;
-        print('✗ Error sending ${event.eventId}: $e');
-        if (retryCount < maxRetries) {
-          await Future.delayed(Duration(seconds: 2 * retryCount));
+        if (attempt < AppConstants.maxSyncRetries - 1) {
+          // Exponential backoff: 2s * (attempt + 1)
+          final backoffMs = 2000 * (attempt + 1);
+          print(
+            '⏳ Attempt ${attempt + 1} failed, retrying in ${backoffMs}ms'
+          );
+          await Future.delayed(Duration(milliseconds: backoffMs));
         }
       }
     }
 
-    print('✗ Failed to sync ${event.eventId} after $maxRetries retries');
+    // Max retries exceeded
+    await dbHelper.incrementSyncAttempts(event.eventId,
+        error: 'Failed after ${AppConstants.maxSyncRetries} attempts');
+    print(
+      '✗ Failed to sync ${event.eventId} after ${AppConstants.maxSyncRetries} attempts'
+    );
+  }
+
+  /// Send event HTTP request with Idempotency-Key header (PRODUCTION)
+  /// Returns HTTP status code or throws exception
+  Future<int> _sendEvent(EventModel event) async {
+    try {
+      final client = HttpClient();
+      final uri =
+          Uri.parse('${AppConstants.apiBaseUrl}${AppConstants.apiIngestEndpoint}');
+
+      final request = await client.postUrl(uri).timeout(
+        Duration(seconds: AppConstants.syncTimeoutSeconds),
+      );
+
+      // Set headers
+      request.headers.contentType = ContentType.json;
+      request.headers.set('Idempotency-Key', event.eventId); // ← CRITICAL
+
+      // Build complete event envelope (production-grade)
+      // Note: appVersion and osVersion can be enhanced later by adding device_info_plus + package_info_plus
+      final String osVersion = Platform.isAndroid ? 'Android' : Platform.isIOS ? 'iOS' : 'Unknown';
+
+      final eventPayload = jsonEncode({
+        'eventId': event.eventId,
+        'eventType': event.type,
+        'eventVersion': '1.0',
+        'timestamp': DateTime.now().toIso8601String(),
+        'userId': event.userId,
+        'deviceId': event.deviceId,
+        'payload': jsonDecode(event.data),
+        'metadata': event.metadata,
+      });
+
+      request.write(eventPayload);
+
+      final response = await request.close().timeout(
+        Duration(seconds: AppConstants.syncTimeoutSeconds),
+      );
+
+      print('POST ${AppConstants.apiIngestEndpoint} → HTTP ${response.statusCode}');
+      return response.statusCode;
+    } on SocketException catch (e) {
+      print('✗ Network error: $e');
+      rethrow;
+    } on TimeoutException catch (e) {
+      print('✗ Request timeout: $e');
+      rethrow;
+    }
   }
 
   void stop() {

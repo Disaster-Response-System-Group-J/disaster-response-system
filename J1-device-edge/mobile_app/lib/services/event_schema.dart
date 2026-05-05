@@ -6,10 +6,14 @@ class EventSchema {
     return {
       'event_id': event.eventId,
       'type': event.type,
-      'data': jsonDecode(event.data),
+      'payload': jsonDecode(event.data),
       'status': event.status,
-      'timestamp_created': event.timestampCreated,
-      'timestamp_submitted': event.timestampSubmitted,
+      'created_at': event.createdAt,
+      'submitted_at': event.submittedAt,
+      'user_id': event.userId,
+      'device_id': event.deviceId,
+      'event_version': event.eventVersion,
+      'metadata': event.metadata,
     };
   }
 

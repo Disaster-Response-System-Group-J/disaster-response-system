@@ -1,20 +1,23 @@
 class AppConstants {
   static const String databaseName = 'j1_disaster_response.db';
-  static const int databaseVersion = 1;
+  static const int databaseVersion = 2;
 
   static const String eventsTable = 'events';
 
+  // Event status constants (PRODUCTION)
   static const String statusQueued = 'QUEUED';
   static const String statusSubmitted = 'SUBMITTED';
+  static const String statusDuplicate = 'DUPLICATE';
   static const String statusFailed = 'FAILED';
 
-  // API Configuration
-  // TODO: Update apiBaseUrl to your backend server
-  // Example: 'http://192.168.1.100:3000' for local testing
-  // Example: 'https://api.yourdomain.com' for production
+  // API Configuration (PRODUCTION - MUST UPDATE BEFORE DEPLOYMENT)
+  // Format: https://api.backend.com (production) or http://192.168.1.100:3000 (local)
   static const String apiBaseUrl = 'http://your-api-server.com';
-  static const String apiUploadEndpoint = '/api/events/upload';
+  static const String apiIngestEndpoint = '/api/v1/events/ingest';
+  static const String apiUploadEndpoint = apiIngestEndpoint;
   
-  // For local testing with a mock server:
-  // static const String apiBaseUrl = 'http://192.168.1.100:3000';
+  // Sync configuration
+  static const int maxSyncRetries = 5;
+  static const int syncTimeoutSeconds = 15;
+  static const int syncPollingIntervalSeconds = 30;
 }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../services/auth_service.dart';
+import '../services/database_helper.dart';
 import '../services/offline_queue_manager.dart';
 import '../services/gps_service.dart';
 import '../widgets/form_widgets.dart';
@@ -55,7 +57,19 @@ class _DataReportFormState extends State<DataReportForm> {
         'images': _selectedImages,
       };
 
-      await OfflineQueueManager().addEvent(payload, 'DATA_REPORT');
+      final user = AuthService.instance.currentUser;
+      if (user == null) {
+        throw Exception('Please sign in before submitting a report');
+      }
+
+      final deviceId = await DatabaseHelper.instance.getDeviceId();
+
+      await OfflineQueueManager().addEvent(
+        payload,
+        'DATA_REPORT',
+        userId: user.id,
+        deviceId: deviceId,
+      );
 
       if (!mounted) {
         return;

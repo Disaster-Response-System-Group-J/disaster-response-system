@@ -7,6 +7,7 @@ import '../screens/home_screen.dart';
 import '../screens/my_requests_screen.dart';
 import '../screens/report_screen.dart';
 import '../screens/settings_screen.dart';
+import '../services/auth_service.dart';
 import '../services/database_helper.dart';
 
 class MainTabController extends StatefulWidget {
@@ -71,59 +72,78 @@ class _MainTabControllerState extends State<MainTabController> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _screens,
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        currentIndex: _selectedIndex,
-        onTap: _onTabSelected,
-        items: [
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Badge(
-              isLabelVisible: _queueCount > 0,
-              label: Text('$_queueCount'),
-              child: const Icon(Icons.edit_note_outlined),
+    return ValueListenableBuilder(
+      valueListenable: AuthService.instance.currentUserNotifier,
+      builder: (context, user, _) {
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(
+              user == null ? 'J1 Disaster Response' : 'Welcome, ${user.name}',
             ),
-            activeIcon: Badge(
-              isLabelVisible: _queueCount > 0,
-              label: Text('$_queueCount'),
-              child: const Icon(Icons.edit_note),
-            ),
-            label: 'Report',
+            actions: [
+              IconButton(
+                tooltip: 'Sign out',
+                onPressed: () {
+                  AuthService.instance.logout();
+                },
+                icon: const Icon(Icons.logout),
+              ),
+            ],
           ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.volunteer_activism_outlined),
-            activeIcon: Icon(Icons.volunteer_activism),
-            label: 'Give Help',
+          body: IndexedStack(
+            index: _selectedIndex,
+            children: _screens,
           ),
-          BottomNavigationBarItem(
-            icon: Badge(
-              isLabelVisible: _queueCount > 0,
-              label: Text('$_queueCount'),
-              child: const Icon(Icons.list_alt_outlined),
-            ),
-            activeIcon: Badge(
-              isLabelVisible: _queueCount > 0,
-              label: Text('$_queueCount'),
-              child: const Icon(Icons.list_alt),
-            ),
-            label: 'My Requests',
+          bottomNavigationBar: BottomNavigationBar(
+            type: BottomNavigationBarType.fixed,
+            currentIndex: _selectedIndex,
+            onTap: _onTabSelected,
+            items: [
+              const BottomNavigationBarItem(
+                icon: Icon(Icons.home_outlined),
+                activeIcon: Icon(Icons.home),
+                label: 'Home',
+              ),
+              BottomNavigationBarItem(
+                icon: Badge(
+                  isLabelVisible: _queueCount > 0,
+                  label: Text('$_queueCount'),
+                  child: const Icon(Icons.edit_note_outlined),
+                ),
+                activeIcon: Badge(
+                  isLabelVisible: _queueCount > 0,
+                  label: Text('$_queueCount'),
+                  child: const Icon(Icons.edit_note),
+                ),
+                label: 'Report',
+              ),
+              const BottomNavigationBarItem(
+                icon: Icon(Icons.volunteer_activism_outlined),
+                activeIcon: Icon(Icons.volunteer_activism),
+                label: 'Give Help',
+              ),
+              BottomNavigationBarItem(
+                icon: Badge(
+                  isLabelVisible: _queueCount > 0,
+                  label: Text('$_queueCount'),
+                  child: const Icon(Icons.list_alt_outlined),
+                ),
+                activeIcon: Badge(
+                  isLabelVisible: _queueCount > 0,
+                  label: Text('$_queueCount'),
+                  child: const Icon(Icons.list_alt),
+                ),
+                label: 'My Requests',
+              ),
+              const BottomNavigationBarItem(
+                icon: Icon(Icons.settings_outlined),
+                activeIcon: Icon(Icons.settings),
+                label: 'Settings',
+              ),
+            ],
           ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.settings_outlined),
-            activeIcon: Icon(Icons.settings),
-            label: 'Settings',
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
