@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
@@ -108,6 +110,24 @@ class DatabaseHelper {
       'submitted_at',
     ];
 
+    final legacyLayoutDetected =
+        existingColumns.contains('type') ||
+        existingColumns.contains('createdAt') ||
+        existingColumns.contains('submittedAt') ||
+        existingColumns.contains('userId') ||
+        existingColumns.contains('deviceId') ||
+        existingColumns.contains('eventVersion') ||
+        existingColumns.contains('lastSyncAt') ||
+        existingColumns.contains('lastSyncError') ||
+        !existingColumns.contains('event_type') ||
+        !existingColumns.contains('created_at');
+
+    if (legacyLayoutDetected) {
+      await _rebuildEventsTable(db, existingColumns);
+      _eventsColumns = await _getTableColumns(db, AppConstants.eventsTable);
+      return;
+    }
+
     final missingColumns = requiredColumns
         .where((column) => !existingColumns.contains(column))
         .toList();
@@ -202,6 +222,108 @@ class DatabaseHelper {
 
     await _createEventsTable(db);
     _eventsColumns = await _getTableColumns(db, AppConstants.eventsTable);
+  }
+
+  Future<void> _rebuildEventsTable(
+    Database db,
+    Set<String> existingColumns,
+  ) async {
+    final legacyRows = await db.query(AppConstants.eventsTable);
+    final legacyName =
+        '${AppConstants.eventsTable}_legacy_${DateTime.now().millisecondsSinceEpoch}';
+
+    await db.execute(
+      'ALTER TABLE ${AppConstants.eventsTable} RENAME TO $legacyName',
+    );
+    await _createEventsTable(db);
+
+    final typeColumn = existingColumns.contains('event_type')
+        ? 'event_type'
+        : existingColumns.contains('type')
+            ? 'type'
+            : null;
+    final createdColumn = existingColumns.contains('created_at')
+        ? 'created_at'
+        : existingColumns.contains('createdAt')
+            ? 'createdAt'
+            : null;
+    final submittedColumn = existingColumns.contains('submitted_at')
+        ? 'submitted_at'
+        : existingColumns.contains('submittedAt')
+            ? 'submittedAt'
+            : null;
+    final userColumn = existingColumns.contains('user_id')
+        ? 'user_id'
+        : existingColumns.contains('userId')
+            ? 'userId'
+            : null;
+    final deviceColumn = existingColumns.contains('device_id')
+        ? 'device_id'
+        : existingColumns.contains('deviceId')
+            ? 'deviceId'
+            : null;
+    final versionColumn = existingColumns.contains('event_version')
+        ? 'event_version'
+        : existingColumns.contains('eventVersion')
+            ? 'eventVersion'
+            : null;
+    final syncAttemptsColumn = existingColumns.contains('sync_attempts')
+        ? 'sync_attempts'
+        : existingColumns.contains('syncAttempts')
+            ? 'syncAttempts'
+            : null;
+    final errorColumn = existingColumns.contains('last_sync_error')
+        ? 'last_sync_error'
+        : existingColumns.contains('lastSyncError')
+            ? 'lastSyncError'
+            : null;
+    final lastSyncColumn = existingColumns.contains('last_sync_at')
+        ? 'last_sync_at'
+        : existingColumns.contains('lastSyncAt')
+            ? 'lastSyncAt'
+            : null;
+
+    for (final row in legacyRows) {
+      final insertedEvent = EventModel(
+        eventId: row['event_id']?.toString() ?? const Uuid().v4(),
+        type: (typeColumn == null
+                ? null
+                : row[typeColumn])?.toString() ??
+            'UNKNOWN',
+        data: row['payload']?.toString() ?? row['data']?.toString() ?? '{}',
+        status: row['status']?.toString() ?? AppConstants.statusQueued,
+        createdAt: (createdColumn == null
+                ? null
+                : row[createdColumn])?.toString() ??
+            DateTime.now().toIso8601String(),
+        submittedAt: (submittedColumn == null
+                ? null
+                : row[submittedColumn])?.toString(),
+        userId: (userColumn == null ? null : row[userColumn])?.toString() ??
+            'legacy-user',
+        deviceId: (deviceColumn == null ? null : row[deviceColumn])?.toString() ??
+            'legacy-device',
+        syncAttempts: int.tryParse(
+              (syncAttemptsColumn == null ? null : row[syncAttemptsColumn])
+                      ?.toString() ??
+                  '0',
+            ) ??
+            0,
+        lastSyncError: (errorColumn == null ? null : row[errorColumn])?.toString(),
+        metadata: _decodeMetadata(row['metadata']),
+        eventVersion: (versionColumn == null
+                ? null
+                : row[versionColumn])?.toString() ??
+            '1.0',
+        lastSyncAt: (lastSyncColumn == null ? null : row[lastSyncColumn])?.toString(),
+      );
+
+      await db.insert(
+        AppConstants.eventsTable,
+        insertedEvent.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
   }
 
   Future<Set<String>> _getTableColumns(Database db, String tableName) async {
@@ -744,5 +866,23 @@ class DatabaseHelper {
     }
 
     return values;
+  }
+
+  Map<String, dynamic> _decodeMetadata(dynamic metadata) {
+    if (metadata == null) {
+      return {};
+    }
+    if (metadata is Map<String, dynamic>) {
+      return metadata;
+    }
+    try {
+      final decoded = jsonDecode(metadata.toString());
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } catch (_) {
+      // Fall through to an empty map.
+    }
+    return {};
   }
 }
