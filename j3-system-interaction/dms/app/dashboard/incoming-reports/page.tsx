@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { FileText, CheckCircle2, XCircle, Copy, Eye, MapPin, Clock, Camera, AlertTriangle, ShieldAlert } from 'lucide-react';
-import { MOCK_INCOMING_REPORTS } from '@/data/mock-data';
 import { VerificationStatus, ReportSource, IncomingReport, UserRole, IncidentSeverity } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { useSocket } from '@/context/SocketContext';
@@ -26,7 +25,11 @@ const STATUS_STYLES: Record<string, string> = {
 export default function IncomingReportsPage() {
   const { user, hasPermission } = useAuth();
   const socket = useSocket();
-  const [reports, setReports] = useState<IncomingReport[]>(MOCK_INCOMING_REPORTS);
+  
+  // Updated states for live data fetching
+  const [reports, setReports] = useState<IncomingReport[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [sourceFilter, setSourceFilter] = useState<string>('ALL');
   const [selectedReport, setSelectedReport] = useState<IncomingReport | null>(null);
@@ -37,8 +40,44 @@ export default function IncomingReportsPage() {
     affectedPeople: 0 
   });
 
-
   const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.includes('NATIONAL')) ? 'ALL' : (user as any)?.assignedDistrict || 'ALL';
+
+  // Fetch initial data from database
+  useEffect(() => {
+    const fetchReports = async () => {
+      try {
+        const response = await fetch('/api/reports');
+        if (!response.ok) throw new Error('Failed to fetch reports');
+        
+        const data = await response.json();
+        
+        // Map database row schema to the UI's IncomingReport type
+        const mappedReports: IncomingReport[] = data.map((row: any) => ({
+          reportId: row.report_id.toString(),
+          source: row.source_channel as ReportSource,
+          verificationStatus: row.status as VerificationStatus,
+          district: 'UNASSIGNED', // Fallback as this isn't directly in the Report table
+          disasterType: 'UNKNOWN', // Fallback as this isn't directly in the Report table
+          latitude: Number(row.latitude) || 0,
+          longitude: Number(row.longitude) || 0,
+          mediaUrls: row.media_url ? [row.media_url] : [],
+          contact: row.contact_info || '',
+          createdAt: row.created_at,
+          description: row.description || '',
+          officerNotes: '',
+        }));
+
+        setReports(mappedReports);
+      } catch (err) {
+        console.error('Error fetching reports:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchReports();
+  }, []);
+
   // WebSocket Integration for Real-Time Updates
   useEffect(() => {
     if (!socket) return;
@@ -119,6 +158,14 @@ export default function IncomingReportsPage() {
     setIncidentForm({ title: '', severity: IncidentSeverity.HIGH, affectedPeople: 0 });
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex-1 overflow-y-auto bg-[#0a0f16] text-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 overflow-y-auto bg-[#0a0f16] text-white">
       <div className="p-8 max-w-[1400px] mx-auto">
@@ -163,12 +210,12 @@ export default function IncomingReportsPage() {
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-3">
                     <span className="text-xs font-bold text-slate-300">{report.reportId}</span>
-                    <span className={`px-2 py-0.5 rounded text-[8px] font-bold tracking-widest border ${SOURCE_LABELS[report.source]?.color}`}>
-                      {SOURCE_LABELS[report.source]?.label}
+                    <span className={`px-2 py-0.5 rounded text-[8px] font-bold tracking-widest border ${SOURCE_LABELS[report.source]?.color || 'bg-slate-800 text-slate-300 border-slate-700'}`}>
+                      {SOURCE_LABELS[report.source]?.label || report.source}
                     </span>
                     {report.mediaUrls && report.mediaUrls.length > 0 && <Camera size={12} className="text-teal-400" />}
                   </div>
-                  <span className={`px-2 py-0.5 rounded text-[8px] font-bold tracking-widest border ${STATUS_STYLES[report.verificationStatus]}`}>
+                  <span className={`px-2 py-0.5 rounded text-[8px] font-bold tracking-widest border ${STATUS_STYLES[report.verificationStatus] || 'bg-slate-800 text-slate-400 border-slate-700'}`}>
                     {(report.verificationStatus || 'UNKNOWN').replace(/_/g, ' ')}
                   </span>
                 </div>
@@ -189,7 +236,7 @@ export default function IncomingReportsPage() {
                 <h3 className="text-base font-bold mb-4">Report Details</h3>
                 <div className="space-y-4 text-sm">
                   <Field label="Report ID" value={selectedReport.reportId} />
-                  <Field label="Source" value={SOURCE_LABELS[selectedReport.source]?.label} />
+                  <Field label="Source" value={SOURCE_LABELS[selectedReport.source]?.label || selectedReport.source} />
                   <Field label="Type" value={selectedReport.disasterType} />
                   <Field label="District" value={selectedReport.district} />
                   <Field label="Location" value={`${selectedReport.latitude}, ${selectedReport.longitude}`} />

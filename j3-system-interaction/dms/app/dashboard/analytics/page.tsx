@@ -1,16 +1,10 @@
 'use client';
 
+import { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
-import { Shield, TrendingUp, Users, Activity, MapPin } from 'lucide-react';
-import { MOCK_DASHBOARD_SUMMARY, MOCK_CONFIRMED_INCIDENTS } from '@/data/mock-data';
+import { Shield, TrendingUp, Users, Activity, MapPin, AlertTriangle } from 'lucide-react';
 import { DISTRICT_NAMES } from '@/data/districts';
 import { IncidentSeverity } from '@/types';
-
-// Process mock data for charts
-const severityData = Object.values(IncidentSeverity).map(sev => ({
-  name: sev,
-  value: MOCK_CONFIRMED_INCIDENTS.filter(i => i.severity === sev).length
-}));
 
 const SEVERITY_COLORS = {
   CRITICAL: '#ef4444',
@@ -19,49 +13,91 @@ const SEVERITY_COLORS = {
   LOW: '#3b82f6',
 };
 
-const districtData = DISTRICT_NAMES
-  .map(d => ({
-    name: d,
-    incidents: MOCK_CONFIRMED_INCIDENTS.filter(i => i.district === d).length
-  }))
-  .filter(d => d.incidents > 0)
-  .sort((a, b) => b.incidents - a.incidents);
-
-const trendData = [
-  { day: 'Mon', floods: 2, landslides: 0, droughts: 0, other: 1 },
-  { day: 'Tue', floods: 3, landslides: 1, droughts: 0, other: 0 },
-  { day: 'Wed', floods: 5, landslides: 1, droughts: 1, other: 0 },
-  { day: 'Thu', floods: 4, landslides: 2, droughts: 1, other: 1 },
-  { day: 'Fri', floods: 6, landslides: 2, droughts: 2, other: 0 },
-  { day: 'Sat', floods: 8, landslides: 3, droughts: 1, other: 1 },
-  { day: 'Sun', floods: 5, landslides: 2, droughts: 1, other: 0 },
-];
-
 export default function AnalyticsPage() {
-  const data = MOCK_DASHBOARD_SUMMARY;
+  const [incidents, setIncidents] = useState<any[]>([]);
+  const [shelterStats, setShelterStats] = useState({ utilization: 0 });
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch live analytics data
+  useEffect(() => {
+    const fetchAnalyticsData = async () => {
+      try {
+        const [incidentsRes, sheltersRes] = await Promise.all([
+          fetch('/api/incidents').then(res => res.json()),
+          fetch('/api/relief/shelter').then(res => res.json())
+        ]);
+
+        setIncidents(incidentsRes);
+
+        const totalCapacity = sheltersRes.reduce((sum: number, s: any) => sum + (s.max_capacity || 0), 0);
+        const totalOccupancy = sheltersRes.reduce((sum: number, s: any) => sum + (s.current_occupancy || 0), 0);
+        setShelterStats({ 
+          utilization: totalCapacity > 0 ? Math.round((totalOccupancy / totalCapacity) * 100) : 0 
+        });
+      } catch (error) {
+        console.error('Error fetching analytics:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchAnalyticsData();
+  }, []);
+
+  const severityData = useMemo(() => 
+    Object.values(IncidentSeverity).map(sev => ({
+      name: sev,
+      value: incidents.filter(i => i.severity === sev).length
+    })), [incidents]);
+
+  const districtData = useMemo(() => 
+    DISTRICT_NAMES
+      .map(d => ({
+        name: d,
+        incidents: incidents.filter(i => i.district === d || i.location === d).length
+      }))
+      .filter(d => d.incidents > 0)
+      .sort((a, b) => b.incidents - a.incidents), 
+  [incidents]);
+
+  const trendData = useMemo(() => {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (6 - i));
+      const dateStr = d.toISOString().split('T')[0];
+      const dayIncidents = incidents.filter(inc => inc.created_at?.startsWith(dateStr));
+      
+      return { 
+        day: days[d.getDay()],
+        floods: dayIncidents.filter(inc => inc.title?.toUpperCase().includes('FLOOD')).length,
+        landslides: dayIncidents.filter(inc => inc.title?.toUpperCase().includes('LANDSLIDE')).length,
+        droughts: dayIncidents.filter(inc => inc.title?.toUpperCase().includes('DROUGHT')).length,
+        other: dayIncidents.length 
+      };
+    });
+  }, [incidents]);
+
+  const totalAffected = incidents.reduce((sum, i) => sum + (i.affected_population || 0), 0);
+
+  if (isLoading) return <div className="flex-1 bg-[#0a0f16] flex items-center justify-center text-blue-500">Loading Analytics...</div>;
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#0a0f16] text-white">
       <div className="p-8 max-w-[1400px] mx-auto">
-        <div className="flex items-end justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-extrabold tracking-tight mb-2">Analytics & Reporting</h1>
-            <p className="text-sm text-slate-400">Data-driven insights for disaster response coordination.</p>
-          </div>
-        </div>
+        <h1 className="text-3xl font-extrabold tracking-tight mb-2">Analytics & Reporting</h1>
+        <p className="text-sm text-slate-400 mb-8">Data-driven insights for disaster response coordination[cite: 6].</p>
 
-        {/* Top KPIs */}
         <div className="grid grid-cols-4 gap-6 mb-8">
-          <StatCard title="Total Affected" value={data.peopleAffected.toLocaleString()} icon={<Users />} trend={`+${data.peopleAffectedChange}%`} />
+          <StatCard title="Total Affected" value={totalAffected.toLocaleString()} icon={<Users />} trend="+12%" />
           <StatCard title="Avg Response Time" value="14.2m" icon={<Activity />} trend="-2.4m" />
-          <StatCard title="Shelter Utilization" value="84%" icon={<Shield />} trend="+5%" />
-          <StatCard title="Active Incidents" value={data.activeIncidents.toString()} icon={<AlertTriangle />} trend={`+${data.activeIncidentsChange}`} />
+          <StatCard title="Shelter Utilization" value={`${shelterStats.utilization}%`} icon={<Shield />} trend="+5%" />
+          <StatCard title="Active Incidents" value={incidents.filter(i => i.status === 'ACTIVE').length.toString()} icon={<AlertTriangle size={18} />} trend="+3" />
         </div>
 
         <div className="grid grid-cols-2 gap-6 mb-6">
-          {/* Incidents by Severity */}
           <div className="bg-[#131924] border border-slate-800/80 rounded-xl p-6">
-            <h3 className="text-[10px] font-bold text-slate-400 tracking-widest uppercase mb-6">INCIDENTS BY SEVERITY</h3>
+            <h3 className="text-[10px] font-bold text-slate-400 tracking-widest uppercase mb-6">INCIDENTS BY SEVERITY[cite: 6]</h3>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -70,36 +106,21 @@ export default function AnalyticsPage() {
                       <Cell key={`cell-${index}`} fill={SEVERITY_COLORS[entry.name as keyof typeof SEVERITY_COLORS]} />
                     ))}
                   </Pie>
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#131924', borderColor: '#1e293b', borderRadius: '8px' }}
-                    itemStyle={{ color: '#fff', fontSize: '12px', fontWeight: 'bold' }}
-                  />
+                  <Tooltip contentStyle={{ backgroundColor: '#131924', border: 'none' }} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
-            <div className="flex justify-center gap-4 mt-4 text-[10px] font-bold text-slate-400">
-              {severityData.map(d => (
-                <div key={d.name} className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: SEVERITY_COLORS[d.name as keyof typeof SEVERITY_COLORS] }} />
-                  {d.name} ({d.value})
-                </div>
-              ))}
-            </div>
           </div>
 
-          {/* Incidents by District */}
           <div className="bg-[#131924] border border-slate-800/80 rounded-xl p-6">
-            <h3 className="text-[10px] font-bold text-slate-400 tracking-widest uppercase mb-6 flex items-center gap-2"><MapPin size={12} /> INCIDENTS BY DISTRICT</h3>
+            <h3 className="text-[10px] font-bold text-slate-400 tracking-widest uppercase mb-6 flex items-center gap-2"><MapPin size={12} /> INCIDENTS BY DISTRICT[cite: 6]</h3>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={districtData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <BarChart data={districtData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                  <XAxis dataKey="name" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
-                  <Tooltip
-                    cursor={{ fill: '#1e293b' }}
-                    contentStyle={{ backgroundColor: '#131924', borderColor: '#1e293b', borderRadius: '8px' }}
-                  />
+                  <XAxis dataKey="name" stroke="#64748b" fontSize={10} tickLine={false} />
+                  <YAxis stroke="#64748b" fontSize={10} tickLine={false} />
+                  <Tooltip cursor={{ fill: '#1e293b' }} contentStyle={{ backgroundColor: '#131924', border: 'none' }} />
                   <Bar dataKey="incidents" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -107,23 +128,18 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
-        {/* 7-Day Trend */}
         <div className="bg-[#131924] border border-slate-800/80 rounded-xl p-6">
-          <h3 className="text-[10px] font-bold text-slate-400 tracking-widest uppercase mb-6 flex items-center gap-2"><TrendingUp size={12} /> 7-DAY DISASTER TREND</h3>
+          <h3 className="text-[10px] font-bold text-slate-400 tracking-widest uppercase mb-6 flex items-center gap-2"><TrendingUp size={12} /> 7-DAY DISASTER TREND[cite: 6]</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <LineChart data={trendData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                <XAxis dataKey="day" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
-                <YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#131924', borderColor: '#1e293b', borderRadius: '8px' }}
-                  itemStyle={{ fontSize: '12px', fontWeight: 'bold' }}
-                />
-                <Line type="monotone" dataKey="floods" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4, fill: '#3b82f6' }} name="Floods" />
-                <Line type="monotone" dataKey="landslides" stroke="#f97316" strokeWidth={3} dot={{ r: 4, fill: '#f97316' }} name="Landslides" />
-                <Line type="monotone" dataKey="droughts" stroke="#eab308" strokeWidth={3} dot={{ r: 4, fill: '#eab308' }} name="Droughts" />
-                <Line type="monotone" dataKey="other" stroke="#8b5cf6" strokeWidth={3} dot={{ r: 4, fill: '#8b5cf6' }} name="Other" />
+                <XAxis dataKey="day" stroke="#64748b" fontSize={10} />
+                <YAxis stroke="#64748b" fontSize={10} />
+                <Tooltip contentStyle={{ backgroundColor: '#131924', border: 'none' }} />
+                <Line type="monotone" dataKey="floods" stroke="#3b82f6" strokeWidth={3} name="Floods" />
+                <Line type="monotone" dataKey="landslides" stroke="#f97316" strokeWidth={3} name="Landslides" />
+                <Line type="monotone" dataKey="droughts" stroke="#eab308" strokeWidth={3} name="Droughts" />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -150,5 +166,3 @@ function StatCard({ title, value, icon, trend }: { title: string; value: string;
     </div>
   );
 }
-// Using generic lucide icon wrapper for the Alert icon to prevent conflicts
-function AlertTriangle() { return <TrendingUp />; } // Placeholder just for the stat card
