@@ -15,6 +15,7 @@ class _DataReportFormState extends State<DataReportForm> {
   final _formKey = GlobalKey<FormState>();
   final _descriptionController = TextEditingController();
   final _locationController = TextEditingController();
+  final List<String> _selectedImages = [];
 
   String _selectedType = 'Flood level';
   bool _saving = false;
@@ -51,6 +52,7 @@ class _DataReportFormState extends State<DataReportForm> {
         'data_type': _selectedType,
         'description': _descriptionController.text.trim(),
         'location': _locationController.text.trim(),
+        'images': _selectedImages,
       };
 
       await OfflineQueueManager().addEvent(payload, 'DATA_REPORT');
@@ -70,6 +72,7 @@ class _DataReportFormState extends State<DataReportForm> {
         _selectedType = _dataTypes.first;
         _gpsCaptured = false;
         _saving = false;
+        _selectedImages.clear();
       });
     } catch (e) {
       if (!mounted) {
@@ -178,6 +181,73 @@ class _DataReportFormState extends State<DataReportForm> {
               label: Text(_locating ? 'Locating...' : 'Capture GPS Location'),
             ),
           ),
+          const SizedBox(height: 16),
+          Text(
+            'Images',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                // TODO: Implement image picker
+              },
+              icon: const Icon(Icons.add_a_photo),
+              label: const Text('Add Images'),
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (_selectedImages.isEmpty)
+            const Text('No images selected')
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _selectedImages
+                  .map((imagePath) => Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: Container(
+                            color: Colors.grey[200],
+                            child: const Icon(Icons.image),
+                          ),
+                        ),
+                        Positioned(
+                          top: 4,
+                          right: 4,
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _selectedImages.remove(imagePath);
+                              });
+                            },
+                            child: Container(
+                              decoration: const BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                              ),
+                              padding: const EdgeInsets.all(4),
+                              child: const Icon(
+                                Icons.close,
+                                size: 16,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ))
+                  .toList(),
+            ),
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,

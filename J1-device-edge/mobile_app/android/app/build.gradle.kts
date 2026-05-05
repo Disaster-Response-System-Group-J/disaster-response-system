@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.example.offline_app"
-    compileSdk = 35
+    compileSdk = 36
     // Use the highest NDK version required by plugins (sqflite_android requires 27.0.12077973)
     ndkVersion = "27.0.12077973"
 
