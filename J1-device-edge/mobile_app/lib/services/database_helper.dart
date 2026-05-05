@@ -408,6 +408,8 @@ class DatabaseHelper {
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
     }
+
+    await _ensureDemoHelpRequests(db);
   }
 
   Future<void> ensureMockUser() async {
@@ -436,6 +438,107 @@ class DatabaseHelper {
       usersTable,
       seededUser.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> _ensureDemoHelpRequests(Database db) async {
+    final existingDemo = await db.query(
+      AppConstants.eventsTable,
+      where: 'event_id IN (?, ?)',
+      whereArgs: [
+        'demo-help-request-1',
+        'demo-help-request-2',
+      ],
+      limit: 1,
+    );
+    if (existingDemo.isNotEmpty) {
+      return;
+    }
+
+    await _ensureDemoUser(
+      db,
+      userId: 'demo-user-1',
+      name: 'Nimal Fernando',
+      email: 'nimal.demo@j1.local',
+    );
+    await _ensureDemoUser(
+      db,
+      userId: 'demo-user-2',
+      name: 'Ayesha Perera',
+      email: 'ayesha.demo@j1.local',
+    );
+
+    final demoDeviceId = await _getOrCreateDeviceId(db);
+
+    final demoEvents = <EventModel>[
+      EventModel(
+        eventId: 'demo-help-request-1',
+        type: 'HELP_REQUEST',
+        data: '{"request_type":"Medical help","description":"Need medicine and first aid support near the school","people_count":2,"mobility_support_required":false,"injuries_reported":true,"location":"Kandy"}',
+        status: AppConstants.statusQueued,
+        createdAt: '2026-05-05T00:00:00Z',
+        submittedAt: null,
+        userId: 'demo-user-1',
+        deviceId: demoDeviceId,
+        metadata: const {'seeded': true, 'source': 'demo'},
+        eventVersion: '1.0',
+        lastSyncAt: null,
+      ),
+      EventModel(
+        eventId: 'demo-help-request-2',
+        type: 'HELP_REQUEST',
+        data: '{"request_type":"Water supply","description":"Requesting drinking water for families in the area","people_count":5,"mobility_support_required":false,"injuries_reported":false,"location":"Galle"}',
+        status: AppConstants.statusQueued,
+        createdAt: '2026-05-05T00:05:00Z',
+        submittedAt: null,
+        userId: 'demo-user-2',
+        deviceId: demoDeviceId,
+        metadata: const {'seeded': true, 'source': 'demo'},
+        eventVersion: '1.0',
+        lastSyncAt: null,
+      ),
+    ];
+
+    for (final event in demoEvents) {
+      await db.insert(
+        AppConstants.eventsTable,
+        event.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+    }
+  }
+
+  Future<void> _ensureDemoUser(
+    Database db, {
+    required String userId,
+    required String name,
+    required String email,
+  }) async {
+    final result = await db.query(
+      usersTable,
+      where: 'id = ? OR email = ?',
+      whereArgs: [userId, email],
+      limit: 1,
+    );
+
+    if (result.isNotEmpty) {
+      return;
+    }
+
+    final demoUser = AppUser(
+      id: userId,
+      name: name,
+      email: email,
+      password: 'demo1234',
+      role: 'PUBLIC_USER',
+      isMock: true,
+      createdAt: DateTime.now().toUtc().toIso8601String(),
+    );
+
+    await db.insert(
+      usersTable,
+      demoUser.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.ignore,
     );
   }
 
@@ -545,18 +648,29 @@ class DatabaseHelper {
   }
 
   Future<String> getDeviceId() async {
-    final existing = await _readMetaValue('device_id');
+    final db = await database;
+    final existing = await _readMetaValue(db, 'device_id');
     if (existing != null && existing.isNotEmpty) {
       return existing;
     }
 
     final generated = const Uuid().v4();
-    await _writeMetaValue('device_id', generated);
+    await _writeMetaValue(db, 'device_id', generated);
     return generated;
   }
 
-  Future<String?> _readMetaValue(String key) async {
-    final db = await database;
+  Future<String> _getOrCreateDeviceId(Database db) async {
+    final existing = await _readMetaValue(db, 'device_id');
+    if (existing != null && existing.isNotEmpty) {
+      return existing;
+    }
+
+    final generated = const Uuid().v4();
+    await _writeMetaValue(db, 'device_id', generated);
+    return generated;
+  }
+
+  Future<String?> _readMetaValue(Database db, String key) async {
     final result = await db.query(
       metaTable,
       where: 'meta_key = ?',
@@ -571,8 +685,7 @@ class DatabaseHelper {
     return result.first['meta_value']?.toString();
   }
 
-  Future<void> _writeMetaValue(String key, String value) async {
-    final db = await database;
+  Future<void> _writeMetaValue(Database db, String key, String value) async {
     await db.insert(
       metaTable,
       {
@@ -690,6 +803,21 @@ class DatabaseHelper {
         ? events
         : events.where((event) => event.userId == userId).toList();
     return filtered.map(RequestModel.fromEvent).toList();
+  }
+
+  Future<List<EventModel>> getHelpRequests({
+    String? excludeUserId,
+  }) async {
+    final events = await getQueuedEvents();
+    return events.where((event) {
+      if (event.type != 'HELP_REQUEST') {
+        return false;
+      }
+      if (excludeUserId == null || excludeUserId.isEmpty) {
+        return true;
+      }
+      return event.userId != excludeUserId;
+    }).toList();
   }
 
   Future<int> updateEventStatus({

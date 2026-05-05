@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../models/event_model.dart';
+import '../services/auth_service.dart';
 import '../services/database_helper.dart';
 import '../widgets/offline_banner.dart';
 
@@ -26,11 +27,11 @@ class _GiveHelpScreenState extends State<GiveHelpScreen> {
       child: RefreshIndicator(
         onRefresh: _refresh,
         child: FutureBuilder<List<EventModel>>(
-          future: _databaseHelper.getQueuedEvents(),
+          future: _databaseHelper.getHelpRequests(
+            excludeUserId: AuthService.instance.currentUser?.id,
+          ),
           builder: (context, snapshot) {
-            final requests = (snapshot.data ?? const <EventModel>[])
-                .where((event) => event.type == 'HELP_REQUEST')
-                .toList();
+            final requests = snapshot.data ?? const <EventModel>[];
 
             return ListView(
               physics: const AlwaysScrollableScrollPhysics(),
@@ -43,7 +44,7 @@ class _GiveHelpScreenState extends State<GiveHelpScreen> {
                 const SizedBox(height: 8),
                 const OfflineBanner(),
                 Text(
-                  'Open help requests from the local queue. Tap a request to claim it.',
+                  'Open help requests from the local queue. Your own requests are hidden here.',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 16),
