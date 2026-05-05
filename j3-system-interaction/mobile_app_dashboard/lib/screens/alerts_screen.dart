@@ -1,23 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
-import '../components/nav_bar.dart';
+import "../components/nav_bar.dart";
 
-class AlertsScreen extends StatefulWidget {
+class AlertsScreen extends StatelessWidget {
   const AlertsScreen({super.key});
-
-  @override
-  State<AlertsScreen> createState() => _AlertsScreenState();
-}
-
-class _AlertsScreenState extends State<AlertsScreen> {
-  int currentIndex = 4; // Alerts tab
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      // ─── Top App Bar ───
       appBar: AppBar(
         backgroundColor: Colors.black.withValues(alpha: 0.8),
         elevation: 0,
@@ -49,21 +41,15 @@ class _AlertsScreenState extends State<AlertsScreen> {
       ),
       body: Stack(
         children: [
-          // ─── Scrollable content ───
           SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ─── Page Header ───
                 _buildPageHeader(),
                 const SizedBox(height: 16),
-
-                // ─── System Health Overview ───
                 _buildSystemHealthCard(),
                 const SizedBox(height: 16),
-
-                // ─── Critical Alert 1: Flood Warning ───
                 _buildAlertCard(
                   severity: AlertSeverity.critical,
                   icon: Icons.warning,
@@ -77,8 +63,6 @@ class _AlertsScreenState extends State<AlertsScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
-
-                // ─── Critical Alert 2: Grid Failure ───
                 _buildAlertCard(
                   severity: AlertSeverity.critical,
                   icon: Icons.electrical_services,
@@ -92,8 +76,6 @@ class _AlertsScreenState extends State<AlertsScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
-
-                // ─── High Priority Alert ───
                 _buildAlertCard(
                   severity: AlertSeverity.high,
                   icon: Icons.priority_high,
@@ -106,26 +88,19 @@ class _AlertsScreenState extends State<AlertsScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
-
-                // ─── Routine Alert ───
                 _buildRoutineAlertCard(),
                 const SizedBox(height: 24),
               ],
             ),
           ),
-
-          // ─── Bottom nav (fixed) ───
           Positioned(
             left: 0,
             right: 0,
             bottom: 0,
             child: BottomNav(
-              currentIndex: currentIndex,
+              currentIndex: 4,
               onTap: (index) {
-                if (index == currentIndex) return;
-                setState(() {
-                  currentIndex = index;
-                });
+                if (index == 4) return;
                 _navigateTo(context, index);
               },
             ),

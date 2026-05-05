@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -5,6 +6,9 @@ import 'package:latlong2/latlong.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../components/nav_bar.dart';
+import '../services/incident_service.dart';
+import '../services/auth_service.dart';
+import '../models/incident.dart';
 
 /// Tactical Map screen.
 ///
@@ -26,25 +30,52 @@ class _MapScreenState extends State<MapScreen> {
   int _currentNavIndex = 2; // Map tab
   final MapController _mapController = MapController();
   final LatLng _center = const LatLng(34.0522, -118.2437); // Los Angeles, CA
+  List<Incident> _incidents = [];
+  StreamSubscription<Incident>? _updatesSub;
+  // Track current center and zoom to avoid depending on MapController internals
+  late LatLng _mapCenter;
+  double _currentZoom = 13.0;
 
   @override
   void dispose() {
     _mapController.dispose();
+    _updatesSub?.cancel();
     super.dispose();
   }
 
+  @override
+  void initState() {
+    super.initState();
+    _loadIncidents();
+    _updatesSub = IncidentService.updates.listen((inc) {
+      final idx = _incidents.indexWhere((i) => i.id == inc.id);
+      if (idx != -1) {
+        setState(() => _incidents[idx] = inc);
+      }
+    });
+    _mapCenter = _center;
+  }
+
+  Future<void> _loadIncidents() async {
+    final zone = AuthService.currentUser?.zone;
+    final list = await IncidentService.getIncidentsForZone(zone);
+    if (!mounted) return;
+    setState(() => _incidents = list);
+  }
+
   void _zoomIn() {
-    final zoom = _mapController.camera.zoom + 1;
-    _mapController.move(_mapController.camera.center, zoom);
+    _currentZoom = (_currentZoom + 1).clamp(3.0, 18.0);
+    _mapController.move(_mapCenter, _currentZoom);
   }
 
   void _zoomOut() {
-    final zoom = _mapController.camera.zoom - 1;
-    _mapController.move(_mapController.camera.center, zoom);
+    _currentZoom = (_currentZoom - 1).clamp(3.0, 18.0);
+    _mapController.move(_mapCenter, _currentZoom);
   }
 
   void _resetZoom() {
-    _mapController.move(_center, 13.0);
+    _currentZoom = 13.0;
+    _mapController.move(_center, _currentZoom);
   }
 
   @override
@@ -95,9 +126,13 @@ class _MapScreenState extends State<MapScreen> {
               mapController: _mapController,
               options: MapOptions(
                 initialCenter: _center,
-                initialZoom: 13.0,
+                initialZoom: _currentZoom,
                 minZoom: 3.0,
                 maxZoom: 18.0,
+                onPositionChanged: (pos, _) {
+                  if (pos.center != null) _mapCenter = pos.center!;
+                  _currentZoom = pos.zoom ?? _currentZoom;
+                },
               ),
               children: [
                 TileLayer(
@@ -105,48 +140,24 @@ class _MapScreenState extends State<MapScreen> {
                   subdomains: const ['a', 'b', 'c', 'd'],
                 ),
                 MarkerLayer(
-                  markers: [
-                    // Marker 1: Critical (FLOOD-01)
-                    Marker(
-                      point: const LatLng(34.055, -118.25),
-                      width: 80,
-                      height: 80,
-                      child: _buildMapMarker(
-                        icon: Icons.warning,
-                        bgColor: AppColors.error,
-                        fgColor: AppColors.onError,
-                        label: 'FLOOD-01',
-                        labelColor: AppColors.error,
-                        glowColor: const Color(0x33EF4444),
+                  markers: _incidents.map((inc) {
+                    return Marker(
+                      point: LatLng(inc.latitude, inc.longitude),
+                      width: 72,
+                      height: 72,
+                      child: GestureDetector(
+                        onTap: () => _showIncidentSheet(inc),
+                        child: _buildMapMarker(
+                          icon: Icons.report,
+                          bgColor: inc.priority == 'HIGH' ? AppColors.error : AppColors.primary,
+                          fgColor: AppColors.onSurface,
+                          label: inc.id,
+                          labelColor: AppColors.onSurface,
+                          glowColor: inc.priority == 'HIGH' ? const Color(0x33EF4444) : const Color(0x333B82F6),
+                        ),
                       ),
-                    ),
-                    // Marker 2: Shelter (SHLT-COL)
-                    Marker(
-                      point: const LatLng(34.045, -118.23),
-                      width: 80,
-                      height: 80,
-                      child: _buildMapMarker(
-                        icon: Icons.home_work,
-                        bgColor: AppColors.secondary,
-                        fgColor: AppColors.onSecondary,
-                        label: 'SHLT-COL',
-                        labelColor: AppColors.secondary,
-                        glowColor: const Color(0x334CD7F6),
-                      ),
-                    ),
-                    // Marker 3: Elevated (landslide — no label)
-                    Marker(
-                      point: const LatLng(34.065, -118.26),
-                      width: 40,
-                      height: 40,
-                      child: _buildMapMarkerIconOnly(
-                        icon: Icons.landslide,
-                        bgColor: AppColors.tertiaryContainer,
-                        fgColor: AppColors.onTertiaryContainer,
-                        glowColor: const Color(0x33DF7412),
-                      ),
-                    ),
-                  ],
+                    );
+                  }).toList(),
                 ),
               ],
             ),
@@ -386,6 +397,118 @@ class _MapScreenState extends State<MapScreen> {
   // ═══════════════════════════════════════
   //  MAP MARKER (with label)
   // ═══════════════════════════════════════
+  void _showIncidentSheet(Incident inc) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.4,
+          minChildSize: 0.2,
+          maxChildSize: 0.9,
+          builder: (_, controller) {
+            return Container(
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainerHighest,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              ),
+              padding: const EdgeInsets.all(12),
+              child: ListView(
+                controller: controller,
+                children: [
+                  Text(inc.id, style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.onSurface)),
+                  const SizedBox(height: 8),
+                  Text('${inc.type} • ${inc.zone}', style: GoogleFonts.spaceGrotesk(color: AppColors.onSurfaceVariant)),
+                  const SizedBox(height: 12),
+                  Text(inc.description, style: GoogleFonts.inter(color: AppColors.onSurface)),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      ElevatedButton(
+                        onPressed: () async {
+                          await IncidentService.updateIncidentStatus(inc.id, IncidentStatus.onTheWay);
+                          if (!mounted) return;
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Status updated: On the way')));
+                        },
+                        child: const Text('ON THE WAY'),
+                      ),
+                      ElevatedButton(
+                        onPressed: () async {
+                          await IncidentService.updateIncidentStatus(inc.id, IncidentStatus.reached);
+                          if (!mounted) return;
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Status updated: Reached')));
+                        },
+                        child: const Text('REACHED'),
+                      ),
+                      ElevatedButton(
+                        onPressed: () async {
+                          await IncidentService.updateIncidentStatus(inc.id, IncidentStatus.verified);
+                          if (!mounted) return;
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Marked verified')));
+                        },
+                        child: const Text('VERIFY'),
+                      ),
+                      ElevatedButton(
+                        onPressed: () async {
+                          final res = await showDialog<String?>(context: context, builder: (dctx) {
+                            final ctrl = TextEditingController();
+                            return AlertDialog(
+                              title: const Text('Request Resources'),
+                              content: TextField(controller: ctrl, decoration: const InputDecoration(hintText: 'e.g. Ambulance, Medical Team')),
+                              actions: [
+                                TextButton(onPressed: () => Navigator.pop(dctx), child: const Text('Cancel')),
+                                TextButton(onPressed: () => Navigator.pop(dctx, ctrl.text), child: const Text('Send')),
+                              ],
+                            );
+                          });
+                          if (res != null && res.trim().isNotEmpty) {
+                            final list = res.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+                            await IncidentService.requestResources(inc.id, list);
+                            if (!mounted) return;
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Resource request sent')));
+                          }
+                        },
+                        child: const Text('REQUEST RESOURCES'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton(
+                    onPressed: () async {
+                      final note = await showDialog<String?>(context: context, builder: (dctx) {
+                        final ctrl = TextEditingController();
+                        return AlertDialog(
+                          title: const Text('Add Observation'),
+                          content: TextField(controller: ctrl, decoration: const InputDecoration(hintText: 'Short note')), 
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(dctx), child: const Text('Cancel')),
+                            TextButton(onPressed: () => Navigator.pop(dctx, ctrl.text), child: const Text('Save')),
+                          ],
+                        );
+                      });
+                      if (note != null && note.trim().isNotEmpty) {
+                        await IncidentService.addObservation(inc.id, note.trim());
+                        if (!mounted) return;
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Observation added')));
+                      }
+                    },
+                    child: const Text('ADD OBSERVATION'),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
   Widget _buildMapMarker({
     required IconData icon,
     required Color bgColor,

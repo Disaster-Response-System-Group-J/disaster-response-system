@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../components/nav_bar.dart';
+import 'dart:async';
+import '../services/incident_service.dart';
+import '../services/auth_service.dart';
+import '../models/incident.dart';
 
 /// Field Reports (Incoming Reports) screen.
 ///
@@ -18,45 +22,38 @@ class ReportsScreen extends StatefulWidget {
 }
 
 class _ReportsScreenState extends State<ReportsScreen> {
-  int _selectedFilter = 0; // 0 = All, 1 = SOS, 2 = Public
+  int _selectedFilter = 0; // 0 = All
   int _currentNavIndex = 1; // Reports tab
 
-  final List<String> _filterLabels = ['ALL', 'SOS', 'PUBLIC'];
+  // Tactical filter labels (kept minimal for officer workflow)
+  final List<String> _filterLabels = ['ALL', 'ASSIGNED', 'PRIORITY'];
 
-  // ─── Sample report data ───
-  final List<_ReportData> _reports = const [
-    _ReportData(
-      type: _ReportType.sos,
-      badgeLabel: 'SOS PRIORITY',
-      timestamp: 'T-02:14',
-      sector: 'SEC-DELTA',
-      description:
-          'Structural collapse reported at primary junction. Multiple casualties suspected. Requesting immediate heavy rescue detachment.',
-    ),
-    _ReportData(
-      type: _ReportType.public,
-      badgeLabel: 'PUBLIC INFO',
-      timestamp: 'T-08:45',
-      sector: 'DIST-04',
-      description:
-          'Water line rupture flooding secondary arterial route. Traffic significantly delayed, requesting public works assessment.',
-    ),
-    _ReportData(
-      type: _ReportType.j1,
-      badgeLabel: 'J1 INTERNAL',
-      timestamp: 'T-14:22',
-      sector: 'SEC-ALPHA',
-      description:
-          'Communications relay tower #4 reporting intermittent signal degradation. Engineering team dispatched.',
-    ),
-  ];
+  List<Incident> _incidents = [];
+  StreamSubscription<Incident>? _updatesSub;
 
-  List<_ReportData> get _filteredReports {
-    if (_selectedFilter == 0) return _reports;
-    if (_selectedFilter == 1) {
-      return _reports.where((r) => r.type == _ReportType.sos).toList();
-    }
-    return _reports.where((r) => r.type == _ReportType.public).toList();
+  @override
+  void initState() {
+    super.initState();
+    _loadIncidents();
+    _updatesSub = IncidentService.updates.listen((inc) {
+      final idx = _incidents.indexWhere((i) => i.id == inc.id);
+      if (idx != -1) {
+        setState(() => _incidents[idx] = inc);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _updatesSub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadIncidents() async {
+    final zone = AuthService.currentUser?.zone;
+    final list = await IncidentService.getIncidentsForZone(zone);
+    if (!mounted) return;
+    setState(() => _incidents = list);
   }
 
   @override
@@ -174,11 +171,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
               Expanded(
                 child: ListView.builder(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
-                  itemCount: _filteredReports.length,
+                  itemCount: _incidents.length,
                   itemBuilder: (context, index) {
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 16),
-                      child: _buildReportCard(_filteredReports[index]),
+                      child: _buildIncidentCard(_incidents[index]),
                     );
                   },
                 ),
@@ -222,30 +219,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
   // ═══════════════════════════════════════
   //  REPORT CARD
   // ═══════════════════════════════════════
-  Widget _buildReportCard(_ReportData report) {
-    final Color accentColor;
-    final Color badgeBg;
-    final Color badgeFg;
-    final bool hasBorder;
-
-    switch (report.type) {
-      case _ReportType.sos:
-        accentColor = AppColors.error;
-        badgeBg = AppColors.errorContainer;
-        badgeFg = AppColors.onErrorContainer;
-        hasBorder = false;
-      case _ReportType.public:
-        accentColor = AppColors.tertiary;
-        badgeBg = AppColors.tertiaryContainer;
-        badgeFg = AppColors.onTertiaryContainer;
-        hasBorder = false;
-      case _ReportType.j1:
-        accentColor = AppColors.primary;
-        badgeBg = AppColors.primary.withValues(alpha: 0.2);
-        badgeFg = AppColors.primary;
-        hasBorder = true;
-    }
-
+  Widget _buildIncidentCard(Incident inc) {
+    final Color accent = inc.priority == 'HIGH' ? AppColors.error : AppColors.primary;
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
@@ -256,165 +231,86 @@ class _ReportsScreenState extends State<ReportsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Top accent border (2px coloured bar)
-          Container(height: 2, color: accentColor),
-
-          Stack(
-            children: [
-              // SOS: subtle red wash over the entire card
-              if (report.type == _ReportType.sos)
-                Positioned.fill(
-                  child: Container(
-                    color: AppColors.error.withValues(alpha: 0.05),
-                  ),
-                ),
-
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          Container(height: 2, color: accent),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // ── Header: badge + time | sector ──
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            // Badge
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: badgeBg,
-                                borderRadius: BorderRadius.circular(2),
-                                border: hasBorder
-                                    ? Border.all(
-                                        color: accentColor
-                                            .withValues(alpha: 0.3))
-                                    : null,
-                              ),
-                              child: Text(
-                                report.badgeLabel,
-                                style: GoogleFonts.spaceGrotesk(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.8,
-                                  color: badgeFg,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            // Timestamp
-                            Text(
-                              report.timestamp,
-                              style: GoogleFonts.spaceGrotesk(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                                color: AppColors.outline,
-                              ),
-                            ),
-                          ],
-                        ),
-                        // Sector badge
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppColors.surface,
-                            borderRadius: BorderRadius.circular(2),
-                            border:
-                                Border.all(color: AppColors.outlineVariant),
-                          ),
-                          child: Text(
-                            report.sector,
-                            style: GoogleFonts.spaceGrotesk(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                              color: AppColors.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
+                        Text(inc.type, style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.onSurface)),
+                        const SizedBox(height: 6),
+                        Text('${inc.id} • ${inc.reportedAt.toLocal()}', style: GoogleFonts.spaceGrotesk(fontSize: 11, color: AppColors.outline)),
                       ],
                     ),
-                    const SizedBox(height: 12),
-
-                    // ── Description ──
-                    Text(
-                      report.description,
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w400,
-                        height: 1.45,
-                        color: AppColors.onSurface,
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: AppColors.outlineVariant),
                       ),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // ── Action buttons: Verify | Reject ──
-                    Row(
-                      children: [
-                        // Verify
-                        Expanded(
-                          child: Material(
-                            color: AppColors.primary,
-                            borderRadius: BorderRadius.circular(4),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(4),
-                              onTap: () {},
-                              child: Container(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 10),
-                                alignment: Alignment.center,
-                                child: Text(
-                                  'VERIFY',
-                                  style: GoogleFonts.spaceGrotesk(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 2,
-                                    color: AppColors.onPrimary,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        // Reject
-                        Expanded(
-                          child: Material(
-                            color: Colors.transparent,
-                            borderRadius: BorderRadius.circular(4),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(4),
-                              onTap: () {},
-                              child: Container(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 10),
-                                alignment: Alignment.center,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(
-                                      color: AppColors.outline),
-                                ),
-                                child: Text(
-                                  'REJECT',
-                                  style: GoogleFonts.spaceGrotesk(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 2,
-                                    color: AppColors.onSurface,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+                      child: Text(inc.zone, style: GoogleFonts.spaceGrotesk(fontSize: 11, color: AppColors.onSurfaceVariant)),
                     ),
                   ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 12),
+                Text(inc.description, style: GoogleFonts.inter(fontSize: 14, color: AppColors.onSurface)),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Material(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(4),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(4),
+                          onTap: () async {
+                            await IncidentService.updateIncidentStatus(inc.id, IncidentStatus.verified);
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Marked as verified')));
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            alignment: Alignment.center,
+                            child: Text('VERIFY', style: GoogleFonts.spaceGrotesk(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.onPrimary)),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Material(
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(4),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(4),
+                          onTap: () async {
+                            await IncidentService.updateIncidentStatus(inc.id, IncidentStatus.reported);
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Marked as rejected')));
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: AppColors.outline),
+                            ),
+                            child: Text('REJECT', style: GoogleFonts.spaceGrotesk(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.onSurface)),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -422,22 +318,4 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 }
 
-// ─── Enums & data models ───
-
-enum _ReportType { sos, public, j1 }
-
-class _ReportData {
-  final _ReportType type;
-  final String badgeLabel;
-  final String timestamp;
-  final String sector;
-  final String description;
-
-  const _ReportData({
-    required this.type,
-    required this.badgeLabel,
-    required this.timestamp,
-    required this.sector,
-    required this.description,
-  });
-}
+// End of reports screen

@@ -1,30 +1,50 @@
-/// Static authentication service with hardcoded credentials.
-/// Replace this with actual API calls when the backend is ready.
+/// Authentication service used by the mobile Field Officer app.
+/// Currently uses an in-memory credential store and a lightweight
+/// session model. Replace with secure API calls and token storage
+/// when integrating with the backend.
+import '../models/user.dart';
+
 class AuthService {
   /// Valid credential pairs: Service ID → Passkey
   static const Map<String, String> _validCredentials = {
     'CMD-049': 'admin123',
     'LOG-012': 'logistics123',
     'ADM-001': 'superadmin',
+    // Field officers
+    'FO-A01': 'zonea001',
+    'FO-B02': 'zoneb002',
   };
 
-  /// Maps Service IDs to their designated roles
-  static const Map<String, String> _roleMap = {
-    'CMD-049': 'OFFICER',
-    'LOG-012': 'LOGISTICS',
-    'ADM-001': 'ADMIN',
+  /// Maps Service IDs to their designated roles and zones
+  static const Map<String, Map<String, String>> _profileMap = {
+    'CMD-049': {'role': 'OFFICER', 'zone': 'ZONE-A'},
+    'LOG-012': {'role': 'LOGISTICS', 'zone': 'LOGISTICS'},
+    'ADM-001': {'role': 'ADMIN', 'zone': 'NATIONAL'},
+    'FO-A01': {'role': 'OFFICER', 'zone': 'ZONE-A'},
+    'FO-B02': {'role': 'OFFICER', 'zone': 'ZONE-B'},
   };
 
-  /// Attempts login with the given credentials.
-  /// Returns `true` if valid, `false` otherwise.
-  static bool login(String serviceId, String passkey) {
-    final trimmedId = serviceId.trim().toUpperCase();
-    final trimmedKey = passkey.trim();
-    return _validCredentials[trimmedId] == trimmedKey;
+  /// The currently authenticated user (in-memory session).
+  /// Use a proper secure storage for production.
+  static User? currentUser;
+
+  /// Attempts authentication and returns a `User` on success,
+  /// otherwise returns `null`.
+  static User? authenticate(String serviceId, String passkey) {
+    final id = serviceId.trim().toUpperCase();
+    final key = passkey.trim();
+
+    final valid = _validCredentials[id] == key;
+    if (!valid) return null;
+
+    final profile = _profileMap[id] ?? {'role': 'UNKNOWN', 'zone': 'UNKNOWN'};
+    final user = User(serviceId: id, role: profile['role']!, zone: profile['zone']!);
+    currentUser = user;
+    return user;
   }
 
-  /// Returns the role for a given Service ID, or 'UNKNOWN' if not found.
-  static String getRole(String serviceId) {
-    return _roleMap[serviceId.trim().toUpperCase()] ?? 'UNKNOWN';
+  /// Clears the in-memory session.
+  static void signOut() {
+    currentUser = null;
   }
 }

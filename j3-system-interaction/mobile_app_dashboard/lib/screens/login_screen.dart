@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../services/auth_service.dart';
+import '../models/user.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -54,22 +55,22 @@ class _LoginScreenState extends State<LoginScreen>
 
     setState(() => _isLoading = true);
 
-    // Simulate a brief network delay for UX feel
-    Future.delayed(const Duration(milliseconds: 800), () {
+    // Simulate a brief network delay and authenticate
+    Future.delayed(const Duration(milliseconds: 600), () {
       if (!mounted) return;
 
-      final success = AuthService.login(serviceId, passkey);
+      final User? user = AuthService.authenticate(serviceId, passkey);
 
       setState(() => _isLoading = false);
 
-      if (success) {
-        final role = AuthService.getRole(serviceId);
+      if (user != null) {
         Navigator.pushReplacementNamed(
           context,
           '/dashboard',
           arguments: {
-            'serviceId': serviceId.toUpperCase(),
-            'role': role,
+            'serviceId': user.serviceId,
+            'role': user.role,
+            'zone': user.zone,
           },
         );
       } else {
