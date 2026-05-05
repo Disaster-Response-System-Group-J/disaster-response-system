@@ -2,6 +2,6 @@ FROM node:20-alpine
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --frozen-lockfile --omit=dev
-COPY mock-server.js ./
+COPY *.js ./
 EXPOSE 3001
-CMD ["node", "mock-server.js"]
+CMD ["node", "event-bridge.js"]
