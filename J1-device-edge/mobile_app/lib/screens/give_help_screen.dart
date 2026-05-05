@@ -77,12 +77,66 @@ class _GiveHelpScreenState extends State<GiveHelpScreen> {
     );
   }
 
-  void _claimRequest(EventModel event) {
+  Future<void> _claimRequest(EventModel event) async {
+    final currentUser = AuthService.instance.currentUser;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please sign in to claim a request')),
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Claim request?'),
+            content: Text(
+              'Are you sure you want to claim "${_requestTitle(event)}"?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('Claim'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (!confirmed) {
+      return;
+    }
+
+    final updated = await _databaseHelper.claimHelpRequest(
+      eventId: event.eventId,
+      claimedByUserId: currentUser.id,
+      claimedByUserName: currentUser.name,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (updated == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This request was already claimed or is unavailable'),
+        ),
+      );
+      setState(() {});
+      return;
+    }
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Claimed ${_requestTitle(event)}'),
       ),
     );
+    setState(() {});
   }
 
   String _requestTitle(EventModel event) {
@@ -114,10 +168,13 @@ class _HelpRequestCard extends StatelessWidget {
     final requestType = data['request_type']?.toString() ?? 'Help Request';
     final description = data['description']?.toString() ?? 'No description';
     final location = data['location']?.toString() ?? 'Unknown location';
+    final latitude = _formatCoordinate(data['latitude']);
+    final longitude = _formatCoordinate(data['longitude']);
     final peopleCount = data['people_count']?.toString() ?? '1';
     final mobility = data['mobility_support_required'] == true ? 'Yes' : 'No';
     final injuries = data['injuries_reported'] == true ? 'Yes' : 'No';
     final priority = injuries == 'Yes' ? 'High' : 'Medium';
+    final isClaimed = event.status == 'CLAIMED';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -154,6 +211,8 @@ class _HelpRequestCard extends StatelessWidget {
               runSpacing: 8,
               children: [
                 _InfoChip(label: 'Location', value: location),
+                if (latitude != null) _InfoChip(label: 'Latitude', value: latitude),
+                if (longitude != null) _InfoChip(label: 'Longitude', value: longitude),
                 _InfoChip(label: 'People', value: peopleCount),
                 _InfoChip(label: 'Mobility', value: mobility),
                 _InfoChip(label: 'Injuries', value: injuries),
@@ -163,13 +222,31 @@ class _HelpRequestCard extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: FilledButton(
-                    onPressed: onClaim,
-                    child: const Text('I Can Help'),
+                  child: isClaimed
+                      ? FilledButton.icon(
+                          onPressed: null,
+                          icon: const Icon(Icons.check_circle_outline),
+                          label: Text(
+                            event.claimedByUserName == null || event.claimedByUserName!.isEmpty
+                                ? 'Claimed'
+                                : 'Claimed by ${event.claimedByUserName}',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        )
+                      : FilledButton(
+                          onPressed: onClaim,
+                          child: const Text('I Can Help'),
+                        ),
                   ),
-                ),
               ],
             ),
+            if (isClaimed && event.claimedAt != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Claimed at ${event.claimedAt}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
           ],
         ),
       ),
@@ -186,6 +263,22 @@ class _HelpRequestCard extends StatelessWidget {
       // Ignore malformed JSON.
     }
     return <String, dynamic>{};
+  }
+
+  String? _formatCoordinate(dynamic value) {
+    if (value == null) {
+      return null;
+    }
+
+    if (value is num) {
+      return value.toStringAsFixed(6);
+    }
+
+    final parsed = double.tryParse(value.toString());
+    if (parsed == null) {
+      return null;
+    }
+    return parsed.toStringAsFixed(6);
   }
 }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../services/auth_service.dart';
 import '../services/database_helper.dart';
@@ -23,6 +24,7 @@ class _DataReportFormState extends State<DataReportForm> {
   bool _saving = false;
   bool _locating = false;
   bool _gpsCaptured = false;
+  Position? _currentPosition;
 
   static const List<String> _dataTypes = [
     'Flood level',
@@ -55,6 +57,8 @@ class _DataReportFormState extends State<DataReportForm> {
         'description': _descriptionController.text.trim(),
         'location': _locationController.text.trim(),
         'images': _selectedImages,
+        'latitude': _currentPosition?.latitude,
+        'longitude': _currentPosition?.longitude,
       };
 
       final user = AuthService.instance.currentUser;
@@ -85,6 +89,7 @@ class _DataReportFormState extends State<DataReportForm> {
       setState(() {
         _selectedType = _dataTypes.first;
         _gpsCaptured = false;
+        _currentPosition = null;
         _saving = false;
         _selectedImages.clear();
       });
@@ -125,6 +130,7 @@ class _DataReportFormState extends State<DataReportForm> {
 
     _locationController.text = GpsService.formatPosition(position);
     setState(() {
+      _currentPosition = position;
       _gpsCaptured = true;
     });
     ScaffoldMessenger.of(context).showSnackBar(
@@ -179,6 +185,10 @@ class _DataReportFormState extends State<DataReportForm> {
             hintText: 'Captured from GPS only',
             prefixIcon: Icons.place_outlined,
             readOnly: true,
+            onChanged: (_) {
+              _currentPosition = null;
+              _gpsCaptured = false;
+            },
             validator: (value) {
               if (!_gpsCaptured || value == null || value.trim().isEmpty) {
                 return 'Capture GPS location first';

@@ -6,6 +6,7 @@ class AppConstants {
 
   // Event status constants (PRODUCTION)
   static const String statusQueued = 'QUEUED';
+  static const String statusClaimed = 'CLAIMED';
   static const String statusSubmitted = 'SUBMITTED';
   static const String statusDuplicate = 'DUPLICATE';
   static const String statusFailed = 'FAILED';

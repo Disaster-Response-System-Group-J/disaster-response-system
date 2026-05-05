@@ -71,12 +71,15 @@ class DatabaseHelper {
         payload TEXT NOT NULL,
         metadata TEXT NOT NULL,
         status TEXT NOT NULL DEFAULT 'QUEUED',
+        claimed_by_user_id TEXT,
+        claimed_by_user_name TEXT,
+        claimed_at DATETIME,
         sync_attempts INTEGER DEFAULT 0,
         last_sync_error TEXT,
         last_sync_at DATETIME,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         submitted_at DATETIME,
-        CHECK (status IN ('QUEUED', 'SUBMITTED', 'FAILED', 'DUPLICATE'))
+        CHECK (status IN ('QUEUED', 'CLAIMED', 'SUBMITTED', 'FAILED', 'DUPLICATE'))
       )
     ''');
 
@@ -103,6 +106,9 @@ class DatabaseHelper {
       'payload',
       'metadata',
       'status',
+      'claimed_by_user_id',
+      'claimed_by_user_name',
+      'claimed_at',
       'sync_attempts',
       'last_sync_error',
       'last_sync_at',
@@ -119,6 +125,12 @@ class DatabaseHelper {
         existingColumns.contains('eventVersion') ||
         existingColumns.contains('lastSyncAt') ||
         existingColumns.contains('lastSyncError') ||
+        existingColumns.contains('claimedByUserId') ||
+        existingColumns.contains('claimedByUserName') ||
+        existingColumns.contains('claimedAt') ||
+        !existingColumns.contains('claimed_by_user_id') ||
+        !existingColumns.contains('claimed_by_user_name') ||
+        !existingColumns.contains('claimed_at') ||
         !existingColumns.contains('event_type') ||
         !existingColumns.contains('created_at');
 
@@ -146,6 +158,9 @@ class DatabaseHelper {
         'payload' => "TEXT NOT NULL DEFAULT ''",
         'metadata' => "TEXT NOT NULL DEFAULT '{}'",
         'status' => "TEXT NOT NULL DEFAULT 'QUEUED'",
+        'claimed_by_user_id' => 'TEXT',
+        'claimed_by_user_name' => 'TEXT',
+        'claimed_at' => 'DATETIME',
         'sync_attempts' => 'INTEGER DEFAULT 0',
         'last_sync_error' => 'TEXT',
         'last_sync_at' => 'DATETIME',
@@ -220,6 +235,27 @@ class DatabaseHelper {
       ''');
     }
 
+    if (existingColumns.contains('claimedByUserId')) {
+      await db.rawUpdate('''
+        UPDATE ${AppConstants.eventsTable}
+        SET claimed_by_user_id = COALESCE(claimed_by_user_id, claimedByUserId)
+      ''');
+    }
+
+    if (existingColumns.contains('claimedByUserName')) {
+      await db.rawUpdate('''
+        UPDATE ${AppConstants.eventsTable}
+        SET claimed_by_user_name = COALESCE(claimed_by_user_name, claimedByUserName)
+      ''');
+    }
+
+    if (existingColumns.contains('claimedAt')) {
+      await db.rawUpdate('''
+        UPDATE ${AppConstants.eventsTable}
+        SET claimed_at = COALESCE(claimed_at, claimedAt)
+      ''');
+    }
+
     await _createEventsTable(db);
     _eventsColumns = await _getTableColumns(db, AppConstants.eventsTable);
   }
@@ -251,6 +287,21 @@ class DatabaseHelper {
         ? 'submitted_at'
         : existingColumns.contains('submittedAt')
             ? 'submittedAt'
+            : null;
+    final claimedByUserIdColumn = existingColumns.contains('claimed_by_user_id')
+        ? 'claimed_by_user_id'
+        : existingColumns.contains('claimedByUserId')
+            ? 'claimedByUserId'
+            : null;
+    final claimedByUserNameColumn = existingColumns.contains('claimed_by_user_name')
+        ? 'claimed_by_user_name'
+        : existingColumns.contains('claimedByUserName')
+            ? 'claimedByUserName'
+            : null;
+    final claimedAtColumn = existingColumns.contains('claimed_at')
+        ? 'claimed_at'
+        : existingColumns.contains('claimedAt')
+            ? 'claimedAt'
             : null;
     final userColumn = existingColumns.contains('user_id')
         ? 'user_id'
@@ -299,6 +350,13 @@ class DatabaseHelper {
         submittedAt: (submittedColumn == null
                 ? null
                 : row[submittedColumn])?.toString(),
+        claimedByUserId: (claimedByUserIdColumn == null
+                ? null
+                : row[claimedByUserIdColumn])?.toString(),
+        claimedByUserName: (claimedByUserNameColumn == null
+                ? null
+                : row[claimedByUserNameColumn])?.toString(),
+        claimedAt: (claimedAtColumn == null ? null : row[claimedAtColumn])?.toString(),
         userId: (userColumn == null ? null : row[userColumn])?.toString() ??
             'legacy-user',
         deviceId: (deviceColumn == null ? null : row[deviceColumn])?.toString() ??
@@ -474,7 +532,7 @@ class DatabaseHelper {
       EventModel(
         eventId: 'demo-help-request-1',
         type: 'HELP_REQUEST',
-        data: '{"request_type":"Medical help","description":"Need medicine and first aid support near the school","people_count":2,"mobility_support_required":false,"injuries_reported":true,"location":"Kandy"}',
+        data: '{"request_type":"Medical help","description":"Need medicine and first aid support near the school","people_count":2,"mobility_support_required":false,"injuries_reported":true,"location":"Kandy","latitude":7.2906,"longitude":80.6337}',
         status: AppConstants.statusQueued,
         createdAt: '2026-05-05T00:00:00Z',
         submittedAt: null,
@@ -487,7 +545,7 @@ class DatabaseHelper {
       EventModel(
         eventId: 'demo-help-request-2',
         type: 'HELP_REQUEST',
-        data: '{"request_type":"Water supply","description":"Requesting drinking water for families in the area","people_count":5,"mobility_support_required":false,"injuries_reported":false,"location":"Galle"}',
+        data: '{"request_type":"Water supply","description":"Requesting drinking water for families in the area","people_count":5,"mobility_support_required":false,"injuries_reported":false,"location":"Galle","latitude":6.0535,"longitude":80.2210}',
         status: AppConstants.statusQueued,
         createdAt: '2026-05-05T00:05:00Z',
         submittedAt: null,
@@ -808,9 +866,13 @@ class DatabaseHelper {
   Future<List<EventModel>> getHelpRequests({
     String? excludeUserId,
   }) async {
-    final events = await getQueuedEvents();
+    final events = await getAllEvents();
     return events.where((event) {
       if (event.type != 'HELP_REQUEST') {
+        return false;
+      }
+      if (event.status != AppConstants.statusQueued &&
+          event.status != AppConstants.statusClaimed) {
         return false;
       }
       if (excludeUserId == null || excludeUserId.isEmpty) {
@@ -818,6 +880,25 @@ class DatabaseHelper {
       }
       return event.userId != excludeUserId;
     }).toList();
+  }
+
+  Future<int> claimHelpRequest({
+    required String eventId,
+    required String claimedByUserId,
+    required String claimedByUserName,
+  }) async {
+    final db = await database;
+    return db.update(
+      AppConstants.eventsTable,
+      {
+        'status': AppConstants.statusClaimed,
+        'claimed_by_user_id': claimedByUserId,
+        'claimed_by_user_name': claimedByUserName,
+        'claimed_at': DateTime.now().toUtc().toIso8601String(),
+      },
+      where: 'event_id = ? AND status = ?',
+      whereArgs: [eventId, AppConstants.statusQueued],
+    );
   }
 
   Future<int> updateEventStatus({
@@ -945,6 +1026,27 @@ class DatabaseHelper {
     }
     if (columns.contains('submittedAt')) {
       values['submittedAt'] = event.submittedAt;
+    }
+
+    if (columns.contains('claimed_by_user_id')) {
+      values['claimed_by_user_id'] = event.claimedByUserId;
+    }
+    if (columns.contains('claimedByUserId')) {
+      values['claimedByUserId'] = event.claimedByUserId;
+    }
+
+    if (columns.contains('claimed_by_user_name')) {
+      values['claimed_by_user_name'] = event.claimedByUserName;
+    }
+    if (columns.contains('claimedByUserName')) {
+      values['claimedByUserName'] = event.claimedByUserName;
+    }
+
+    if (columns.contains('claimed_at')) {
+      values['claimed_at'] = event.claimedAt;
+    }
+    if (columns.contains('claimedAt')) {
+      values['claimedAt'] = event.claimedAt;
     }
 
     if (columns.contains('user_id')) {

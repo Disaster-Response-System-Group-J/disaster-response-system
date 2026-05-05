@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../services/auth_service.dart';
 import '../services/database_helper.dart';
@@ -24,6 +25,7 @@ class _HelpRequestFormState extends State<HelpRequestForm> {
   bool _injuries = false;
   bool _saving = false;
   bool _locating = false;
+  Position? _currentPosition;
 
   static const List<String> _requestTypes = [
     'Medical help',
@@ -61,6 +63,8 @@ class _HelpRequestFormState extends State<HelpRequestForm> {
         'mobility_support_required': _mobilitySupport,
         'injuries_reported': _injuries,
         'location': _locationController.text.trim(),
+        'latitude': _currentPosition?.latitude,
+        'longitude': _currentPosition?.longitude,
       };
 
       final user = AuthService.instance.currentUser;
@@ -93,6 +97,7 @@ class _HelpRequestFormState extends State<HelpRequestForm> {
         _selectedType = _requestTypes.first;
         _mobilitySupport = false;
         _injuries = false;
+        _currentPosition = null;
         _saving = false;
       });
     } catch (e) {
@@ -133,6 +138,7 @@ class _HelpRequestFormState extends State<HelpRequestForm> {
     }
 
     _locationController.text = GpsService.formatPosition(position);
+    _currentPosition = position;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Location captured from GPS')),
     );
@@ -201,6 +207,9 @@ class _HelpRequestFormState extends State<HelpRequestForm> {
             controller: _locationController,
             labelText: 'Location',
             hintText: 'Tap GPS or enter manually',
+            onChanged: (_) {
+              _currentPosition = null;
+            },
             validator: (value) {
               if (value == null || value.trim().isEmpty) {
                 return 'Enter a location';

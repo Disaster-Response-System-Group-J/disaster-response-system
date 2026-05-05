@@ -12,6 +12,7 @@ class CustomTextInput extends StatelessWidget {
     this.maxLines = 1,
     this.prefixIcon,
     this.readOnly = false,
+    this.onChanged,
   });
 
   final TextEditingController controller;
@@ -22,6 +23,7 @@ class CustomTextInput extends StatelessWidget {
   final int maxLines;
   final IconData? prefixIcon;
   final bool readOnly;
+  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -31,6 +33,7 @@ class CustomTextInput extends StatelessWidget {
       keyboardType: keyboardType,
       maxLines: maxLines,
       readOnly: readOnly,
+      onChanged: onChanged,
       decoration: InputDecoration(
         labelText: labelText,
         hintText: hintText,
