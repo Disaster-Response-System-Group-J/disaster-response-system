@@ -8,6 +8,7 @@ import '../models/app_user.dart';
 import '../utills/constants.dart';
 import '../models/event_model.dart';
 import '../models/request_model.dart';
+import '../models/resource_model.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._internal();
@@ -39,6 +40,7 @@ class DatabaseHelper {
     );
 
     await _ensureEventsSchema(db);
+    await _ensureResourcesSchema(db);
     await _ensureSeedData(db);
     return db;
   }
@@ -46,6 +48,7 @@ class DatabaseHelper {
   Future<void> _onCreate(Database db, int version) async {
     await _createAuthTables(db);
     await _createEventsTable(db);
+    await _createResourcesTable(db);
     await _ensureSeedData(db);
   }
 
@@ -55,6 +58,7 @@ class DatabaseHelper {
     }
 
     await _ensureEventsSchema(db);
+    await _ensureResourcesSchema(db);
 
     await _ensureSeedData(db);
   }
@@ -467,7 +471,137 @@ class DatabaseHelper {
       );
     }
 
-    await _ensureDemoHelpRequests(db);
+    // Seed demo resources for offline mode
+    await _ensureDemoResources(db);
+  }
+
+  /// Seed demo resources once during database initialization
+  Future<void> _ensureDemoResources(Database db) async {
+    final existingResources = await db.query('resources', limit: 1);
+    
+    // Only seed if no resources exist
+    if (existingResources.isNotEmpty) {
+      return;
+    }
+
+    final demoResources = [
+      ResourceModel(
+        id: const Uuid().v4(),
+        type: ResourceType.SHELTER,
+        name: 'Colombo Central Shelter',
+        district: 'Colombo',
+        status: ResourceStatus.AVAILABLE,
+        latitude: 6.9271,
+        longitude: 79.8612,
+        capacity: 300,
+        currentLoad: 120,
+        lastUpdated: DateTime.now(),
+      ),
+      ResourceModel(
+        id: const Uuid().v4(),
+        type: ResourceType.SHELTER,
+        name: 'Kandy District Relief Center',
+        district: 'Kandy',
+        status: ResourceStatus.AVAILABLE,
+        latitude: 6.9271,
+        longitude: 80.6328,
+        capacity: 200,
+        currentLoad: 85,
+        lastUpdated: DateTime.now(),
+      ),
+      ResourceModel(
+        id: const Uuid().v4(),
+        type: ResourceType.RESCUE_TEAM,
+        name: 'Colombo Rescue Team Alpha',
+        district: 'Colombo',
+        status: ResourceStatus.AVAILABLE,
+        latitude: 6.9271,
+        longitude: 79.8612,
+        capacity: 15,
+        currentLoad: 12,
+        lastUpdated: DateTime.now(),
+      ),
+      ResourceModel(
+        id: const Uuid().v4(),
+        type: ResourceType.BOAT,
+        name: 'Rescue Boat Team',
+        district: 'Galle',
+        status: ResourceStatus.AVAILABLE,
+        latitude: 6.0535,
+        longitude: 80.2210,
+        capacity: 20,
+        currentLoad: 8,
+        lastUpdated: DateTime.now(),
+      ),
+      ResourceModel(
+        id: const Uuid().v4(),
+        type: ResourceType.AMBULANCE,
+        name: 'Mobile Medical Unit - North',
+        district: 'Jaffna',
+        status: ResourceStatus.AVAILABLE,
+        latitude: 9.6615,
+        longitude: 80.0255,
+        capacity: 4,
+        currentLoad: 3,
+        lastUpdated: DateTime.now(),
+      ),
+      ResourceModel(
+        id: const Uuid().v4(),
+        type: ResourceType.AMBULANCE,
+        name: 'Emergency Ambulance Service',
+        district: 'Colombo',
+        status: ResourceStatus.AVAILABLE,
+        latitude: 6.9271,
+        longitude: 79.8612,
+        capacity: 5,
+        currentLoad: 2,
+        lastUpdated: DateTime.now(),
+      ),
+      ResourceModel(
+        id: const Uuid().v4(),
+        type: ResourceType.MEDICAL_TEAM,
+        name: 'Mobile Medical Unit',
+        district: 'Colombo',
+        status: ResourceStatus.AVAILABLE,
+        latitude: 6.9271,
+        longitude: 79.8612,
+        capacity: 30,
+        currentLoad: 25,
+        lastUpdated: DateTime.now(),
+      ),
+      ResourceModel(
+        id: const Uuid().v4(),
+        type: ResourceType.FOOD_WATER,
+        name: 'Food & Water Distribution Point',
+        district: 'Colombo',
+        status: ResourceStatus.AVAILABLE,
+        latitude: 6.9271,
+        longitude: 79.8612,
+        capacity: 500,
+        currentLoad: 350,
+        lastUpdated: DateTime.now(),
+      ),
+      ResourceModel(
+        id: const Uuid().v4(),
+        type: ResourceType.FOOD_WATER,
+        name: 'Water Supply Station',
+        district: 'Kandy',
+        status: ResourceStatus.AVAILABLE,
+        latitude: 6.9271,
+        longitude: 80.6328,
+        capacity: 1000,
+        currentLoad: 750,
+        lastUpdated: DateTime.now(),
+      ),
+    ];
+
+    for (final resource in demoResources) {
+      await db.insert(
+        'resources',
+        resource.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
   }
 
   Future<void> ensureMockUser() async {
@@ -496,107 +630,6 @@ class DatabaseHelper {
       usersTable,
       seededUser.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
-    );
-  }
-
-  Future<void> _ensureDemoHelpRequests(Database db) async {
-    final existingDemo = await db.query(
-      AppConstants.eventsTable,
-      where: 'event_id IN (?, ?)',
-      whereArgs: [
-        'demo-help-request-1',
-        'demo-help-request-2',
-      ],
-      limit: 1,
-    );
-    if (existingDemo.isNotEmpty) {
-      return;
-    }
-
-    await _ensureDemoUser(
-      db,
-      userId: 'demo-user-1',
-      name: 'Nimal Fernando',
-      email: 'nimal.demo@j1.local',
-    );
-    await _ensureDemoUser(
-      db,
-      userId: 'demo-user-2',
-      name: 'Ayesha Perera',
-      email: 'ayesha.demo@j1.local',
-    );
-
-    final demoDeviceId = await _getOrCreateDeviceId(db);
-
-    final demoEvents = <EventModel>[
-      EventModel(
-        eventId: 'demo-help-request-1',
-        type: 'HELP_REQUEST',
-        data: '{"request_type":"Medical help","description":"Need medicine and first aid support near the school","people_count":2,"mobility_support_required":false,"injuries_reported":true,"location":"Kandy","latitude":7.2906,"longitude":80.6337}',
-        status: AppConstants.statusQueued,
-        createdAt: '2026-05-05T00:00:00Z',
-        submittedAt: null,
-        userId: 'demo-user-1',
-        deviceId: demoDeviceId,
-        metadata: const {'seeded': true, 'source': 'demo'},
-        eventVersion: '1.0',
-        lastSyncAt: null,
-      ),
-      EventModel(
-        eventId: 'demo-help-request-2',
-        type: 'HELP_REQUEST',
-        data: '{"request_type":"Water supply","description":"Requesting drinking water for families in the area","people_count":5,"mobility_support_required":false,"injuries_reported":false,"location":"Galle","latitude":6.0535,"longitude":80.2210}',
-        status: AppConstants.statusQueued,
-        createdAt: '2026-05-05T00:05:00Z',
-        submittedAt: null,
-        userId: 'demo-user-2',
-        deviceId: demoDeviceId,
-        metadata: const {'seeded': true, 'source': 'demo'},
-        eventVersion: '1.0',
-        lastSyncAt: null,
-      ),
-    ];
-
-    for (final event in demoEvents) {
-      await db.insert(
-        AppConstants.eventsTable,
-        event.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.ignore,
-      );
-    }
-  }
-
-  Future<void> _ensureDemoUser(
-    Database db, {
-    required String userId,
-    required String name,
-    required String email,
-  }) async {
-    final result = await db.query(
-      usersTable,
-      where: 'id = ? OR email = ?',
-      whereArgs: [userId, email],
-      limit: 1,
-    );
-
-    if (result.isNotEmpty) {
-      return;
-    }
-
-    final demoUser = AppUser(
-      id: userId,
-      name: name,
-      email: email,
-      password: 'demo1234',
-      role: 'PUBLIC_USER',
-      isMock: true,
-      createdAt: DateTime.now().toUtc().toIso8601String(),
-    );
-
-    await db.insert(
-      usersTable,
-      demoUser.toMap(),
-      conflictAlgorithm: ConflictAlgorithm.ignore,
     );
   }
 
@@ -707,17 +740,6 @@ class DatabaseHelper {
 
   Future<String> getDeviceId() async {
     final db = await database;
-    final existing = await _readMetaValue(db, 'device_id');
-    if (existing != null && existing.isNotEmpty) {
-      return existing;
-    }
-
-    final generated = const Uuid().v4();
-    await _writeMetaValue(db, 'device_id', generated);
-    return generated;
-  }
-
-  Future<String> _getOrCreateDeviceId(Database db) async {
     final existing = await _readMetaValue(db, 'device_id');
     if (existing != null && existing.isNotEmpty) {
       return existing;
@@ -861,44 +883,6 @@ class DatabaseHelper {
         ? events
         : events.where((event) => event.userId == userId).toList();
     return filtered.map(RequestModel.fromEvent).toList();
-  }
-
-  Future<List<EventModel>> getHelpRequests({
-    String? excludeUserId,
-  }) async {
-    final events = await getAllEvents();
-    return events.where((event) {
-      if (event.type != 'HELP_REQUEST') {
-        return false;
-      }
-      if (event.status != AppConstants.statusQueued &&
-          event.status != AppConstants.statusClaimed) {
-        return false;
-      }
-      if (excludeUserId == null || excludeUserId.isEmpty) {
-        return true;
-      }
-      return event.userId != excludeUserId;
-    }).toList();
-  }
-
-  Future<int> claimHelpRequest({
-    required String eventId,
-    required String claimedByUserId,
-    required String claimedByUserName,
-  }) async {
-    final db = await database;
-    return db.update(
-      AppConstants.eventsTable,
-      {
-        'status': AppConstants.statusClaimed,
-        'claimed_by_user_id': claimedByUserId,
-        'claimed_by_user_name': claimedByUserName,
-        'claimed_at': DateTime.now().toUtc().toIso8601String(),
-      },
-      where: 'event_id = ? AND status = ?',
-      whereArgs: [eventId, AppConstants.statusQueued],
-    );
   }
 
   Future<int> updateEventStatus({
@@ -1115,4 +1099,272 @@ class DatabaseHelper {
     }
     return {};
   }
+
+  /// Create resources table for caching backend resources
+  Future<void> _createResourcesTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS resources (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        name TEXT NOT NULL,
+        district TEXT NOT NULL,
+        status TEXT NOT NULL,
+        latitude REAL,
+        longitude REAL,
+        capacity INTEGER,
+        current_load INTEGER,
+        last_updated TEXT NOT NULL
+      )
+    ''');
+
+    // Create indexes for common queries
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_resources_status ON resources(status)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_resources_district ON resources(district)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_resources_type ON resources(type)');
+  }
+
+  /// Ensure resources table exists (for schema migrations)
+  Future<void> _ensureResourcesSchema(Database db) async {
+    final existingColumns = await _getTableColumns(db, 'resources');
+    
+    if (existingColumns.isEmpty) {
+      // Table doesn't exist, create it
+      await _createResourcesTable(db);
+      return;
+    }
+
+    // Table exists, verify it has all required columns
+    final requiredColumns = <String>[
+      'id',
+      'type',
+      'name',
+      'district',
+      'status',
+      'latitude',
+      'longitude',
+      'capacity',
+      'current_load',
+      'last_updated',
+    ];
+
+    final missingColumns = requiredColumns
+        .where((column) => !existingColumns.contains(column))
+        .toList();
+
+    // Add any missing columns
+    for (final column in missingColumns) {
+      final definition = switch (column) {
+        'id' => 'TEXT PRIMARY KEY',
+        'type' => 'TEXT NOT NULL',
+        'name' => 'TEXT NOT NULL',
+        'district' => 'TEXT NOT NULL',
+        'status' => 'TEXT NOT NULL',
+        'latitude' => 'REAL',
+        'longitude' => 'REAL',
+        'capacity' => 'INTEGER',
+        'current_load' => 'INTEGER',
+        'last_updated' => 'TEXT NOT NULL',
+        _ => 'TEXT',
+      };
+
+      try {
+        await db.execute(
+          'ALTER TABLE resources ADD COLUMN $column $definition',
+        );
+      } catch (e) {
+        // Column might already exist, ignore error
+      }
+    }
+
+    // Ensure indexes exist
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_resources_status ON resources(status)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_resources_district ON resources(district)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_resources_type ON resources(type)');
+  }
+
+  /// Save/cache resources from backend API
+  Future<void> saveResources(List<ResourceModel> resources) async {
+    final db = await database;
+    
+    try {
+      // Ensure table exists
+      await _ensureResourcesSchema(db);
+      
+      for (final resource in resources) {
+        await db.insert(
+          'resources',
+          resource.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+    } catch (e) {
+      print('DatabaseHelper: Error saving resources: $e');
+      rethrow;
+    }
+  }
+
+  /// Get all cached resources from SQLite
+  Future<List<ResourceModel>> getResources() async {
+    final db = await database;
+    
+    try {
+      // Ensure table exists
+      await _ensureResourcesSchema(db);
+      
+      final result = await db.query(
+        'resources',
+        orderBy: 'district ASC, name ASC',
+      );
+
+      return result.map(ResourceModel.fromMap).toList();
+    } catch (e) {
+      print('DatabaseHelper: Error getting resources: $e');
+      return [];
+    }
+  }
+
+  /// Get resources by type
+  Future<List<ResourceModel>> getResourcesByType(ResourceType type) async {
+    final db = await database;
+    
+    try {
+      // Ensure table exists
+      await _ensureResourcesSchema(db);
+      
+      final typeString = ResourceModel.typeToString(type);
+      final result = await db.query(
+        'resources',
+        where: 'type = ?',
+        whereArgs: [typeString],
+        orderBy: 'district ASC, name ASC',
+      );
+
+      return result.map(ResourceModel.fromMap).toList();
+    } catch (e) {
+      print('DatabaseHelper: Error getting resources by type: $e');
+      return [];
+    }
+  }
+
+  /// Get resources by district
+  Future<List<ResourceModel>> getResourcesByDistrict(String district) async {
+    final db = await database;
+    
+    try {
+      // Ensure table exists
+      await _ensureResourcesSchema(db);
+      
+      final result = await db.query(
+        'resources',
+        where: 'district = ?',
+        whereArgs: [district],
+        orderBy: 'name ASC',
+      );
+
+      return result.map(ResourceModel.fromMap).toList();
+    } catch (e) {
+      print('DatabaseHelper: Error getting resources by district: $e');
+      return [];
+    }
+  }
+
+  /// Get available resources (AVAILABLE status only)
+  Future<List<ResourceModel>> getAvailableResources() async {
+    final db = await database;
+    
+    try {
+      // Ensure table exists
+      await _ensureResourcesSchema(db);
+      
+      final statusString = ResourceModel.statusToString(ResourceStatus.AVAILABLE);
+      final result = await db.query(
+        'resources',
+        where: 'status = ?',
+        whereArgs: [statusString],
+        orderBy: 'district ASC, name ASC',
+      );
+
+      return result.map(ResourceModel.fromMap).toList();
+    } catch (e) {
+      print('DatabaseHelper: Error getting available resources: $e');
+      return [];
+    }
+  }
+
+  /// Get available resources by district
+  Future<List<ResourceModel>> getAvailableResourcesByDistrict(String district) async {
+    final db = await database;
+    
+    try {
+      // Ensure table exists
+      await _ensureResourcesSchema(db);
+      
+      final statusString = ResourceModel.statusToString(ResourceStatus.AVAILABLE);
+      final result = await db.query(
+        'resources',
+        where: 'status = ? AND district = ?',
+        whereArgs: [statusString, district],
+        orderBy: 'name ASC',
+      );
+
+      return result.map(ResourceModel.fromMap).toList();
+    } catch (e) {
+      print('DatabaseHelper: Error getting available resources by district: $e');
+      return [];
+    }
+  }
+
+  /// Get count of resources
+  Future<int> getResourcesCount() async {
+    final db = await database;
+    
+    try {
+      // Ensure table exists
+      await _ensureResourcesSchema(db);
+      
+      final result = await db.rawQuery(
+        'SELECT COUNT(*) as count FROM resources',
+      );
+
+      return Sqflite.firstIntValue(result) ?? 0;
+    } catch (e) {
+      print('DatabaseHelper: Error getting resources count: $e');
+      return 0;
+    }
+  }
+
+  /// Clear all cached resources
+  Future<int> clearResources() async {
+    final db = await database;
+    
+    try {
+      // Ensure table exists
+      await _ensureResourcesSchema(db);
+      
+      return await db.delete('resources');
+    } catch (e) {
+      print('DatabaseHelper: Error clearing resources: $e');
+      return 0;
+    }
+  }
+
+  /// Delete a single resource
+  Future<int> deleteResource(String resourceId) async {
+    final db = await database;
+    
+    try {
+      // Ensure table exists
+      await _ensureResourcesSchema(db);
+      
+      return await db.delete(
+        'resources',
+        where: 'id = ?',
+        whereArgs: [resourceId],
+      );
+    } catch (e) {
+      print('DatabaseHelper: Error deleting resource: $e');
+      return 0;
+    }
+  }
 }
+

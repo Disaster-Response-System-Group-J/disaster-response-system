@@ -1,4 +1,4 @@
-# J1 Mobile App - 1 Week Sprint (7 Days)
+﻿# J1 Mobile App - 1 Week Sprint (7 Days)
 ## Condensed Task List for 2 People
 
 **Timeline:** Monday - Friday (5 working days, or 7 days if including weekend)
@@ -17,7 +17,6 @@
 - [ ] Build `main.dart` with bottom tab navigation (5 tabs)
 - [ ] Test: `flutter run` - see 5 empty tabs
 
-#### Person 2 (Backend/Sync Lead):
 - [ ] Create `database_helper.dart` with SQLite schema
   - [ ] events table: event_id, type, data, status, timestamp_created, timestamp_submitted
   - [ ] metadata table: sync_stats, queue_count, last_sync
@@ -30,7 +29,7 @@
 - Person 2 shows: Database working with test data
 - Share code: Person 1 gets database_helper.dart, Event model
 
-**Deliverable:** App shell + working database ✓
+**Deliverable:** App shell + working database âœ“
 
 ---
 
@@ -46,11 +45,10 @@
 - [ ] Build `help_request_form.dart`:
   - [ ] Type, Description, People count, Mobility, Injuries toggles
   - [ ] Location field (placeholder for GPS)
-  - [ ] Submit button → calls Person 2's function
+  - [ ] Submit button â†’ calls Person 2's function
 - [ ] Integrate forms into Report screen (toggle between Help Request & Data Report)
 - [ ] Test: Forms display and validate
 
-#### Person 2 (Backend/Sync Lead):
 - [ ] Create `mqtt_config.dart` - define MQTT broker details
 - [ ] Add MQTT dependency: `flutter pub add mqtt5_client`
 - [ ] Create `mqtt_client_service.dart`:
@@ -66,7 +64,7 @@
 - Person 2 shows: MQTT client connecting
 - Share: MQTT topics and message format
 
-**Deliverable:** All forms built + MQTT client ready ✓
+**Deliverable:** All forms built + MQTT client ready âœ“
 
 ---
 
@@ -86,7 +84,6 @@
   - [ ] Pull-to-refresh
 - [ ] Test: Switch between forms, status bar updates
 
-#### Person 2 (Backend/Sync Lead):
 - [ ] Create `sync_service.dart` - background sync engine:
   - [ ] Poll SQLite queue every 10 seconds
   - [ ] Publish to MQTT with QoS 1
@@ -99,14 +96,14 @@
 - [ ] Create `sync_status_emitter.dart`:
   - [ ] Emit queue_count, sync_in_progress, last_sync_time
   - [ ] Person 1 listens to update status bar
-- [ ] Test: Submit form → syncs to MQTT
+- [ ] Test: Submit form â†’ syncs to MQTT
 
 **EOD Standup (15 min):**
 - Person 1 shows: Data Report form + My Requests screen
 - Person 2 shows: Forms syncing to MQTT, status bar live updates
 - Verify: Queue count updates in real-time
 
-**Deliverable:** All forms + syncing to MQTT ✓
+**Deliverable:** All forms + syncing to MQTT âœ“
 
 ---
 
@@ -126,7 +123,6 @@
   - [ ] Show error if GPS unavailable
 - [ ] Test: GPS capture works
 
-#### Person 2 (Backend/Sync Lead):
 - [ ] Create `offline_queue_manager.dart`:
   - [ ] Queue events in SQLite before network
   - [ ] Generate UUID v4 for each event
@@ -137,26 +133,22 @@
   - [ ] Exponential backoff on retries
   - [ ] Log all failures
 - [ ] Implement network detection:
-  - [ ] When network returns → trigger immediate sync
+  - [ ] When network returns â†’ trigger immediate sync
   - [ ] Queue doesn't get lost on app close
-- [ ] Test: Submit form offline → kill app → relaunch → verify data still queued
+- [ ] Test: Submit form offline â†’ kill app â†’ relaunch â†’ verify data still queued
 
 **EOD Standup (15 min):**
 - Person 1 shows: GPS working
 - Person 2 shows: Offline queue survives app close
 - Test: Submit form offline, close app, relaunch, see it sync
 
-**Deliverable:** Full offline-first pipeline working ✓
+**Deliverable:** Full offline-first pipeline working âœ“
 
 ---
 
-### **Day 5 (Friday): Give Help Screen & Testing**
 
 #### Person 1 (UI Lead):
-- [ ] Build `give_help_screen.dart`:
   - [ ] List of open help requests (from MQTT subscription)
-  - [ ] "I Can Help" button
-  - [ ] Claim functionality
 - [ ] Polish all screens:
   - [ ] Add error messages (red text)
   - [ ] Loading spinners on submit
@@ -165,18 +157,12 @@
 - [ ] Full E2E testing:
   - [ ] Submit 10 forms offline
   - [ ] Kill app mid-sync
-  - [ ] Relaunch → verify all sync
+  - [ ] Relaunch â†’ verify all sync
   - [ ] Test with network toggle
 
-#### Person 2 (Backend/Sync Lead):
-- [ ] Implement `claim_request.dart`:
-  - [ ] Create claim event when volunteer taps "I Can Help"
-  - [ ] Publish to MQTT
-  - [ ] Update SQLite with claim status
 - [ ] Subscribe to help requests from J2:
   - [ ] Listen to incoming requests
   - [ ] Store in SQLite cache
-  - [ ] Emit to Person 1 for "Give Help" list
 - [ ] Build sync analytics:
   - [ ] Track events submitted
   - [ ] Track failures
@@ -188,11 +174,11 @@
   - [ ] How to integrate with J2
 
 **Full E2E Testing Both:**
-- [ ] Offline scenario: 10 forms offline → close → relaunch → all sync ✓
-- [ ] Network toggle: Submit offline, toggle network, verify auto-sync ✓
-- [ ] GPS: Both mandatory and fallback modes work ✓
-- [ ] Concurrency: Rapid submissions have unique IDs ✓
-- [ ] Performance: 100 queued events sync in <5 sec ✓
+- [ ] Offline scenario: 10 forms offline â†’ close â†’ relaunch â†’ all sync âœ“
+- [ ] Network toggle: Submit offline, toggle network, verify auto-sync âœ“
+- [ ] GPS: Both mandatory and fallback modes work âœ“
+- [ ] Concurrency: Rapid submissions have unique IDs âœ“
+- [ ] Performance: 100 queued events sync in <5 sec âœ“
 
 **EOD Standup (15 min):**
 - Full app review (all screens working)
@@ -200,7 +186,7 @@
 - Document any known issues
 - Prepare for handoff to J2
 
-**Deliverable:** Production-ready app for demo ✓
+**Deliverable:** Production-ready app for demo âœ“
 
 ---
 
@@ -213,11 +199,9 @@
 - [ ] Day 2: Help Request form + form components
 - [ ] Day 3: Data Report form + My Requests screen
 - [ ] Day 4: GPS integration on both forms
-- [ ] Day 5: Give Help screen + Polish
 
 **Track B: Offline Indicators**
 - [ ] Day 2: Status bar (Online/Offline + queue count)
-- [ ] Day 5: Offline banner + badges
 
 ---
 
@@ -231,7 +215,6 @@
 - [ ] Day 2: MQTT client + event schema
 - [ ] Day 3: Sync service + network listener
 - [ ] Day 4: Offline queue + error handling
-- [ ] Day 5: Claim request + incoming subscriptions
 
 ---
 
@@ -268,26 +251,25 @@ Use this each day:
 ## Must-Have by End of Day
 
 ### **Day 1 (EOD):**
-- App shell with navigation ✓
-- SQLite database working ✓
+- App shell with navigation âœ“
+- SQLite database working âœ“
 
 ### **Day 2 (EOD):**
-- Help Request form complete ✓
-- MQTT client connecting ✓
+- Help Request form complete âœ“
+- MQTT client connecting âœ“
 
 ### **Day 3 (EOD):**
-- Data Report form complete ✓
-- Forms syncing to MQTT ✓
-- Status bar live updating ✓
+- Data Report form complete âœ“
+- Forms syncing to MQTT âœ“
+- Status bar live updating âœ“
 
 ### **Day 4 (EOD):**
-- GPS working on both forms ✓
-- Offline queue tested ✓
+- GPS working on both forms âœ“
+- Offline queue tested âœ“
 
 ### **Day 5 (EOD):**
-- Give Help screen working ✓
-- All E2E tests passing ✓
-- Ready for demo ✓
+- All E2E tests passing âœ“
+- Ready for demo âœ“
 
 ---
 
@@ -337,33 +319,32 @@ flutter pub add sqflite uuid intl mqtt5_client geolocator
 
 ```
 j1_disaster_response/
-├── lib/
-│   ├── main.dart
-│   ├── models/
-│   │   ├── event_model.dart
-│   ├── services/
-│   │   ├── database_helper.dart
-│   │   ├── mqtt_client_service.dart
-│   │   ├── sync_service.dart
-│   │   ├── network_service.dart
-│   │   ├── gps_service.dart
-│   │   ├── event_schema.dart
-│   ├── screens/
-│   │   ├── home_screen.dart
-│   │   ├── report_screen.dart
-│   │   ├── help_request_form.dart
-│   │   ├── data_report_form.dart
-│   │   ├── give_help_screen.dart
-│   │   ├── my_requests_screen.dart
-│   │   ├── settings_screen.dart
-│   ├── widgets/
-│   │   ├── form_widgets.dart
-│   │   ├── status_bar.dart
-│   ├── utils/
-│   │   ├── constants.dart
-│   │   ├── error_handler.dart
-├── pubspec.yaml
-├── README.md
+â”œâ”€â”€ lib/
+â”‚   â”œâ”€â”€ main.dart
+â”‚   â”œâ”€â”€ models/
+â”‚   â”‚   â”œâ”€â”€ event_model.dart
+â”‚   â”œâ”€â”€ services/
+â”‚   â”‚   â”œâ”€â”€ database_helper.dart
+â”‚   â”‚   â”œâ”€â”€ mqtt_client_service.dart
+â”‚   â”‚   â”œâ”€â”€ sync_service.dart
+â”‚   â”‚   â”œâ”€â”€ network_service.dart
+â”‚   â”‚   â”œâ”€â”€ gps_service.dart
+â”‚   â”‚   â”œâ”€â”€ event_schema.dart
+â”‚   â”œâ”€â”€ screens/
+â”‚   â”‚   â”œâ”€â”€ home_screen.dart
+â”‚   â”‚   â”œâ”€â”€ report_screen.dart
+â”‚   â”‚   â”œâ”€â”€ help_request_form.dart
+â”‚   â”‚   â”œâ”€â”€ data_report_form.dart
+â”‚   â”‚   â”œâ”€â”€ my_requests_screen.dart
+â”‚   â”‚   â”œâ”€â”€ settings_screen.dart
+â”‚   â”œâ”€â”€ widgets/
+â”‚   â”‚   â”œâ”€â”€ form_widgets.dart
+â”‚   â”‚   â”œâ”€â”€ status_bar.dart
+â”‚   â”œâ”€â”€ utils/
+â”‚   â”‚   â”œâ”€â”€ constants.dart
+â”‚   â”‚   â”œâ”€â”€ error_handler.dart
+â”œâ”€â”€ pubspec.yaml
+â”œâ”€â”€ README.md
 ```
 
 ---
@@ -372,7 +353,7 @@ j1_disaster_response/
 
 **Day 1 Sync:** Person 1 & 2 agree on Event data structure
 **Day 2 Sync:** Person 1 shows forms, Person 2 shows MQTT integration
-**Day 3 Sync:** Verify forms → SQLite → MQTT flow works
+**Day 3 Sync:** Verify forms â†’ SQLite â†’ MQTT flow works
 **Day 4 Sync:** Offline queue tested, Person 1 adds GPS
 **Day 5 Sync:** E2E testing together, prepare demo
 
@@ -384,26 +365,24 @@ By end of Friday:
 - [ ] App runs offline without network
 - [ ] Can submit forms and they save locally
 - [ ] Status bar shows queue count in real-time
-- [ ] Network returns → events auto-sync
+- [ ] Network returns â†’ events auto-sync
 - [ ] App survives force-close (data not lost)
 - [ ] GPS works on both forms
-- [ ] Give Help screen shows requests
 - [ ] Zero data loss in any scenario
 
-**Ready to hand off to J2 for MQTT integration** ✓
+**Ready to hand off to J2 for MQTT integration** âœ“
 
 ---
 
 ## If You Run Out of Time
 
 **Must-Have (Days 1-3):**
-- All forms working ✓
-- SQLite persisting data ✓
-- Status bar updating ✓
+- All forms working âœ“
+- SQLite persisting data âœ“
+- Status bar updating âœ“
 
 **Nice-to-Have (Days 4-5):**
 - GPS integration
-- Give Help screen
 
 **Can Do Post-Week:**
 - Final polish
@@ -414,4 +393,4 @@ Focus on **forms + offline persistence first**. Everything else builds on that.
 
 ---
 
-**Start Monday morning. EOD standup every day. You've got this! 🚀**
+**Start Monday morning. EOD standup every day. You've got this! ðŸš€**

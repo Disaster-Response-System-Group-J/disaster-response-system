@@ -1,8 +1,8 @@
-# J1 Disaster Response Mobile App
+﻿# J1 Disaster Response Mobile App
 
-Offline-first Flutter application for disaster reporting, help requests, and local case management.
+Offline-first Flutter application for disaster reporting, help requests, local case management, and emergency resource viewing.
 
-The mobile app is designed to work even when the network is unavailable. It stores user actions in SQLite first, uses the local database to power the UI, and syncs queued events when connectivity returns.
+The mobile app is designed to work even when the network is unavailable. It stores user actions in SQLite first, uses the local database to power the UI, and syncs queued events when connectivity returns. Emergency resources are cached locally for offline visibility.
 
 ## Overview
 
@@ -12,6 +12,7 @@ The mobile app is designed to work even when the network is unavailable. It stor
 - Offline queue: Event-based local persistence with UUIDs and idempotency
 - Location: GPS capture via `geolocator`
 - Sync: Network-aware background flush to backend API
+- Resources: Read-only cached emergency resources (shelters, rescue teams, ambulances, food/water, medical teams)
 - Optional transport layer: MQTT client service exists in the codebase, but the current main sync path is HTTP-based
 
 ## Product Goal
@@ -47,14 +48,8 @@ The user interface is SQLite-first.
 7. Backend deduplicates using `eventId` / `Idempotency-Key`
 8. On success, local status changes from `QUEUED` to `SUBMITTED`
 
-### Claim flow
 
-The Give Help tab shows help requests from other users only.
 
-- The volunteer taps `I Can Help`
-- The app asks for confirmation
-- If confirmed, the local SQLite row is updated to `CLAIMED`
-- The card updates to show claimed state and claimant details
 
 ## Key Features
 
@@ -66,14 +61,14 @@ The Give Help tab shows help requests from other users only.
 - Data report form
 - GPS capture with manual fallback where allowed
 - My Requests view from local SQLite
-- Give Help view for other users' requests
-- Claim request workflow
+- **Resources view**: Read-only view of cached emergency resources
 - Offline queue with UUIDs
 - Duplicate prevention using payload signature
 - Idempotent sync key support
 - Network status awareness
-- Demo data seeding for testing
+- Demo data seeding for testing (including demo resources)
 - Local schema migration and rebuild for older SQLite layouts
+- Offline-first resource caching from backend API
 
 ## Screens
 
@@ -101,8 +96,8 @@ The Give Help tab shows help requests from other users only.
 
 - Home
 - Report
-- Give Help
 - My Requests
+- Resources
 - Settings
 
 ### Reporting
@@ -112,13 +107,33 @@ The Give Help tab shows help requests from other users only.
 - Help Request form
 - Data Report form
 
-### Give Help
 
-`give_help_screen.dart` lists open help requests from other users and allows claiming them locally.
 
 ### My Requests
 
 `my_requests_screen.dart` shows the current user's locally stored requests and their queue/sync status.
+
+### Resources
+
+`resources_screen.dart` displays read-only cached emergency resources:
+
+- Shelters
+- Rescue teams
+- Ambulances
+- Food/water distribution points
+- Medical teams
+- Boats
+
+Features:
+
+- Pull-to-refresh to fetch latest resources from backend
+- Filter by resource type
+- Filter by district
+- Show only available resources
+- Display capacity and current load
+- Show location coordinates when available
+- Graceful fallback to cached data when offline
+- Demo resources seeded for offline testing
 
 ### Settings
 
@@ -183,7 +198,6 @@ Responsibilities:
 - store and retrieve the current session
 - store and retrieve event queue rows
 - detect duplicates
-- claim help requests locally
 - count queued events
 
 Important methods:
@@ -348,6 +362,37 @@ Main method:
 
 - `logError()`
 
+### `lib/services/resource_service.dart`
+
+Responsibilities:
+
+- fetch resources from backend API
+- cache resources locally in SQLite
+- support offline fallback to cached resources
+- expose methods for UI to query resources
+- handle network failures gracefully
+
+Main methods:
+
+- `fetchAndCacheResources()`
+- `getResources()`
+- `getAvailableResources()`
+- `getResourcesByType()`
+- `getResourcesByDistrict()`
+- `getAvailableResourcesByDistrict()`
+- `clearCachedResources()`
+- `getResourcesCount()`
+- `isCacheEmpty()`
+
+Architecture notes:
+
+- Resources are read-only (no create/update/delete on client)
+- Backend URL: `GET /api/v1/resources`
+- All resources are stored in SQLite for offline access
+- Pull-to-refresh in UI triggers `fetchAndCacheResources(forceRefresh: true)`
+- If network is unavailable, cached resources are returned automatically
+- Demo resources are seeded during app initialization for offline demo purposes
+
 ## Data Models
 
 ### `EventModel`
@@ -406,6 +451,39 @@ Important fields:
 - `description`
 - `location`
 - `status`
+
+### `ResourceModel`
+
+Represents a backend-managed emergency resource cached locally.
+
+Important fields:
+
+- `id`
+- `type` (ResourceType enum)
+- `name`
+- `district`
+- `status` (ResourceStatus enum)
+- `latitude`
+- `longitude`
+- `capacity`
+- `currentLoad`
+- `lastUpdated`
+
+Resource types:
+
+- `RESCUE_TEAM`
+- `BOAT`
+- `AMBULANCE`
+- `SHELTER`
+- `MEDICAL_TEAM`
+- `FOOD_WATER`
+
+Resource statuses:
+
+- `AVAILABLE`
+- `ASSIGNED`
+- `BUSY`
+- `OUT_OF_SERVICE`
 
 ## SQLite Schema
 
@@ -475,6 +553,35 @@ Notes:
 - Older table layouts are detected and rebuilt when necessary
 - Demo rows are seeded only once
 
+### `resources`
+
+Columns:
+
+- `id` (TEXT PRIMARY KEY)
+- `type` (TEXT NOT NULL)
+- `name` (TEXT NOT NULL)
+- `district` (TEXT NOT NULL)
+- `status` (TEXT NOT NULL)
+- `latitude` (REAL)
+- `longitude` (REAL)
+- `capacity` (INTEGER)
+- `current_load` (INTEGER)
+- `last_updated` (TEXT NOT NULL)
+
+Indexes:
+
+- `status`
+- `district`
+- `type`
+
+Notes:
+
+- Resources are cached locally from the backend API
+- Demo resources are seeded during initialization
+- Resources are read-only on the client (no create/update/delete operations)
+- Populated by `ResourceService.fetchAndCacheResources()`
+- Schema is automatically created during database initialization
+
 ## Current UI Behavior
 
 ### Help Request submission
@@ -492,19 +599,25 @@ Notes:
 - Stores latitude and longitude when available
 - Queues the row locally
 
-### Give Help behavior
 
-- Shows help requests from other users only
-- Hides the current user’s own requests
-- Asks for confirmation before claiming
-- Marks the request as `CLAIMED`
-- Shows claimant details in the card
 
 ### My Requests behavior
 
-- Shows the current user’s local events
+- Shows the current userâ€™s local events
 - Displays status badges for queue/sync state
+### Resources view behavior
 
+- Displays all cached emergency resources from SQLite
+- Supports pull-to-refresh to fetch latest resources from backend
+- If online, fetches resources from backend and updates local cache
+- If offline, displays previously cached resources
+- Supports filtering by resource type (SHELTER, RESCUE_TEAM, BOAT, AMBULANCE, MEDICAL_TEAM, FOOD_WATER)
+- Supports filtering by district
+- Supports filtering by availability status (AVAILABLE only)
+- Shows resource capacity and current load as a progress bar
+- Shows location coordinates when available
+- Displays read-only badge to indicate resources cannot be modified or claimed
+- Demo resources are available for offline testing
 ## Duplicate Prevention
 
 The app uses multiple layers of protection:
@@ -528,13 +641,16 @@ It defines:
 - `Resource`
 - `Alert`
 
-Important diagnosis:
+Important notes:
 
 - The current mobile app does not persist Prisma entities directly on the device
-- It persists generic local events
-- The backend must map those events into Prisma models during sync
+- It persists generic local events for user submissions (help requests, data reports)
+- Resources are a special case: they are backend-managed read-only entities that the mobile app caches locally
+- The backend must map user events into Prisma models during sync
+- Resources are fetched from the backend API and cached in SQLite for offline visibility
+- ResourceModel fields align with the Prisma `Resource` schema (type, status, capacity, location, etc.)
 
-This means the mobile event payloads and Prisma schema are related, but not identical.
+This means the mobile event payloads and Prisma schema are related, but not identical. Resources are architecturally different—they are server-managed, not user-generated.
 
 ## Runtime Dependencies
 
@@ -598,10 +714,7 @@ Mock local account:
 - Email: `mock.user@j1.local`
 - Password: `mock1234`
 
-Seeded demo help request users:
 
-- `demo-user-1`
-- `demo-user-2`
 
 ## SRS-Oriented Requirements
 
@@ -615,13 +728,7 @@ Seeded demo help request users:
 6. The system shall assign a unique UUID to every queued event.
 7. The system shall save every submission to SQLite before network sync.
 8. The system shall display user-facing data from SQLite only.
-9. The system shall show the current user’s submitted requests in `My Requests`.
-10. The system shall show help requests from other users in `Give Help`.
-11. The system shall allow a volunteer to claim a help request after confirmation.
-12. The system shall mark a claimed request as `CLAIMED` in SQLite.
-13. The system shall prevent duplicate inserts for the same event signature.
-14. The system shall sync queued events to the backend when network is available.
-15. The system shall support GPS capture for location-aware submissions.
+9. The system shall show the current userâ€™s submitted requests in `My Requests`.
 
 ### Non-Functional Requirements
 
@@ -671,7 +778,6 @@ If you are building a formal SRS from this project, structure it as:
 - `lib/screens/report_screen.dart`
 - `lib/screens/help_request_form.dart`
 - `lib/screens/data_report_form.dart`
-- `lib/screens/give_help_screen.dart`
 - `lib/screens/my_requests_screen.dart`
 - `lib/screens/settings_screen.dart`
 

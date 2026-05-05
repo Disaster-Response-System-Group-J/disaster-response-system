@@ -72,24 +72,10 @@ class _QuickActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _ActionCard(
-            icon: Icons.edit_note_outlined,
-            title: 'Report',
-            subtitle: 'Log help or field data',
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _ActionCard(
-            icon: Icons.volunteer_activism_outlined,
-            title: 'Give Help',
-            subtitle: 'Review open requests',
-          ),
-        ),
-      ],
+    return const _ActionCard(
+      icon: Icons.edit_note_outlined,
+      title: 'Report',
+      subtitle: 'Log help or field data',
     );
   }
 }

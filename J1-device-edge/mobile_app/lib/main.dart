@@ -8,6 +8,7 @@ import 'services/auth_service.dart';
 import 'services/database_helper.dart';
 import 'services/gps_service.dart';
 import 'services/network_service.dart';
+import 'services/resource_service.dart';
 import 'services/sync_service.dart';
 
 void main() {
@@ -67,6 +68,16 @@ class _StartupGateState extends State<StartupGate> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       unawaited(NetworkService.checkConnection());
       unawaited(_syncService?.syncQueuedEvents() ?? Future<void>.value());
+      // Refresh resources when app resumes
+      unawaited(
+        Future.microtask(() async {
+          try {
+            await ResourceService.instance.fetchAndCacheResources();
+          } catch (e) {
+            print('Error refreshing resources: $e');
+          }
+        }),
+      );
     }
   }
 
@@ -115,6 +126,18 @@ class _StartupGateState extends State<StartupGate> with WidgetsBindingObserver {
       });
       _syncService ??= SyncService();
       await _syncService!.start();
+
+      // Initialize resources (non-blocking)
+      unawaited(
+        Future.microtask(() async {
+          try {
+            await ResourceService.instance.fetchAndCacheResources();
+            print('Resources initialized');
+          } catch (e) {
+            print('Error initializing resources: $e');
+          }
+        }),
+      );
 
       if (!mounted) {
         return;

@@ -2,10 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../screens/give_help_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/my_requests_screen.dart';
 import '../screens/report_screen.dart';
+import '../screens/resources_screen.dart';
 import '../screens/settings_screen.dart';
 import '../services/auth_service.dart';
 import '../services/database_helper.dart';
@@ -26,8 +26,8 @@ class _MainTabControllerState extends State<MainTabController> {
   final List<Widget> _screens = const [
     HomeScreen(),
     ReportScreen(),
-    GiveHelpScreen(),
     MyRequestsScreen(),
+    ResourcesScreen(),
     SettingsScreen(),
   ];
 
@@ -117,11 +117,6 @@ class _MainTabControllerState extends State<MainTabController> {
                 ),
                 label: 'Report',
               ),
-              const BottomNavigationBarItem(
-                icon: Icon(Icons.volunteer_activism_outlined),
-                activeIcon: Icon(Icons.volunteer_activism),
-                label: 'Give Help',
-              ),
               BottomNavigationBarItem(
                 icon: Badge(
                   isLabelVisible: _queueCount > 0,
@@ -134,6 +129,11 @@ class _MainTabControllerState extends State<MainTabController> {
                   child: const Icon(Icons.list_alt),
                 ),
                 label: 'My Requests',
+              ),
+              const BottomNavigationBarItem(
+                icon: Icon(Icons.local_hospital_outlined),
+                activeIcon: Icon(Icons.local_hospital),
+                label: 'Resources',
               ),
               const BottomNavigationBarItem(
                 icon: Icon(Icons.settings_outlined),
