@@ -120,6 +120,10 @@ Once `docker compose up -d` completes, the following are available:
 | **PostgreSQL** | `localhost:5432` | `disaster` / `disaster123` | Shared application database |
 | **Kafka** | `localhost:9092` | — | Message broker (J1 sensors → J3 dashboard) |
 
+Grafana loads a prebuilt dashboard automatically after startup:
+
+- `Disaster Response System Overview` at `http://localhost:3000/d/drs-overview/disaster-response-system-overview`
+
 > **Note:** Grafana runs on **port 3030** (not 3000) because J3's dashboard occupies port 3000.
 
 > **Important:** The credentials above are for **local development only**. Never use these in a production environment.

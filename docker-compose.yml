@@ -47,6 +47,40 @@ services:
     networks:
       - disaster-net
 
+  # Postgres exporter — exposes Postgres metrics for Prometheus
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: disaster-postgres-exporter
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable"
+    ports:
+      - "9187:9187"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - disaster-net
+
+  # Keycloak exporter — exposes Keycloak metrics for Prometheus
+  keycloak-exporter:
+    image: quay.io/integr8ly/keycloak-exporter:2.5
+    container_name: disaster-keycloak-exporter
+    restart: unless-stopped
+    environment:
+      KC_URL: "http://keycloak:8080"
+      KC_USERNAME: "${KEYCLOAK_ADMIN}"
+      KC_PASSWORD: "${KEYCLOAK_ADMIN_PASSWORD}"
+      KC_REALM: "master"
+      METRICS_PORT: "9404"
+    ports:
+      - "9404:9404"
+    depends_on:
+      keycloak:
+        condition: service_started
+    networks:
+      - disaster-net
+
   # Keycloak — identity & access management, imports disaster-response realm on startup
   keycloak:
     image: quay.io/keycloak/keycloak:24.0
@@ -60,6 +94,8 @@ services:
       KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
       KC_DB_USERNAME: keycloak
       KC_DB_PASSWORD: keycloak123
+      KC_METRICS_ENABLED: "true"
+      KC_METRICS_PATH: "/metrics"
     ports:
       - "8180:8080"
     volumes:
@@ -174,6 +210,8 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD}
     volumes:
       - grafana_data:/var/lib/grafana
+      - ./j4-platform-security/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./j4-platform-security/grafana/dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
       - prometheus
     networks:
