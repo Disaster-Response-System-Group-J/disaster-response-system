@@ -6,16 +6,26 @@
 
 export enum UserRole {
   PUBLIC_USER = 'PUBLIC_USER',
-  OFFICER = 'OFFICER',
-  RESOURCE_MANAGER = 'RESOURCE_MANAGER',
-  ADMIN = 'ADMIN',
+  INCIDENT_COMMANDER_NATIONAL = 'INCIDENT_COMMANDER_NATIONAL',
+  INCIDENT_COMMANDER_ZONAL = 'INCIDENT_COMMANDER_ZONAL',
+  OPERATIONS_OFFICER_NATIONAL = 'OPERATIONS_OFFICER_NATIONAL',
+  OPERATIONS_OFFICER_ZONAL = 'OPERATIONS_OFFICER_ZONAL',
+  RESOURCE_MANAGER_NATIONAL = 'RESOURCE_MANAGER_NATIONAL',
+  RESOURCE_MANAGER_ZONAL = 'RESOURCE_MANAGER_ZONAL',
+  SYSTEM_ADMIN = 'SYSTEM_ADMIN',
 }
 
-export enum DisasterType {
-  FLOOD = 'FLOOD',
-  LANDSLIDE = 'LANDSLIDE',
-  OTHER = 'OTHER',
-}
+// ── Enums ────────────────────────────────────────────────────
+
+// Core disaster types (always available)
+export const DISASTER_TYPES = {
+  FLOOD: 'FLOOD',
+  LANDSLIDE: 'LANDSLIDE',
+  DROUGHT: 'DROUGHT',
+  OTHER: 'OTHER', // For admin-defined disasters
+} as const;
+
+export type DisasterType = typeof DISASTER_TYPES[keyof typeof DISASTER_TYPES] | string; // Allow custom disaster types
 
 export enum ReportSource {
   J1_SOS_APP = 'J1_SOS_APP',
@@ -182,7 +192,9 @@ export interface DashboardSummary {
   incidents: {
     floods: number;
     landslides: number;
+    droughts: number;
     other: number;
+    [key: string]: number; // Allow for custom disaster types
   };
   resources: {
     availableTeams: { current: number; total: number };
@@ -250,45 +262,31 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     'view:emergency-contacts',
     'create:public-report',
   ],
-  [UserRole.OFFICER]: [
-    'view:dashboard',
-    'view:incoming-reports',
-    'verify:reports',
-    'reject:reports',
-    'view:incident-map',
-    'view:resources',
-    'view:alerts',
-    'view:analytics',
-    'view:sensors',
-    'view:predictions',
-    'create:incident',
+  [UserRole.INCIDENT_COMMANDER_NATIONAL]: [
+    'view:dashboard', 'view:incident-map', 'view:alerts', 'view:analytics', 'view:predictions',
+    'view:sensors', 'approve:incidents', 'reject:incidents', 'issue:alerts', 'force-reallocate:resources'
   ],
-  [UserRole.RESOURCE_MANAGER]: [
-    'view:dashboard',
-    'view:incident-map',
-    'view:resources',
-    'assign:resources',
-    'update:resource-status',
-    'view:alerts',
-    'view:analytics',
-    'view:sensors',
-    'view:predictions',
+  [UserRole.INCIDENT_COMMANDER_ZONAL]: [
+    'view:dashboard', 'view:incident-map', 'view:alerts', 'view:analytics', 'view:predictions',
+    'view:sensors', 'approve:incidents', 'reject:incidents', 'issue:alerts', 'force-reallocate:resources'
   ],
-  [UserRole.ADMIN]: [
-    'view:dashboard',
-    'view:incoming-reports',
-    'verify:reports',
-    'reject:reports',
-    'view:incident-map',
-    'view:resources',
-    'assign:resources',
-    'update:resource-status',
-    'view:alerts',
-    'view:analytics',
-    'view:sensors',
-    'view:predictions',
-    'manage:users',
-    'manage:settings',
-    'create:incident',
+  [UserRole.OPERATIONS_OFFICER_NATIONAL]: [
+    'view:dashboard', 'view:incoming-reports', 'view:incident-map', 'view:sensors',
+    'verify:reports', 'reject:reports', 'update:incident-status', 'request:resources'
+  ],
+  [UserRole.OPERATIONS_OFFICER_ZONAL]: [
+    'view:dashboard', 'view:incoming-reports', 'view:incident-map', 'view:sensors',
+    'verify:reports', 'reject:reports', 'update:incident-status', 'request:resources'
+  ],
+  [UserRole.RESOURCE_MANAGER_NATIONAL]: [
+    'view:dashboard', 'view:incident-map', 'view:resources', 'view:predictions',
+    'dispatch:resources', 'update:resource-status', 'manage:shelters'
+  ],
+  [UserRole.RESOURCE_MANAGER_ZONAL]: [
+    'view:dashboard', 'view:incident-map', 'view:resources', 'view:predictions',
+    'dispatch:resources', 'update:resource-status', 'manage:shelters'
+  ],
+  [UserRole.SYSTEM_ADMIN]: [
+    'view:dashboard', 'manage:users', 'manage:settings', 'view:audit-logs'
   ],
 };

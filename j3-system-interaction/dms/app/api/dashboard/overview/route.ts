@@ -1,61 +1,25 @@
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server';
+import { pool } from '@/lib/db';
 
 export async function GET() {
   try {
-    const dashboardData = {
-      activeIncidents: 142,
-      activeIncidentsChange: 12,
-      criticalAlerts: 8,
-      peopleAffected: 45200,
-      peopleAffectedChange: 15,
-      inShelters: 12400,
-      incidents: {
-        floods: 86,
-        landslides: 41,
-        other: 15,
-      },
-      resources: {
-        availableTeams: { current: 124, total: 150 },
-        activeShelters: { current: 86, total: 120 },
-        heavyMachinery: { current: 45, total: 90 },
-      },
-      alerts: [
-        {
-          id: 1,
-          severity: "critical",
-          title: "Earthquake Alert - Magnitude 5.2",
-          location: "Northern District",
-          time: "15 minutes ago",
-        },
-        {
-          id: 2,
-          severity: "high",
-          title: "Flooding Risk Assessment",
-          location: "River Basin Area",
-          time: "32 minutes ago",
-        },
-        {
-          id: 3,
-          severity: "medium",
-          title: "Storm Warning Issued",
-          location: "Coastal Region",
-          time: "1 hour ago",
-        },
-        {
-          id: 4,
-          severity: "low",
-          title: "Road Damage Report",
-          location: "Highway 5",
-          time: "2 hours ago",
-        },
-      ],
-    };
+    // Run multiple count queries concurrently
+    const [incidents, resources, shelters] = await Promise.all([
+      pool.query('SELECT COUNT(*) as count FROM public."ActiveIncident" WHERE status = $1', ['ACTIVE']),
+      pool.query('SELECT COUNT(*) as count FROM public."DeployableAsset" WHERE status = $1', ['AVAILABLE']),
+      pool.query('SELECT COUNT(*) as count FROM public."Shelter" WHERE status != $1', ['CLOSED'])
+    ]);
 
-    return NextResponse.json(dashboardData, { status: 200 });
+    // Format the response for your frontend
+    const stats = {
+      activeIncidents: parseInt(incidents.rows[0].count, 10),
+      availableResources: parseInt(resources.rows[0].count, 10),
+      openShelters: parseInt(shelters.rows[0].count, 10),
+    };
+    
+    return NextResponse.json(stats);
   } catch (error) {
-    return NextResponse.json(
-      { success: false, message: "Server error" },
-      { status: 500 }
-    );
+    console.error('Database Error fetching overview stats:', error);
+    return NextResponse.json({ error: 'Failed to fetch dashboard stats' }, { status: 500 });
   }
 }
