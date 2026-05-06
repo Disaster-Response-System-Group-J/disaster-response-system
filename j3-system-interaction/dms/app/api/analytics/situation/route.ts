@@ -1,21 +1,50 @@
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server';
+import { pool } from '@/lib/db';
 
 export async function GET() {
   try {
-    const situationData = {
-      avgResponseTime: 14,
-      avgResponseTimeChange: 2.4,
-      totalRelief: 84.2,
-      totalReliefChange: 15,
-      totalRescued: 1248,
-      rescuedDistricts: 14,
-    };
+    // 1. Fetch incident counts by day for the trend chart
+    const trendQuery = `
+      SELECT 
+        TO_CHAR(created_at, 'YYYY-MM-DD') as date,
+        COUNT(*) as count
+      FROM public."ActiveIncident"
+      WHERE created_at > NOW() - INTERVAL '7 days'
+      GROUP BY date
+      ORDER BY date ASC
+    `;
 
-    return NextResponse.json(situationData, { status: 200 });
+    // 2. Fetch disaster type distribution for the pie/bar charts
+    const distributionQuery = `
+      SELECT 
+        severity,
+        COUNT(*) as count
+      FROM public."ActiveIncident"
+      GROUP BY severity
+    `;
+
+    // 3. Fetch resource allocation stats
+    const resourceQuery = `
+      SELECT 
+        status,
+        COUNT(*) as count
+      FROM public."DeployableAsset"
+      GROUP BY status
+    `;
+
+    const [trends, distribution, resources] = await Promise.all([
+      pool.query(trendQuery),
+      pool.query(distributionQuery),
+      pool.query(resourceQuery)
+    ]);
+
+    return NextResponse.json({
+      trends: trends.rows,
+      distribution: distribution.rows,
+      resources: resources.rows
+    });
   } catch (error) {
-    return NextResponse.json(
-      { success: false, message: "Server error" },
-      { status: 500 }
-    );
+    console.error('Analytics API Error:', error);
+    return NextResponse.json({ error: 'Failed to fetch analytics data' }, { status: 500 });
   }
 }

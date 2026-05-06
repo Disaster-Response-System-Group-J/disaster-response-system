@@ -1,14 +1,15 @@
-import { NextResponse } from "next/server";
-import { MOCK_CONFIRMED_INCIDENTS } from "@/data/mock-data";
+import { NextResponse } from 'next/server';
+import { pool } from '@/lib/db'; // Import the Supabase pool we just created
 
 export async function GET() {
   try {
-    return NextResponse.json(MOCK_CONFIRMED_INCIDENTS);
+    // Fetch all active incidents from Supabase
+    const query = 'SELECT * FROM public."ActiveIncident" ORDER BY created_at DESC';
+    const { rows } = await pool.query(query);
+    
+    return NextResponse.json(rows);
   } catch (error) {
-    console.error("Incidents API error:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch incidents data" },
-      { status: 500 }
-    );
+    console.error('Database Error:', error);
+    return NextResponse.json({ error: 'Failed to fetch incidents' }, { status: 500 });
   }
 }
