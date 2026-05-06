@@ -63,23 +63,24 @@ services:
       - disaster-net
 
   # Keycloak exporter — exposes Keycloak metrics for Prometheus
-  keycloak-exporter:
-    image: quay.io/integr8ly/keycloak-exporter:2.5
-    container_name: disaster-keycloak-exporter
-    restart: unless-stopped
-    environment:
-      KC_URL: "http://keycloak:8080"
-      KC_USERNAME: "${KEYCLOAK_ADMIN}"
-      KC_PASSWORD: "${KEYCLOAK_ADMIN_PASSWORD}"
-      KC_REALM: "master"
-      METRICS_PORT: "9404"
-    ports:
-      - "9404:9404"
-    depends_on:
-      keycloak:
-        condition: service_started
-    networks:
-      - disaster-net
+# keycloak-exporter:
+  #   image: ghcr.io/ivanklee86/keycloak_exporter:latest
+  #   container_name: disaster-keycloak-exporter
+  #   restart: unless-stopped
+  #   environment:
+  #     KC_URL: "http://keycloak:8080"
+  #     KC_USERNAME: "${KEYCLOAK_ADMIN}"
+  #     KC_PASSWORD: "${KEYCLOAK_ADMIN_PASSWORD}"
+  #     KC_REALM: "master"
+  #     METRICS_PORT: "9404"
+  #   ports:
+  #     - "9404:9404"
+  #   depends_on:
+  #     keycloak:
+  #       condition: service_started
+  #   networks:
+  #     - disaster-net
+
 
   # Keycloak — identity & access management, imports disaster-response realm on startup
   keycloak:
@@ -139,8 +140,8 @@ services:
       KONG_ADMIN_LISTEN: 0.0.0.0:8001
       KONG_LOG_LEVEL: warn
     ports:
-      - "8000:8000" # proxy — all API requests go here
-      - "8001:8001" # admin API
+      - "8000:8000"
+      - "8001:8001"
     healthcheck:
       test: ["CMD", "kong", "health"]
       interval: 10s
@@ -322,8 +323,11 @@ services:
   #   networks:
   #     - disaster-net
 
-  # Hardhat Node for Blockchain Testing ─────────────────────────
-  # Local Hardhat blockchain node for J4 blockchain audit demo/development.
+  # ─────────────────────────────────────────────────────────────
+  # J4 — Blockchain Audit (Hardhat local dev)
+  # ─────────────────────────────────────────────────────────────
+
+  # Local Hardhat blockchain node for J4 blockchain audit demo/development
   hardhat-node:
     image: node:22-alpine
     container_name: hardhat-node
@@ -334,9 +338,10 @@ services:
     command: sh -c "npm ci && npx hardhat node --hostname 0.0.0.0"
     ports:
       - "8545:8545"
+    networks:
+      - disaster-net
 
-  # One-time deployment container. It deploys IncidentAuditLog and writes the
-  # contract address to the shared audit-deployment volume.
+  # One-time deployment — deploys IncidentAuditLog contract and writes address to shared volume
   deploy-audit-contract:
     image: node:22-alpine
     working_dir: /app
@@ -348,10 +353,10 @@ services:
     depends_on:
       - hardhat-node
     restart: "no"
+    networks:
+      - disaster-net
 
-  # J4 blockchain audit API. It reads the contract address from /deployment.
-  # AUDIT_PRIVATE_KEY still comes from the root .env file.
-  # This setup is for local demo/development only.
+  # J4 blockchain audit API — reads contract address from /deployment volume
   j4-audit-api:
     build: ./j4-platform-security/blockchain-audit
     container_name: j4-audit-api
@@ -366,11 +371,18 @@ services:
     depends_on:
       deploy-audit-contract:
         condition: service_completed_successfully
+    networks:
+      - disaster-net
 
-# ── Named Volumes ─────────────────────────────────────────────────────────
+# ── Named Volumes ──────────────────────────────────────────────────────────────
 volumes:
-  kong-db-data:
-  app-db-data:
-  grafana-data:
+  postgres_data:
+  prometheus_data:
+  grafana_data:
   hardhat-node-modules:
   audit-deployment:
+
+# ── Networks ───────────────────────────────────────────────────────────────────
+networks:
+  disaster-net:
+    driver: bridge
