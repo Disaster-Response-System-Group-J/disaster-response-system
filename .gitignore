@@ -30,6 +30,9 @@ build/
 # Node
 node_modules/
 npm-debug.log*
+.next/
+.next
+out/
 
 # Java / Maven / Gradle
 target/
