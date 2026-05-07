@@ -5,6 +5,7 @@ import { FileText, CheckCircle2, XCircle, Copy, Eye, MapPin, Clock, Camera, Aler
 import { VerificationStatus, ReportSource, IncomingReport, UserRole, IncidentSeverity } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { useSocket } from '@/context/SocketContext';
+import { logAuditEvent } from '@/services/j4AuditService';
 
 const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
   J1_SOS_APP: { label: 'J1 SOS', color: 'bg-red-500/10 text-red-400 border-red-500/20' },
@@ -34,11 +35,12 @@ export default function IncomingReportsPage() {
   const [sourceFilter, setSourceFilter] = useState<string>('ALL');
   const [selectedReport, setSelectedReport] = useState<IncomingReport | null>(null);
   const [isElevating, setIsElevating] = useState(false);
-  const [incidentForm, setIncidentForm] = useState({ 
-    title: '', 
-    severity: IncidentSeverity.HIGH, 
-    affectedPeople: 0 
+  const [incidentForm, setIncidentForm] = useState({
+    title: '',
+    severity: IncidentSeverity.HIGH,
+    affectedPeople: 0
   });
+  const [auditWarn, setAuditWarn] = useState<string | null>(null);
 
   const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.includes('NATIONAL')) ? 'ALL' : (user as any)?.assignedDistrict || 'ALL';
 
@@ -112,9 +114,12 @@ export default function IncomingReportsPage() {
 
   const pendingCount = reports.filter(r => r.verificationStatus === VerificationStatus.PENDING_REVIEW).length;
 
-  const handleAction = (reportId: string, action: 'verify' | 'reject' | 'duplicate') => {
+  const handleAction = async (reportId: string, action: 'verify' | 'reject' | 'duplicate') => {
     const statusMap = { verify: VerificationStatus.VERIFIED, reject: VerificationStatus.REJECTED, duplicate: VerificationStatus.DUPLICATE };
     const newStatus = statusMap[action];
+    const previousStatus = selectedReport?.verificationStatus;
+
+    // 1. Apply the J3 action locally first
     setReports(prev => prev.map(r => {
       if (r.reportId !== reportId) return r;
       return { ...r, verificationStatus: newStatus, reviewedAt: new Date().toISOString() };
@@ -123,18 +128,51 @@ export default function IncomingReportsPage() {
     if (socket) {
       socket.emit('client:update-report-status', { reportId, status: newStatus });
     }
+
+    // 2. Log to J4 audit AFTER the local action succeeds
+    // blockchainCaseId lives on the incident, not the raw report.
+    // We only log if the report carries a linked blockchainCaseId from J1.
+    const report = reports.find(r => r.reportId === reportId);
+    const caseId = (report as any)?.blockchainCaseId as number | null | undefined;
+
+    if (caseId != null && (action === 'verify' || action === 'reject')) {
+      const eventType = action === 'verify' ? 'INCIDENT_VERIFIED' : 'FALSE_REPORT_MARKED';
+      const newAuditStatus = action === 'verify' ? 'verified' : 'false_report';
+      try {
+        await logAuditEvent({
+          caseId,
+          eventId: crypto.randomUUID(),
+          eventType,
+          incidentId: reportId,
+          performedBy: user?.id ?? 'unknown',
+          performedRole: user?.role ?? 'unknown',
+          previousStatus: previousStatus ?? undefined,
+          newStatus: newAuditStatus,
+          district: report?.district,
+          notes: action === 'verify'
+            ? 'Field officer confirmed incident on-site'
+            : 'No disaster evidence found — report rejected',
+        });
+      } catch {
+        setAuditWarn('Action completed, but blockchain audit submission failed.');
+        setTimeout(() => setAuditWarn(null), 5000);
+      }
+    }
   };
 
-  const handleElevate = (e: React.FormEvent) => {
+  const handleElevate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedReport) return;
 
     // 1. Update the report status locally to CONVERTED
-    setReports(prev => prev.map(r => r.reportId === selectedReport.reportId ? { ...r, verificationStatus: VerificationStatus.CONVERTED_TO_INCIDENT } : r));
+    setReports(prev => prev.map(r =>
+      r.reportId === selectedReport.reportId
+        ? { ...r, verificationStatus: VerificationStatus.CONVERTED_TO_INCIDENT }
+        : r
+    ));
 
     // 2. Emit the new incident to the server via Socket
     if (socket) {
-      // Tell J2/J3 backend to create the incident
       socket.emit('client:create-incident', {
         sourceReportId: selectedReport.reportId,
         title: incidentForm.title,
@@ -145,11 +183,32 @@ export default function IncomingReportsPage() {
         district: selectedReport.district,
         disasterType: selectedReport.disasterType,
       });
-      // Tell backend the report is now converted
-      socket.emit('client:update-report-status', { 
-        reportId: selectedReport.reportId, 
-        status: VerificationStatus.CONVERTED_TO_INCIDENT 
+      socket.emit('client:update-report-status', {
+        reportId: selectedReport.reportId,
+        status: VerificationStatus.CONVERTED_TO_INCIDENT,
       });
+    }
+
+    // 3. Log INCIDENT_ASSIGNED to J4 if blockchainCaseId is available
+    const caseId = (selectedReport as any)?.blockchainCaseId as number | null | undefined;
+    if (caseId != null) {
+      try {
+        await logAuditEvent({
+          caseId,
+          eventId: crypto.randomUUID(),
+          eventType: 'INCIDENT_ASSIGNED',
+          incidentId: selectedReport.reportId,
+          performedBy: user?.id ?? 'unknown',
+          performedRole: user?.role ?? 'unknown',
+          previousStatus: 'verified',
+          newStatus: 'assigned',
+          district: selectedReport.district,
+          notes: `Elevated to active incident: ${incidentForm.title}`,
+        });
+      } catch {
+        setAuditWarn('Action completed, but blockchain audit submission failed.');
+        setTimeout(() => setAuditWarn(null), 5000);
+      }
     }
 
     // Reset UI
@@ -197,6 +256,13 @@ export default function IncomingReportsPage() {
             </select>
           </div>
         </div>
+
+        {/* Audit submission warning */}
+        {auditWarn && (
+          <div className="mb-4 px-4 py-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-xs font-semibold text-yellow-400">
+            ⚠ {auditWarn}
+          </div>
+        )}
 
         <div className="grid grid-cols-3 gap-6">
           {/* Reports List */}

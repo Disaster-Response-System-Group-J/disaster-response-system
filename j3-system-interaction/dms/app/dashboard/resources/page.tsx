@@ -9,6 +9,7 @@ import { ResourceType, ResourceStatus, IncidentStatus, UserRole } from '@/types'
 import { useAuth } from '@/context/AuthContext';
 import { DISTRICT_NAMES } from '@/data/districts';
 import { useSocket } from '@/context/SocketContext';
+import { logAuditEvent } from '@/services/j4AuditService';
 
 const STATUS_STYLES: Record<string, string> = {
   AVAILABLE: 'bg-green-500/10 text-green-400 border-green-500/20',
@@ -46,6 +47,7 @@ export default function ResourcesPage() {
   const [selectedIncidentId, setSelectedIncidentId] = useState<string>('');
   const [shelterModal, setShelterModal] = useState<string | null>(null);
   const [shelterForm, setShelterForm] = useState({ capacity: 0, currentLoad: 0 });
+  const [auditWarn, setAuditWarn] = useState<string | null>(null);
 
   useEffect(() => {
   const fetchAllData = async () => {
@@ -87,9 +89,17 @@ export default function ResourcesPage() {
 
       setResources([...mappedAssets, ...mappedShelters]);
       
-      // Ensure incidentsRes is handled as an array before filtering[cite: 6]
+      // Ensure incidentsRes is handled as an array before filtering
       const incidentsArray = Array.isArray(incidentsRes) ? incidentsRes : [];
-      setActiveIncidents(incidentsArray.filter((i: any) => i.status === 'ACTIVE'));
+      // Preserve blockchainCaseId from J1/backend (stored as blockchain_case_id in the DB)
+      setActiveIncidents(
+        incidentsArray
+          .filter((i: any) => i.status === 'ACTIVE')
+          .map((i: any) => ({
+            ...i,
+            blockchainCaseId: i.blockchain_case_id ?? null,
+          }))
+      );
       
     } catch (err) {
       console.error('Error loading resources:', err);
@@ -135,14 +145,40 @@ export default function ResourcesPage() {
     }
   };
 
-  const handleDispatch = (e: React.FormEvent) => {
+  const handleDispatch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!assignModal || !selectedIncidentId) return;
     const incident = activeIncidents.find(i => i.incident_id.toString() === selectedIncidentId);
     if (!incident) return;
+
+    // 1. Apply J3 action first
     handleStatusUpdate(assignModal, ResourceStatus.ASSIGNED);
+    const resource = resources.find(r => r.resourceId === assignModal);
     setAssignModal(null);
     setSelectedIncidentId('');
+
+    // 2. Log RESOURCE_ASSIGNED to J4 AFTER local action succeeds
+    const caseId: number | null = incident.blockchainCaseId ?? null;
+    if (caseId != null) {
+      try {
+        await logAuditEvent({
+          caseId,
+          eventId: crypto.randomUUID(),
+          eventType: 'RESOURCE_ASSIGNED',
+          incidentId: incident.incident_id.toString(),
+          resourceId: assignModal,
+          performedBy: user?.id ?? 'unknown',
+          performedRole: user?.role ?? 'unknown',
+          previousStatus: 'available',
+          newStatus: 'assigned',
+          district: resource?.district,
+          notes: `Resource ${resource?.name ?? assignModal} dispatched to incident ${incident.title}`,
+        });
+      } catch {
+        setAuditWarn('Action completed, but blockchain audit submission failed.');
+        setTimeout(() => setAuditWarn(null), 5000);
+      }
+    }
   };
 
   const openShelterModal = (resource: any) => {
@@ -206,6 +242,12 @@ export default function ResourcesPage() {
   return (
     <div className="flex-1 overflow-y-auto bg-[#0a0f16] text-white">
       <div className="p-8 max-w-[1400px] mx-auto">
+        {auditWarn && (
+          <div className="mb-4 px-4 py-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-xs font-semibold text-yellow-400">
+            ⚠ {auditWarn}
+          </div>
+        )}
+
         <div className="flex items-end justify-between mb-8">
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight mb-2">Resource Tracking</h1>
