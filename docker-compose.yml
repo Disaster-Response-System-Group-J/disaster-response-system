@@ -1,5 +1,4 @@
 services:
-
   # ─────────────────────────────────────────────────────────────
   # INFRASTRUCTURE  (managed by J4)
   # ─────────────────────────────────────────────────────────────
@@ -63,9 +62,9 @@ services:
     networks:
       - disaster-net
 
-  # # Keycloak exporter — exposes Keycloak metrics for Prometheus (DISABLED: image unavailable)
-  # keycloak-exporter:
-  #   image: quay.io/integr8ly/keycloak-exporter:2.5
+  # Keycloak exporter — exposes Keycloak metrics for Prometheus
+# keycloak-exporter:
+  #   image: ghcr.io/ivanklee86/keycloak_exporter:latest
   #   container_name: disaster-keycloak-exporter
   #   restart: unless-stopped
   #   environment:
@@ -81,6 +80,7 @@ services:
   #       condition: service_started
   #   networks:
   #     - disaster-net
+
 
   # Keycloak — identity & access management, imports disaster-response realm on startup
   keycloak:
@@ -140,8 +140,8 @@ services:
       KONG_ADMIN_LISTEN: 0.0.0.0:8001
       KONG_LOG_LEVEL: warn
     ports:
-      - "8000:8000"   # proxy — all API requests go here
-      - "8001:8001"   # admin API
+      - "8000:8000"
+      - "8001:8001"
     healthcheck:
       test: ["CMD", "kong", "health"]
       interval: 10s
@@ -343,12 +343,67 @@ services:
   #   networks:
   #     - disaster-net
 
+  # ─────────────────────────────────────────────────────────────
+  # J4 — Blockchain Audit (Hardhat local dev)
+  # ─────────────────────────────────────────────────────────────
+
+  # Local Hardhat blockchain node for J4 blockchain audit demo/development
+  hardhat-node:
+    image: node:22-alpine
+    container_name: hardhat-node
+    working_dir: /app
+    volumes:
+      - ./j4-platform-security/blockchain-audit:/app
+      - hardhat-node-modules:/app/node_modules
+    command: sh -c "npm ci && npx hardhat node --hostname 0.0.0.0"
+    ports:
+      - "8545:8545"
+    networks:
+      - disaster-net
+
+  # One-time deployment — deploys IncidentAuditLog contract and writes address to shared volume
+  deploy-audit-contract:
+    image: node:22-alpine
+    working_dir: /app
+    volumes:
+      - ./j4-platform-security/blockchain-audit:/app
+      - hardhat-node-modules:/app/node_modules
+      - audit-deployment:/deployment
+    command: sh -c "npm ci && npx hardhat run scripts/deploy.ts --network docker"
+    depends_on:
+      - hardhat-node
+    restart: "no"
+    networks:
+      - disaster-net
+
+  # J4 blockchain audit API — reads contract address from /deployment volume
+  j4-audit-api:
+    build: ./j4-platform-security/blockchain-audit
+    container_name: j4-audit-api
+    ports:
+      - "8084:8084"
+    environment:
+      PORT: 8084
+      BLOCKCHAIN_RPC_URL: http://hardhat-node:8545
+      AUDIT_PRIVATE_KEY: ${AUDIT_PRIVATE_KEY:-0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80}
+    volumes:
+      - audit-deployment:/deployment:ro
+    depends_on:
+      deploy-audit-contract:
+        condition: service_completed_successfully
+    networks:
+      - disaster-net
+
+# ── Named Volumes ──────────────────────────────────────────────────────────────
 volumes:
   postgres_data:
   prometheus_data:
   alertmanager_data:
   grafana_data:
+  hardhat-node-modules:
+  audit-deployment:
 
+# ── Networks ───────────────────────────────────────────────────────────────────
 networks:
   disaster-net:
     driver: bridge

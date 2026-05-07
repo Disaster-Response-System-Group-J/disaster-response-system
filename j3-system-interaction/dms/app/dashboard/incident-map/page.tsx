@@ -1,14 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react'; // 1. Add useEffect
+import { useState, useEffect } from 'react';
 import Map, { Marker, NavigationControl, Popup, ViewStateChangeEvent } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Shield, Filter, MapPin, AlertTriangle, X, ChevronDown, CheckCircle2, Clock } from 'lucide-react';
-import { MOCK_CONFIRMED_INCIDENTS } from '@/data/mock-data';
-import { IncidentSeverity, IncidentStatus, DisasterType, ConfirmedIncident, UserRole } from '@/types';
+import { IncidentSeverity, IncidentStatus, DISASTER_TYPES, ConfirmedIncident, UserRole } from '@/types';
 import { SRI_LANKA_CENTER, DISTRICT_NAMES } from '@/data/districts';
 import { useAuth } from '@/context/AuthContext';
-import { useSocket } from '@/context/SocketContext'; // 2. Import Socket
+import { useSocket } from '@/context/SocketContext';
 
 const SEVERITY_COLORS: Record<string, string> = {
   CRITICAL: '#ef4444', 
@@ -19,14 +18,14 @@ const SEVERITY_COLORS: Record<string, string> = {
 };
 
 export default function IncidentMapPage() {
-  const { user } = useAuth();
-  const socket = useSocket(); // 3. Initialize Socket
+  const { user, hasPermission} = useAuth();
+  const socket = useSocket();
 
   const [viewState, setViewState] = useState(SRI_LANKA_CENTER);
   const [selectedIncident, setSelectedIncident] = useState<any | null>(null);
   
-  // 4. Convert mock data to state so we can push new pins to it
-  const [mapPins, setMapPins] = useState<any[]>(MOCK_CONFIRMED_INCIDENTS);
+  // Start with an empty array instead of mock data
+  const [mapPins, setMapPins] = useState<any[]>([]);
 
   // Filters
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
@@ -34,9 +33,58 @@ export default function IncidentMapPage() {
   const [districtFilter, setDistrictFilter] = useState<string>('ALL');
   const [showFilters, setShowFilters] = useState(false);
 
-  const enforcedDistrict = user?.role === UserRole.ADMIN ? 'ALL' : (user as any)?.assignedDistrict || 'ALL';
+  const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.includes('NATIONAL')) ? 'ALL' : (user as any)?.assignedDistrict || 'ALL';
 
-  // 5. Listen for incoming reports to drop new pins
+  // Fetch initial data from database
+  useEffect(() => {
+    const fetchIncidents = async () => {
+      try {
+        const response = await fetch('/api/incidents');
+        if (!response.ok) throw new Error('Failed to fetch incidents');
+        
+        const data = await response.json();
+        
+        // Map database schema to the UI's expected format
+        const mappedPins = data.map((inc: any) => ({
+          incidentId: inc.incident_id.toString(),
+          title: inc.title,
+          disasterType: inc.title?.toUpperCase().includes('FLOOD') ? 'FLOOD' : 
+                        inc.title?.toUpperCase().includes('LANDSLIDE') ? 'LANDSLIDE' : 'UNKNOWN',
+          severity: inc.severity || 'LOW',
+          status: inc.status || 'ACTIVE',
+          latitude: Number(inc.latitude) || 0,
+          longitude: Number(inc.longitude) || 0,
+          affectedPeople: inc.affected_population || 0,
+          district: 'UNASSIGNED', // Fallback, could map from division_id if joined in API
+          description: `Reported at ${new Date(inc.created_at).toLocaleString()}`
+        }));
+
+        setMapPins(mappedPins);
+      } catch (error) {
+        console.error('Error fetching incidents:', error);
+      }
+    };
+
+    fetchIncidents();
+  }, []);
+
+  const handleStatusUpdate = (incidentId: string, newStatus: IncidentStatus) => {
+    // Optimistic UI update
+    setMapPins(prev => prev.map(inc => 
+      inc.incidentId === incidentId ? { ...inc, status: newStatus } : inc
+    ));
+    
+    if (selectedIncident?.incidentId === incidentId) {
+      setSelectedIncident({ ...selectedIncident, status: newStatus });
+    }
+
+    // Emit to backend
+    if (socket) {
+      socket.emit('client:update-incident-status', { incidentId, status: newStatus, timestamp: new Date().toISOString() });
+    }
+  };
+
+  // Listen for incoming reports to drop new pins
   useEffect(() => {
     if (!socket) return;
 
@@ -66,7 +114,6 @@ export default function IncidentMapPage() {
     };
   }, [socket]);
 
-  // 6. Update the filter to use `mapPins` state instead of the static mock array
   const filteredIncidents = mapPins.filter(inc => {
     if (typeFilter !== 'ALL' && inc.disasterType !== typeFilter) return false;
     if (severityFilter !== 'ALL' && inc.severity !== severityFilter) return false;
@@ -101,13 +148,13 @@ export default function IncidentMapPage() {
               <div className="relative cursor-pointer group">
                 <div
                   className="w-4 h-4 rounded-full border-2 border-white shadow-lg z-10 relative transition-transform group-hover:scale-125"
-                  style={{ backgroundColor: SEVERITY_COLORS[inc.severity] }}
+                  style={{ backgroundColor: SEVERITY_COLORS[inc.severity] || SEVERITY_COLORS.LOW }}
                 />
                 {inc.severity === IncidentSeverity.CRITICAL && inc.status === IncidentStatus.ACTIVE && (
                   <div className="absolute inset-0 rounded-full animate-ping opacity-75" style={{ backgroundColor: SEVERITY_COLORS[inc.severity] }} />
                 )}
                 {/* Glow */}
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full blur-sm opacity-50 z-0 pointer-events-none" style={{ backgroundColor: SEVERITY_COLORS[inc.severity] }} />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full blur-sm opacity-50 z-0 pointer-events-none" style={{ backgroundColor: SEVERITY_COLORS[inc.severity] || SEVERITY_COLORS.LOW }} />
               </div>
             </Marker>
           ))}
@@ -127,9 +174,9 @@ export default function IncidentMapPage() {
               <div className="bg-[#131924] border border-slate-700 rounded-xl shadow-2xl p-4 w-72 text-white font-sans">
                 <div className="flex justify-between items-start mb-3">
                   <span className={`px-2 py-0.5 rounded text-[8px] font-bold tracking-widest border`} style={{
-                    backgroundColor: `${SEVERITY_COLORS[selectedIncident.severity]}20`,
-                    borderColor: `${SEVERITY_COLORS[selectedIncident.severity]}40`,
-                    color: SEVERITY_COLORS[selectedIncident.severity]
+                    backgroundColor: `${SEVERITY_COLORS[selectedIncident.severity] || SEVERITY_COLORS.LOW}20`,
+                    borderColor: `${SEVERITY_COLORS[selectedIncident.severity] || SEVERITY_COLORS.LOW}40`,
+                    color: SEVERITY_COLORS[selectedIncident.severity] || SEVERITY_COLORS.LOW
                   }}>
                     {selectedIncident.severity}
                   </span>
@@ -140,9 +187,21 @@ export default function IncidentMapPage() {
                 <h3 className="text-sm font-bold mb-1">{selectedIncident.title}</h3>
                 <p className="text-[10px] text-slate-400 mb-3 flex items-center gap-1"><MapPin size={10} /> {selectedIncident.district}</p>
                 <div className="space-y-2 mb-4 text-xs">
-                  <div className="flex justify-between text-slate-300">
+                  <div className="flex justify-between items-center text-slate-300">
                     <span className="text-slate-500">Status</span>
-                    <span className="font-semibold">{selectedIncident.status.replace('_', ' ')}</span>
+                    {hasPermission('update:incident-status') ? (
+                      <select 
+                        value={selectedIncident.status}
+                        onChange={(e) => handleStatusUpdate(selectedIncident.incidentId, e.target.value as IncidentStatus)}
+                        className="bg-[#0a0f16] border border-slate-700 text-xs font-semibold text-slate-200 rounded px-2 py-1 outline-none focus:border-blue-500 cursor-pointer"
+                      >
+                        {Object.values(IncidentStatus).map(s => (
+                          <option key={s} value={s}>{s.replace('_', ' ')}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="font-semibold">{selectedIncident.status.replace('_', ' ')}</span>
+                    )}
                   </div>
                   <div className="flex justify-between text-slate-300">
                     <span className="text-slate-500">Affected</span>
@@ -186,7 +245,7 @@ export default function IncidentMapPage() {
                 <label className="block text-[10px] font-bold text-slate-400 mb-2 tracking-widest uppercase">DISASTER TYPE</label>
                 <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="w-full bg-[#0a0f16] border border-slate-700 rounded-lg px-3 py-2 text-xs font-semibold text-slate-300 focus:outline-none">
                   <option value="ALL">All Types</option>
-                  {Object.values(DisasterType).map(t => <option key={t} value={t}>{t}</option>)}
+                  {Object.values(DISASTER_TYPES).map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
               <div>

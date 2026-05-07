@@ -25,7 +25,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#0a0f16] text-white`}>
+      <body 
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#0a0f16] text-white`}
+        suppressHydrationWarning={true}
+      >
         <AuthProvider> 
           <SocketProvider>
             <GlobalSocketListener /> 
