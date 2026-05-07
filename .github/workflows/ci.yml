@@ -268,6 +268,11 @@ jobs:
         uses: azure/setup-kubectl@v3
         with:
           version: "v1.29.0"
+          
+      - name: Inject Alertmanager email password  # ← ADD THIS
+        run: |
+          sed -i 's/REPLACE_WITH_REAL_PASSWORD/${{ secrets.ALERTMANAGER_EMAIL_PASSWORD }}/g' monitoring/alertmanager.yml
+        continue-on-error: true
 
       - name: Validate K8s manifests (dry-run)
         run: |

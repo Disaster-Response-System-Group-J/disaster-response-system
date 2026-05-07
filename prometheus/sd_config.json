@@ -1,0 +1,58 @@
+[
+  {
+    "targets": ["kafka-exporter:9308"],
+    "labels": {
+      "job": "kafka",
+      "__metrics_path__": "/metrics"
+    }
+  },
+  {
+    "targets": ["postgres-exporter:9187"],
+    "labels": {
+      "job": "postgres",
+      "__metrics_path__": "/metrics"
+    }
+  },
+  {
+    "targets": ["kong:8001"],
+    "labels": {
+      "job": "kong",
+      "__metrics_path__": "/metrics"
+    }
+  },
+  {
+    "targets": ["keycloak:8080"],
+    "labels": {
+      "job": "keycloak",
+      "__metrics_path__": "/metrics"
+    }
+  },
+  {
+    "targets": ["prometheus:9090"],
+    "labels": {
+      "job": "prometheus",
+      "__metrics_path__": "/metrics"
+    }
+  },
+  {
+    "targets": ["grafana:3000"],
+    "labels": {
+      "job": "grafana",
+      "__metrics_path__": "/metrics"
+    }
+  },
+  {
+    "targets": ["alertmanager:9093"],
+    "labels": {
+      "job": "alertmanager",
+      "__metrics_path__": "/metrics"
+    }
+  },
+  {
+    "targets": ["j3-dms:3000"],
+    "labels": {
+      "job": "j3-dms",
+      "__metrics_path__": "/api/metrics"
+    }
+  }
+]
