@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   Users, UserPlus, Shield, Mail, Key, Edit2,
   UserX, UserCheck, CheckCircle2, Search, X,
@@ -9,6 +10,7 @@ import {
 import { MOCK_USERS } from '@/data/mock-data';
 import { UserRole, DISASTER_TYPES } from '@/types';
 import { checkJ4AuditHealth } from '@/services/j4AuditService';
+import { useAuth } from '@/context/AuthContext';
 
 // Extended local type to include status for the demo
 type AdminUser = typeof MOCK_USERS[0] & { status: 'ACTIVE' | 'SUSPENDED' };
@@ -36,6 +38,8 @@ const MOCK_AUDIT_LOGS = [
 ];
 
 export default function AdminPanelPage() {
+  const searchParams = useSearchParams();
+  const { user: loggedInUser } = useAuth();
   const [users, setUsers] = useState<AdminUser[]>(INITIAL_USERS);
   const [search, setSearch] = useState('');
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
@@ -146,6 +150,29 @@ export default function AdminPanelPage() {
     setFormData({ name: selectedUser.name, email: selectedUser.email, role: selectedUser.role });
     setIsEditing(true); setIsCreating(false);
   };
+
+  useEffect(() => {
+    const shouldEditSelf = searchParams.get('editSelf') === '1';
+    if (!shouldEditSelf || !loggedInUser) return;
+
+    const matchedUser = users.find(
+      (u) =>
+        (loggedInUser.id && u.id === loggedInUser.id) ||
+        (loggedInUser.email && u.email.toLowerCase() === loggedInUser.email.toLowerCase()) ||
+        (loggedInUser.name && u.name.toLowerCase() === loggedInUser.name.toLowerCase())
+    );
+
+    if (!matchedUser) {
+      showMessage('Logged-in user profile was not found in admin user records');
+      return;
+    }
+
+    setActiveTab('users');
+    setSelectedUser(matchedUser);
+    setFormData({ name: matchedUser.name, email: matchedUser.email, role: matchedUser.role });
+    setIsCreating(false);
+    setIsEditing(true);
+  }, [searchParams, loggedInUser, users]);
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#0a0f16] text-white">
