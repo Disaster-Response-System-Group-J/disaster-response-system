@@ -186,25 +186,32 @@ services:
     image: alpine:3.19
     container_name: disaster-kong-setup
     restart: "no"
-    entrypoint: >
-      sh -c "
-        apk add --no-cache curl -q &&
+    # Array form (not string form) so docker compose doesn't run the value through
+    # its own shell-style parser, which silently strips bash "\<newline>" line
+    # continuations before sh ever sees them. The literal "|" block then preserves
+    # the \-continuations exactly so sh treats each curl as a single command.
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -e
+        apk add --no-cache curl -q
         until curl -sf http://kong:8001 >/dev/null 2>&1; do
-          echo 'Waiting for Kong Admin API...'; sleep 3;
-        done;
+          echo 'Waiting for Kong Admin API...'
+          sleep 3
+        done
         curl -sf -X POST http://kong:8001/services \
           --data 'name=j3-dms' \
-          --data 'url=http://j3-dms:3000' && echo 'Registered j3-dms';
+          --data 'url=http://j3-dms:3000' && echo 'Registered j3-dms'
         curl -sf -X POST http://kong:8001/services/j3-dms/routes \
           --data 'name=j3-route' \
           --data 'paths[]=/api/v1/system' \
-          --data 'strip_path=false' && echo 'Created j3-route';
+          --data 'strip_path=false' && echo 'Created j3-route'
         curl -sf -X POST http://kong:8001/routes/j3-route/plugins \
           --data 'name=rate-limiting' \
           --data 'config.minute=100' \
-          --data 'config.policy=local' && echo 'Rate limiting applied';
-        echo 'Kong setup complete';
-      "
+          --data 'config.policy=local' && echo 'Rate limiting applied'
+        echo 'Kong setup complete'
     depends_on:
       kong:
         condition: service_healthy
