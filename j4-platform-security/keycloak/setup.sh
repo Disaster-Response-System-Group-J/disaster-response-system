@@ -14,6 +14,23 @@ KC_ADMIN_PASS="${KEYCLOAK_ADMIN_PASSWORD:-admin123}"
 TEST_USER_PASSWORD="${TEST_USER_PASSWORD:-test123}"
 CLIENT_ID="${CLIENT_ID:-disaster-app}"
 
+# If Vault is available, prefer the admin password stored at
+# secret/keycloak/admin over whatever KEYCLOAK_ADMIN_PASSWORD env says.
+# This is what the compose `keycloak-setup` sidecar uses; for host runs
+# without Vault, the env-var fallback kicks in.
+if [[ -n "${VAULT_ADDR:-}" && -n "${VAULT_TOKEN:-}" ]]; then
+  echo "==> Fetching admin password from Vault ($VAULT_ADDR)..."
+  vault_resp=$(curl -sf -H "X-Vault-Token: $VAULT_TOKEN" \
+    "$VAULT_ADDR/v1/secret/data/keycloak/admin") || {
+    echo "ERROR: Vault read failed for secret/keycloak/admin" >&2; exit 1; }
+  vault_pass=$(echo "$vault_resp" | jq -r '.data.data.password // empty')
+  if [[ -z "$vault_pass" ]]; then
+    echo "ERROR: secret/keycloak/admin has no .password field" >&2; exit 1
+  fi
+  KC_ADMIN_PASS="$vault_pass"
+  echo "    Using admin password from Vault."
+fi
+
 ROLES=(
   SYSTEM_ADMIN
   OPERATIONS_OFFICER_ZONAL

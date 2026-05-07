@@ -129,9 +129,36 @@ services:
     networks:
       - disaster-net
 
+  # Vault secret seeding — runs once after Vault is up. Currently writes
+  # the Keycloak admin password from .env into secret/keycloak/admin so
+  # the keycloak-setup sidecar can read it from Vault instead of env.
+  # Idempotent — KV v2 PUT is upsert.
+  vault-setup:
+    image: alpine:3.19
+    container_name: disaster-vault-setup
+    restart: "no"
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN_ID:-dev-root-token}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+    volumes:
+      - ./j4-platform-security/vault/setup.sh:/setup.sh:ro
+    entrypoint:
+      - sh
+      - -c
+      - |
+        apk add --no-cache bash curl -q
+        bash /setup.sh
+    depends_on:
+      vault:
+        condition: service_started
+    networks:
+      - disaster-net
+
   # Keycloak realm provisioning — runs once after Keycloak is up.
   # Creates the 11 realm roles, 11 test users, and the disaster-app client.
-  # Idempotent — safe to re-run.
+  # Pulls the admin password from Vault (secret/keycloak/admin), seeded by
+  # vault-setup. Idempotent — safe to re-run.
   keycloak-setup:
     image: alpine:3.19
     container_name: disaster-keycloak-setup
@@ -139,7 +166,8 @@ services:
     environment:
       KC_URL: http://keycloak:8080
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN_ID:-dev-root-token}
     volumes:
       - ./j4-platform-security/keycloak/setup.sh:/setup.sh:ro
     entrypoint: >
@@ -150,6 +178,8 @@ services:
     depends_on:
       keycloak:
         condition: service_started
+      vault-setup:
+        condition: service_completed_successfully
     networks:
       - disaster-net
 
