@@ -1,0 +1,35 @@
+filebeat.inputs:
+  - type: filestream
+    id: docker-container-logs
+    enabled: true
+    paths:
+      - /var/lib/docker/containers/*/*.log
+    prospector.scanner.symlinks: true
+    parsers:
+      - container:
+          stream: all
+          format: auto
+
+processors:
+  - add_docker_metadata:
+      host: unix:///var/run/docker.sock
+  - drop_event:
+      when:
+        or:
+          - equals:
+              container.name: disaster-filebeat
+          - equals:
+              container.name: disaster-logstash
+          - equals:
+              container.name: disaster-kibana
+          - equals:
+              container.name: disaster-elasticsearch
+
+setup.template.name: drs-logs
+setup.template.pattern: drs-logs-*
+setup.ilm.enabled: false
+
+output.logstash:
+  hosts: ["logstash:5044"]
+
+logging.level: info
