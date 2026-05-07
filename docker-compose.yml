@@ -47,6 +47,21 @@ services:
     networks:
       - disaster-net
 
+  # Kafka Exporter — exposes Kafka metrics for Prometheus
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:latest
+    container_name: disaster-kafka-exporter
+    restart: unless-stopped
+    ports:
+      - "9308:9308"
+    command:
+      - --kafka.server=kafka:29092
+    depends_on:
+      kafka:
+        condition: service_started
+    networks:
+      - disaster-net
+
   # Postgres exporter — exposes Postgres metrics for Prometheus
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter:latest
