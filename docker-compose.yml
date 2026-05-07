@@ -287,26 +287,33 @@ services:
     networks:
       - disaster-net
 
-  # Kong route registration — runs once after Kong is healthy
+  # Kong route registration — runs once after Kong is healthy.
+  # Mounts the canonical j4-platform-security/kong/setup.sh and execs it,
+  # rather than duplicating logic inline. KC_REALM_URL points at the
+  # docker-internal Keycloak (where the sidecar can reach it) while
+  # KC_ISSUER stays on the host-published URL because that's the iss
+  # claim baked into tokens minted via the public port.
   kong-setup:
     image: alpine:3.19
     container_name: disaster-kong-setup
     restart: "no"
     environment:
       KONG_ADMIN: http://kong:8001
+      KC_REALM_URL: http://keycloak:8080/realms/disaster-response
+      KC_ISSUER: http://localhost:8180/realms/disaster-response
     volumes:
-      - ./j4-platform-security/kong/setup.sh:/setup.sh:ro
+      - ./j4-platform-security/kong:/opt/kong-setup:ro
     entrypoint:
       - sh
       - -c
       - |
-        apk add --no-cache bash curl -q
-        tr -d '\r' < /setup.sh > /tmp/kong-setup.sh
-        chmod +x /tmp/kong-setup.sh
-        bash /tmp/kong-setup.sh
+        apk add --no-cache bash curl jq -q
+        bash /opt/kong-setup/setup.sh
     depends_on:
       kong:
         condition: service_healthy
+      keycloak:
+        condition: service_started
     networks:
       - disaster-net
 

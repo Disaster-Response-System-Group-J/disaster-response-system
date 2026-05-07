@@ -4,7 +4,15 @@
 set -euo pipefail
 
 KONG_ADMIN="${KONG_ADMIN:-http://localhost:8001}"
+# KC_REALM_URL is where this script *fetches* the realm public key from —
+# may need to be the docker-internal hostname when run as a compose sidecar.
 KC_REALM_URL="${KC_REALM_URL:-http://localhost:8180/realms/disaster-response}"
+# KC_ISSUER is what gets stored as the Kong jwt credential's `key` field.
+# It must match the `iss` claim in tokens Kong will validate. Defaults to
+# KC_REALM_URL — host-running case where fetch URL == issuer URL — but the
+# compose sidecar overrides this to the host-facing URL because real users
+# mint tokens via the published port, not the docker-internal hostname.
+KC_ISSUER="${KC_ISSUER:-$KC_REALM_URL}"
 KC_CONSUMER="${KC_CONSUMER:-keycloak-disaster-app}"
 
 command -v jq >/dev/null 2>&1 || { echo "ERROR: jq is required (apt install jq / brew install jq)" >&2; exit 1; }
@@ -12,6 +20,10 @@ command -v jq >/dev/null 2>&1 || { echo "ERROR: jq is required (apt install jq /
 echo "==> Waiting for Kong to be ready..."
 until curl -sf "$KONG_ADMIN" > /dev/null; do sleep 2; done
 echo "    Kong is up."
+
+echo "==> Waiting for Keycloak realm at $KC_REALM_URL..."
+until curl -sf -H 'X-Forwarded-Proto: https' "$KC_REALM_URL" > /dev/null; do sleep 2; done
+echo "    Realm reachable."
 
 # ── Services ─────────────────────────────────────────────────────────────────
 
@@ -60,10 +72,10 @@ curl -s -X POST "$KONG_ADMIN/consumers" \
   --data "username=$KC_CONSUMER" > /dev/null && echo "    consumer $KC_CONSUMER OK"
 
 curl -sf -X POST "$KONG_ADMIN/consumers/$KC_CONSUMER/jwt" \
-  --data "key=$KC_REALM_URL" \
+  --data "key=$KC_ISSUER" \
   --data 'algorithm=RS256' \
   --data-urlencode "rsa_public_key=$KC_PUB_KEY" > /dev/null \
-  && echo "    JWT credential ($KC_REALM_URL) OK"
+  && echo "    JWT credential ($KC_ISSUER) OK"
 
 # ── Route helpers ─────────────────────────────────────────────────────────────
 
