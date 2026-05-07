@@ -23,6 +23,8 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  // Weather system initialization delegated to J2 Python Microservice
+
   return (
     <html lang="en">
       <body 
