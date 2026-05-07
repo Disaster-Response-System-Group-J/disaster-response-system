@@ -141,4 +141,15 @@ spec:
                 --data 'name=rate-limiting' \
                 --data 'config.minute=100' \
                 --data 'config.policy=local'
+              curl -sf -X POST http://kong:8001/services \
+                --data 'name=j2-data-intelligence' \
+                --data 'url=http://j2-data-intelligence:8082'
+              curl -sf -X POST http://kong:8001/services/j2-data-intelligence/routes \
+                --data 'name=j2-route' \
+                --data 'paths[]=/api/v1/engine' \
+                --data 'strip_path=false'
+              curl -sf -X POST http://kong:8001/routes/j2-route/plugins \
+                --data 'name=rate-limiting' \
+                --data 'config.minute=60' \
+                --data 'config.policy=local'
               echo 'Kong setup complete'
