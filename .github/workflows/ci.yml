@@ -90,6 +90,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Generate Prisma client
+        run: npx prisma generate
+
       - name: Lint (ESLint)
         run: npm run lint --if-present
         continue-on-error: true   # known lint issues tracked in issue #XX — J3 to resolve before demo
