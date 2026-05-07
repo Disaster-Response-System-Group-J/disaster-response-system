@@ -13,11 +13,11 @@ export default function HomePage() {
             <Shield size={24} className="text-blue-400 fill-blue-400" />
             <span className="text-sm font-bold tracking-wide">DMC SRI LANKA</span>
           </div>
-          <nav className="flex items-center gap-6">
-            <Link href="/public-alerts" className="text-xs font-semibold text-slate-400 hover:text-white transition-colors tracking-wider uppercase">Alerts</Link>
-            <Link href="/shelters" className="text-xs font-semibold text-slate-400 hover:text-white transition-colors tracking-wider uppercase">Shelters</Link>
-            <Link href="/emergency-contacts" className="text-xs font-semibold text-slate-400 hover:text-white transition-colors tracking-wider uppercase">Emergency</Link>
-            <Link href="/login" className="px-4 py-2 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 rounded-lg text-xs font-bold text-blue-400 transition-all">
+          <nav className="flex items-center gap-3 sm:gap-6">
+            <Link href="/public-alerts" className="hidden sm:block text-xs font-semibold text-slate-400 hover:text-white transition-colors tracking-wider uppercase">Alerts</Link>
+            <Link href="/shelters" className="hidden sm:block text-xs font-semibold text-slate-400 hover:text-white transition-colors tracking-wider uppercase">Shelters</Link>
+            <Link href="/emergency-contacts" className="hidden sm:block text-xs font-semibold text-slate-400 hover:text-white transition-colors tracking-wider uppercase">Emergency</Link>
+            <Link href="/login" className="px-3 sm:px-4 py-2 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 rounded-lg text-xs font-bold text-blue-400 transition-all whitespace-nowrap">
               Official Login
             </Link>
           </nav>
@@ -27,19 +27,19 @@ export default function HomePage() {
       {/* Hero */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-blue-900/10 to-transparent pointer-events-none" />
-        <div className="max-w-7xl mx-auto px-6 py-24 lg:py-32 relative">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-14 sm:py-20 lg:py-32 relative">
           <div className="max-w-3xl">
             <div className="flex items-center gap-2 mb-6">
               <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.8)]" />
               <span className="text-[10px] font-bold text-red-400 tracking-widest uppercase">ACTIVE DISASTER RESPONSE</span>
             </div>
-            <h1 className="text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.1] mb-6">
+            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.1] mb-6">
               Sri Lanka Disaster<br />Response System
             </h1>
             <p className="text-lg text-slate-400 leading-relaxed mb-10 max-w-xl">
               Real-time flood and landslide monitoring and emergency coordination platform for authorized response personnel. Find shelters, emergency contacts, and stay informed on active alerts.
             </p>
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4">
               <Link href="/login"
                 className="flex items-center gap-2 px-6 py-4 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 rounded-xl text-sm font-bold text-blue-400 transition-all group">
                 Official Login
@@ -55,7 +55,7 @@ export default function HomePage() {
       </section>
 
       {/* Quick Links Grid */}
-      <section className="max-w-7xl mx-auto px-6 pb-24">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 pb-16 sm:pb-24">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <QuickCard href="/public-alerts" icon={<Waves size={24} />} iconBg="bg-blue-500/10 border-blue-500/20" iconColor="text-blue-400"
             title="Public Alerts" desc="View verified flood and landslide warnings across Sri Lanka." />
@@ -95,8 +95,8 @@ export default function HomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-slate-800/50 py-8">
-        <div className="max-w-7xl mx-auto px-6 flex items-center justify-between text-xs text-slate-500">
+      <footer className="border-t border-slate-800/50 py-6 sm:py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
           <div className="flex items-center gap-3">
             <Shield size={16} className="text-slate-600" />
             <span>Disaster Management Centre — Sri Lanka</span>

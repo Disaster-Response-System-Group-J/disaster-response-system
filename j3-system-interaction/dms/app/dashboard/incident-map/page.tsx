@@ -293,7 +293,7 @@ export default function IncidentMapPage() {
       </div>
 
       {/* Control Panel (Top Left) */}
-      <div className="absolute top-6 left-6 z-10 w-80 space-y-4 pointer-events-none">
+      <div className="absolute top-4 sm:top-6 left-4 sm:left-6 z-10 w-72 sm:w-80 max-w-[calc(100vw-2rem)] space-y-4 pointer-events-none">
         {/* Main Panel */}
         <div className="bg-[#181f2c]/95 backdrop-blur-md border border-slate-700/60 rounded-xl shadow-2xl overflow-hidden pointer-events-auto">
           <div className="p-4 border-b border-slate-700/50 flex justify-between items-center cursor-pointer" onClick={() => setShowFilters(!showFilters)}>
@@ -366,7 +366,7 @@ export default function IncidentMapPage() {
 
       {/* Incident Detail Side Panel */}
       {detailIncident && (
-        <div className="absolute inset-y-0 right-0 z-20 w-[420px] bg-[#0d1420]/98 border-l border-slate-700/60 backdrop-blur-md flex flex-col shadow-2xl overflow-y-auto">
+        <div className="absolute inset-y-0 right-0 z-20 w-full sm:w-[420px] bg-[#0d1420]/98 border-l border-slate-700/60 backdrop-blur-md flex flex-col shadow-2xl overflow-y-auto">
           {/* Header */}
           <div className="flex items-start justify-between p-5 border-b border-slate-700/50 shrink-0">
             <div className="flex-1 min-w-0">

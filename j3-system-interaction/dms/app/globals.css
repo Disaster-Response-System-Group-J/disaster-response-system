@@ -16,3 +16,17 @@ body {
   background: var(--background);
   color: var(--foreground);
 }
+
+/* Prevent horizontal overflow on mobile */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* Hide scrollbar utility */
+.scrollbar-none {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE / Edge */
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}

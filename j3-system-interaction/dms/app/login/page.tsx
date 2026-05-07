@@ -54,9 +54,9 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0f16] flex flex-col md:flex-row text-white font-sans">
+    <div className="min-h-screen bg-[#0a0f16] flex flex-col md:flex-row text-white font-sans overflow-y-auto">
       {/* Left - Branding */}
-      <div className="flex-1 flex flex-col justify-between p-12 lg:p-24 relative z-10 border-r border-slate-800/50">
+      <div className="hidden md:flex flex-1 flex-col justify-between p-8 lg:p-24 relative z-10 border-r border-slate-800/50">
         <div>
           <div className="flex items-center gap-3 mb-24">
             <Shield size={28} className="text-blue-400 fill-blue-400" />
@@ -86,7 +86,7 @@ export default function LoginPage() {
       </div>
 
       {/* Right - Form */}
-      <div className="flex-1 flex items-center justify-center p-8 lg:p-24 relative bg-[#0a0f16]">
+      <div className="flex-1 flex items-center justify-center p-5 sm:p-8 lg:p-24 relative bg-[#0a0f16]">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3/4 h-3/4 bg-blue-900/10 blur-[100px] rounded-full pointer-events-none" />
         
         <div className="w-full max-w-[440px] relative">

@@ -197,15 +197,15 @@ export default function DashboardPage() {
         </div>
       )}
       
-      <main className="flex-1 overflow-y-auto p-8">
+      <main className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
         <div className="max-w-[1400px] mx-auto">
           {/* Header */}
-          <div className="flex items-end justify-between mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6 md:mb-8">
             <div>
               <p className="text-sm font-medium text-slate-400 mb-1">Operational Overview</p>
-              <h1 className="text-4xl font-extrabold tracking-tight">National Status</h1>
+              <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">National Status</h1>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <FilterBtn label="District: All" />
               <FilterBtn label="Disaster Type" />
               <FilterBtn label="Severity" />
@@ -214,9 +214,9 @@ export default function DashboardPage() {
 
           <div className="space-y-6">
             {/* Top Row */}
-            <div className="grid grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
               {/* Active Incidents */}
-              <div className="col-span-1 bg-[#131924] border border-slate-800/80 rounded-xl p-6 flex flex-col justify-between">
+              <div className="sm:col-span-2 lg:col-span-1 bg-[#131924] border border-slate-800/80 rounded-xl p-6 flex flex-col justify-between">
                 <div className="flex justify-between items-start">
                   <span className="text-[10px] font-bold text-slate-400 tracking-widest uppercase">ACTIVE INCIDENTS</span>
                   <Activity className="text-red-400 w-4 h-4" />
@@ -227,7 +227,7 @@ export default function DashboardPage() {
                     <TrendingUp className="w-3 h-3 mr-1" /> +{data.activeIncidentsChange} in 24h
                   </span>
                 </div>
-                <div className="grid grid-cols-4 gap-3 pt-4 border-t border-slate-800/50">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t border-slate-800/50">
                   <Stat label="FLOODS" value={data.incidents.floods} />
                   <Stat label="LANDSLIDES" value={data.incidents.landslides} />
                   <Stat label="DROUGHTS" value={data.incidents.droughts} />
@@ -283,7 +283,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Middle Row */}
-            <div className="grid grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
               {/* Resource Readiness */}
               <div className="col-span-1 bg-[#131924] border border-slate-800/80 rounded-xl p-6 flex flex-col">
                 <span className="text-[10px] font-bold text-slate-400 tracking-widest uppercase mb-6 block">RESOURCE READINESS</span>
@@ -299,7 +299,7 @@ export default function DashboardPage() {
               </div>
 
               {/* Live Map */}
-              <div className="col-span-2 bg-[#131924] border border-slate-800/80 rounded-xl overflow-hidden relative min-h-[320px]">
+              <div className="lg:col-span-2 bg-[#131924] border border-slate-800/80 rounded-xl overflow-hidden relative min-h-[280px] sm:min-h-[320px]">
                 <Map {...viewState} onMove={(evt: ViewStateChangeEvent) => setViewState(evt.viewState)}
                   mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json">
                   
@@ -338,7 +338,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Bottom Row — Weather + Recent Alerts */}
-            <div className="grid grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
               <div className="col-span-1 bg-[#131924] border border-slate-800/80 rounded-xl p-6">
                 <span className="text-[10px] font-bold text-slate-400 tracking-widest block mb-5 uppercase">MONSOON PATTERN (SW)</span>
                 <div className="flex items-center gap-4 mb-8">
@@ -358,7 +358,7 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div className="col-span-2 bg-[#131924] border border-slate-800/80 rounded-xl p-6">
+              <div className="lg:col-span-2 bg-[#131924] border border-slate-800/80 rounded-xl p-6">
                 <div className="flex justify-between items-center mb-6">
                   <span className="text-[10px] font-bold text-slate-400 tracking-widest uppercase">RECENT ALERTS</span>
                   <Link href="/dashboard/alerts" className="text-xs text-slate-400 hover:text-white font-semibold transition-colors">View All</Link>

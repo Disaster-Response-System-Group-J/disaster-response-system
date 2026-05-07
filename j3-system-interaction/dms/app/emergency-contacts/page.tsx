@@ -26,7 +26,7 @@ export default function EmergencyContactsPage() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-12">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
         <div className="flex items-center gap-3 mb-8">
           <div className="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center border border-indigo-500/20">
             <Phone size={20} className="text-indigo-400" />
@@ -55,6 +55,7 @@ export default function EmergencyContactsPage() {
 
         {/* All Contacts */}
         <div className="bg-[#131924] border border-slate-800/80 rounded-xl overflow-hidden">
+          <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-slate-800/80 text-[9px] font-bold text-slate-500 tracking-widest uppercase">
@@ -88,6 +89,7 @@ export default function EmergencyContactsPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       </main>
     </div>
