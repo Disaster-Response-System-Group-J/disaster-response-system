@@ -17,9 +17,9 @@ Anything past Kong (i.e. inside the backend service) can do finer authorisation 
 
 ## Scope
 
-- **In scope**: user-facing routes — `/api/v1/devices/*` (J1), `/api/v1/intelligence/*` (J2), `/api/v1/system/*` (J3).
+- **In scope**: user-facing API routes terminating at Kong, regardless of upstream subgroup. The route list confirmed with J3 on 2026-05-07 is in the mapping below; J1/J2-owned user routes are not yet enumerated. The user-facing audit read (`/api/activity`) is also in scope — it terminates at the J4 audit service, not J3.
 - **Out of scope**:
-  - Service-to-service auth (e.g. J3 → `j4-audit-api`). That uses a separate mechanism — likely a service-account JWT or shared secret, designed alongside whichever subgroup needs it first.
+  - Service-to-service auth (e.g. J3 *writing* to `j4-audit-api` on each user action). That uses a separate mechanism — likely a service-account JWT or shared secret, designed alongside whichever subgroup needs it first.
   - `/health` endpoints. They must remain unauthenticated for compose healthchecks and external monitors.
   - The Keycloak admin console (`:8180`), Kong admin API (`:8001`), Prometheus (`:9090`), and Grafana (`:3030`). These bypass Kong by design.
 
@@ -50,23 +50,37 @@ The realm has 11 roles. See `keycloak/setup.sh` and the realm export for the sou
 
 The `ZONAL`/`NATIONAL` split is *operational scope*, not a strict hierarchy. Whether NATIONAL implicitly grants ZONAL access is left to the backend; Kong treats them as independent roles.
 
-## Route → role mapping (proposal)
+## Route → role mapping
 
-This is the starting allow-list. It must be reviewed with each subgroup before implementation.
+J3 team lead provided the route list below on 2026-05-07. J1- and J2-owned user routes have not yet been enumerated by their leads. **public** in the table means the JWT plugin is not installed on that route — anyone can call it; other rows require a valid JWT plus at least one of the listed roles. Role abbreviations:
 
-| Route | Method | Allowed roles |
-|---|---|---|
-| `/api/v1/devices/*` | any | `SYSTEM_ADMIN`, `FIELD_OFFICER`, `INCIDENT_COMMANDER_*`, `OPERATIONS_OFFICER_*` |
-| `/api/v1/intelligence/*` | any | `SYSTEM_ADMIN`, `INCIDENT_COMMANDER_*`, `OPERATIONS_OFFICER_*` |
-| `/api/v1/system/reports` | `POST` | `PUBLIC_CITIZEN`, `FIELD_OFFICER`, `RESPONSE_TEAM` |
-| `/api/v1/system/reports` | `GET`, `PUT` | `SYSTEM_ADMIN`, `INCIDENT_COMMANDER_*`, `OPERATIONS_OFFICER_*`, `FIELD_OFFICER` |
-| `/api/v1/system/incidents` | any | `SYSTEM_ADMIN`, `INCIDENT_COMMANDER_*`, `FIELD_OFFICER` |
-| `/api/v1/system/shelters` | `GET` | any authenticated user |
-| `/api/v1/system/shelters` | `POST`, `PUT`, `DELETE` | `SYSTEM_ADMIN`, `RESOURCE_MANAGEMENT_*` |
-| `/api/v1/system/resources` | any | `SYSTEM_ADMIN`, `RESOURCE_MANAGEMENT_*`, `LOGISTICS` |
-| `/api/v1/system/alerts` | any | `SYSTEM_ADMIN`, `INCIDENT_COMMANDER_*`, `OPERATIONS_OFFICER_*` |
+- `OPS_*` = `OPERATIONS_OFFICER_{ZONAL,NATIONAL}`
+- `IC_*` = `INCIDENT_COMMANDER_{ZONAL,NATIONAL}`
+- `RM_*` = `RESOURCE_MANAGEMENT_{ZONAL,NATIONAL}`
+- `SYSTEM_ADMIN` is implicitly allowed on every gated route via the bypass below — not repeated in the table.
 
-`SYSTEM_ADMIN` is implicitly allowed everywhere (handled by the bypass below — no need to repeat it on every line in code).
+| Path | Method | Upstream | Allowed |
+|---|---|---|---|
+| `/api/auth/login` | `POST` | J3 (Keycloak proxy or Next.js) | **public** |
+| `/api/reports` | `POST` | J3 | **public** |
+| `/api/reports` | `GET`, `PATCH` | J3 | `OPS_*` |
+| `/api/incidents` | `GET` | J3 | **public** |
+| `/api/incidents` | `POST` | J3 | `IC_*` |
+| `/api/incidents` | `PATCH` | J3 | `OPS_*`, `IC_*` |
+| `/api/relief/shelter` | `GET` | J3 | **public** |
+| `/api/relief/shelter` | `PATCH` | J3 | `RM_*` |
+| `/api/dashboard/overview` | `GET` | J3 | `OPS_*`, `IC_*`, `RM_*` |
+| `/api/sensors` | `GET` | J1 (?) | `OPS_*` |
+| `/api/analytics/situation` | `GET` | J3 / J2 (?) | `IC_*` |
+| `/api/predictions` | `GET` | J2 (?) | `IC_*`, `RM_*` |
+| `/api/resources/list` | `GET`, `PATCH` | J3 | `RM_*` |
+| `/api/activity` | `GET` | J4 `blockchain-audit` | (`SYSTEM_ADMIN` only — via bypass) |
+
+**Known gaps to close before implementation** (tracked in [Open questions](#open-questions)):
+
+- The path prefix `/api/<resource>` doesn't match the agreed `/api/v1/{subgroup}/<resource>` convention. The kong setup can't be written until that is reconciled — every `paths[]` value depends on it.
+- `FIELD_OFFICER`, `LOGISTICS`, `RESPONSE_TEAM` do not appear in any row. Most plausibly they consume J1/J2 routes that haven't been spelled out yet.
+- Upstreams marked `(?)` need confirmation. The J3 team lead's view groups these under "API routes" without saying which container actually serves them; Kong's per-route `service` definition must point at the real backend.
 
 ## Implementation approach
 
@@ -108,8 +122,9 @@ Cleanest UX (one plugin, route config = allow-list), but requires plugin authori
 
 1. **`SYSTEM_ADMIN` bypass.** If `realm_access.roles` contains `SYSTEM_ADMIN`, the request passes regardless of the route's allow-list.
 2. **Fail closed on missing claim.** A token without `realm_access.roles` (e.g. minted via `admin-cli`) gets `403`, not `200`. We do not silently allow unmatched-because-empty.
-3. **`/health` exemption.** No JWT plugin or RBAC plugin on `/health` routes — only on `/api/v1/*`.
-4. **Method-level rules** where called for in the mapping table above (initially: J3 `reports` and `shelters`).
+3. **`/health` exemption.** No JWT plugin or RBAC plugin on `/health` routes.
+4. **Public-endpoint exemption.** Routes marked **public** in the mapping (`/api/auth/login`, `POST /api/reports`, `GET /api/incidents`, `GET /api/relief/shelter`) have no JWT plugin and no RBAC plugin attached. Kong forwards the request straight to the upstream. The backend may still inspect any opportunistically-supplied token for attribution but must not require one.
+5. **Method-level routing in Kong.** Where the same path has different rules per method (`/api/reports`, `/api/incidents`, `/api/relief/shelter`), register one Kong route per `(path, method)` group using the route's `methods` config. JWT and RBAC plugins attach to the gated route(s) only; the public-method route stays naked.
 
 ## Test matrix
 
@@ -124,15 +139,14 @@ Concretely: at least one curl per row × the protected routes, scripted in `j4-p
 
 ## Open questions
 
-1. **Mapping table accuracy.** The proposed allow-list is a guess based on role names + the J3 sub-resources I could see. Each subgroup needs to confirm:
-   - J1: Are device commands really restricted to `FIELD_OFFICER` + officers, or is there a `RESPONSE_TEAM` use-case?
-   - J2: Is `intelligence` ever read by the public (e.g. shown in alerts)? If yes, add `PUBLIC_CITIZEN` for `GET`.
-   - J3: Is the resource list above complete? `/system/users`? `/system/audit-logs`?
-2. **Coarse vs. fine routes in Kong.** Implement one Kong route per `{subgroup}/{resource}` (precise but many routes), or keep coarse routes (`/api/v1/system/*`) and let the backend do per-resource auth (fewer Kong objects)?
-3. **NATIONAL implies ZONAL?** If yes, we encode it once in the Lua bypass; if no, each line of the mapping needs both listed explicitly.
-4. **Where allow-lists live.** In `kong/setup.sh` (one source of truth, reviewable per PR), or extracted to a YAML/JSON file the script reads (cleaner but adds a config file)? Lean: stay in setup.sh until duplication exceeds ~10 routes.
-5. **Audit.** Should role-denied requests log to `j4-audit-api`, or just to Kong's request log? Probably Kong's log for now; audit-API integration comes later.
-6. **Token TTL & refresh.** Currently using Keycloak defaults (5min access, 30min refresh). Long-running mobile clients may need longer. Decide before customer demos.
+1. **Path-prefix mismatch.** J3's route list uses `/api/<resource>`, not the agreed `/api/v1/system/<resource>`. Either Kong is meant to strip the `/api/v1/system` prefix before forwarding (so the dashboard still calls `/api/v1/system/reports` from the browser), or the convention has been informally dropped. Reconcile with J3 before kong setup is rewritten — the answer changes every Kong `paths[]` and `strip_path` value.
+2. **Subgroup ownership of J3-fronted paths.** `/api/sensors`, `/api/predictions`, and `/api/analytics/situation` look like reads served by J1/J2; `/api/activity` is the J4 audit. Kong's per-route `service` must point at the actual backend, not blindly at the J3 container. Confirm with J3 / J1 / J2 leads.
+3. **Three roles unmapped.** `FIELD_OFFICER`, `LOGISTICS`, `RESPONSE_TEAM` are absent from J3's mapping. Most plausibly they consume J1/J2 device & telemetry routes that aren't yet enumerated. Need explicit answers from J1 and J2 leads, plus confirmation from J3 that no dashboard exists for these roles.
+4. **Coarse vs. fine routes in Kong.** Partially settled: with public/private split per method on three resources, fine-grained per-`(path, method)` routes are required regardless. Sub-question — for paths with no method split, register one route per resource path (explicit per-route auditing) or one wildcard `/api/*` route + role logic in the plugin (fewer Kong objects)? Lean per-path.
+5. **NATIONAL implies ZONAL?** If yes, encode it once in the Lua bypass; if no, the role abbreviation `OPS_*` etc. expands to two role names per row in implementation. Default assumption: yes; confirm with operations.
+6. **Where allow-lists live.** In `kong/setup.sh` (one source of truth, reviewable per PR), or extracted to a YAML/JSON file the script reads (cleaner but adds a config file)? Lean: stay in setup.sh until duplication exceeds ~10 routes.
+7. **Audit of denials.** Should role-denied requests log to `j4-audit-api`, or just to Kong's request log? Probably Kong's log for now; audit-API integration comes later.
+8. **Token TTL & refresh.** Currently using Keycloak defaults (5min access, 30min refresh). Long-running mobile clients may need longer. Decide before customer demos.
 
 ## Roll-out plan
 
