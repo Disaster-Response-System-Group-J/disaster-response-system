@@ -97,6 +97,10 @@ services:
       KC_DB_PASSWORD: keycloak123
       KC_METRICS_ENABLED: "true"
       KC_METRICS_PATH: "/metrics"
+      # Trust X-Forwarded-Proto so dev clients (host curl, keycloak-setup
+      # sidecar) can talk plain HTTP without sslRequired=external rejecting
+      # them on the master realm.
+      KC_PROXY_HEADERS: xforwarded
     ports:
       - "8180:8080"
     volumes:
@@ -104,6 +108,30 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - disaster-net
+
+  # Keycloak realm provisioning — runs once after Keycloak is up.
+  # Creates the 11 realm roles, 11 test users, and the disaster-app client.
+  # Idempotent — safe to re-run.
+  keycloak-setup:
+    image: alpine:3.19
+    container_name: disaster-keycloak-setup
+    restart: "no"
+    environment:
+      KC_URL: http://keycloak:8080
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+    volumes:
+      - ./j4-platform-security/keycloak/setup.sh:/setup.sh:ro
+    entrypoint: >
+      sh -c "
+        apk add --no-cache bash curl jq -q &&
+        bash /setup.sh
+      "
+    depends_on:
+      keycloak:
+        condition: service_started
     networks:
       - disaster-net
 
