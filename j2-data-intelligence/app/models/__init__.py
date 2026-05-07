@@ -4,6 +4,7 @@ from app.models.disaster_risk import DisasterRisk
 from app.models.division import Division
 from app.models.dispatch_record import DispatchRecord
 from app.models.flood_severity import FloodSeverity
+from app.models.consideration_score import ConsiderationScore
 from app.models.iot_device import IoTDevice
 from app.models.public_alert import PublicAlert
 from app.models.rainfall_data import RainfallData
