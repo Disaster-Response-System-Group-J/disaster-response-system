@@ -1,13 +1,14 @@
 'use client';
 
-import { useState } from 'react';
-import { 
-  Users, UserPlus, Shield, Mail, Key, Edit2, 
+import { useState, useEffect } from 'react';
+import {
+  Users, UserPlus, Shield, Mail, Key, Edit2,
   UserX, UserCheck, CheckCircle2, Search, X,
-  AlertTriangle, Plus, Trash2, Settings, List, Save, Activity
+  AlertTriangle, Plus, Trash2, Settings, List, Save, Activity, Link2, RefreshCw
 } from 'lucide-react';
 import { MOCK_USERS } from '@/data/mock-data';
 import { UserRole, DISASTER_TYPES } from '@/types';
+import { checkJ4AuditHealth } from '@/services/j4AuditService';
 
 // Extended local type to include status for the demo
 type AdminUser = typeof MOCK_USERS[0] & { status: 'ACTIVE' | 'SUSPENDED' };
@@ -64,6 +65,15 @@ export default function AdminPanelPage() {
 
   // Audit Logs State
   const [logSearch, setLogSearch] = useState('');
+
+  // J4 Audit Service Health
+  const [j4Health, setJ4Health] = useState<'checking' | 'online' | 'offline'>('checking');
+  const checkJ4Health = async () => {
+    setJ4Health('checking');
+    const ok = await checkJ4AuditHealth();
+    setJ4Health(ok ? 'online' : 'offline');
+  };
+  useEffect(() => { checkJ4Health(); }, []);
 
   const filteredUsers = users.filter(u => 
     u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase())
@@ -240,6 +250,7 @@ export default function AdminPanelPage() {
                           <option value={UserRole.OPERATIONS_OFFICER_ZONAL}>Zonal Operations Officer</option>
                           <option value={UserRole.RESOURCE_MANAGER_NATIONAL}>National Resource Manager</option>
                           <option value={UserRole.RESOURCE_MANAGER_ZONAL}>Zonal Resource Manager</option>
+                          <option value={UserRole.AUDITOR}>Auditor</option>
                         </select>
                       </div>
                       <div className="pt-4 mt-4 border-t border-slate-800">
@@ -391,6 +402,41 @@ export default function AdminPanelPage() {
                   </button>
                 </div>
               </form>
+            </div>
+
+            {/* J4 Blockchain Audit Service Health */}
+            <div className="mt-6 bg-[#131924] border border-slate-800/80 rounded-xl overflow-hidden">
+              <div className="p-5 border-b border-slate-800/50 flex items-center justify-between">
+                <h3 className="text-sm font-bold flex items-center gap-2">
+                  <Link2 size={14} className="text-purple-400" /> J4 Blockchain Audit Service
+                </h3>
+                <button
+                  onClick={checkJ4Health}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-xs font-semibold text-slate-300 transition-colors"
+                >
+                  <RefreshCw size={11} className={j4Health === 'checking' ? 'animate-spin' : ''} /> Refresh
+                </button>
+              </div>
+              <div className="p-5">
+                <div className="flex items-center gap-4">
+                  <div className={`w-3 h-3 rounded-full shrink-0 ${
+                    j4Health === 'online' ? 'bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.6)]' :
+                    j4Health === 'offline' ? 'bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.6)]' :
+                    'bg-slate-500 animate-pulse'
+                  }`} />
+                  <div>
+                    <p className="text-sm font-bold text-slate-200">
+                      {j4Health === 'online' ? 'Online' : j4Health === 'offline' ? 'Offline' : 'Checking…'}
+                    </p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">
+                      {process.env.NEXT_PUBLIC_J4_AUDIT_API_BASE_URL || 'http://localhost:8084'}
+                    </p>
+                  </div>
+                  {j4Health === 'offline' && (
+                    <p className="ml-auto text-[10px] text-red-400 font-semibold">Audit events will not be logged until the service is restored.</p>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )}
