@@ -19,13 +19,15 @@ scrape_configs:
       - files: ['/etc/prometheus/sd_config.json']
         refresh_interval: 30s
     relabel_configs:
-      # Use the job label from discovery config
-      - source_labels: [__tmp_job]
+      # Preserve job label from sd_config.json
+      - source_labels: [job]
         target_label: job
-      # Use the metrics_path from discovery config  
-      - source_labels: [__tmp_metrics_path]
+      # Use the metrics_path from discovery config if provided
+      - source_labels: [__metrics_path__]
         regex: '(.+)'
         target_label: __metrics_path__
-      - regex: ''
+      # Default metrics_path to /metrics when empty or missing
+      - source_labels: [__metrics_path__]
+        regex: '^$'
         target_label: __metrics_path__
         replacement: /metrics

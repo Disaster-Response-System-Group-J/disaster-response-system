@@ -35,6 +35,13 @@
     }
   },
   {
+    "targets": ["grafana:3000"],
+    "labels": {
+      "job": "grafana",
+      "__metrics_path__": "/metrics"
+    }
+  },
+  {
     "targets": ["alertmanager:9093"],
     "labels": {
       "job": "alertmanager",
