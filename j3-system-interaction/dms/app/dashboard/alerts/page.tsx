@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { AlertTriangle, MapPin, Clock, Search, Filter } from 'lucide-react';
+import { AlertTriangle, MapPin, Clock, Search, Filter ,Plus, XCircle} from 'lucide-react';
 import { MOCK_ALERTS } from '@/data/mock-data';
 import { IncidentSeverity, AlertType } from '@/types';
 import { DISTRICT_NAMES } from '@/data/districts';
@@ -29,12 +29,22 @@ type Alert = typeof MOCK_ALERTS[0];
 
 export default function AlertsPage() {
   const socket = useSocket();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const [alerts, setAlerts] = useState<Alert[]>(MOCK_ALERTS);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
   const [districtFilter, setDistrictFilter] = useState<string>('ALL');
+
+  const [isCreating, setIsCreating] = useState(false);
+  const [alertForm, setAlertForm] = useState({
+    title: '',
+    description: '',
+    type: AlertType.PUBLIC_ALERT,
+    severity: IncidentSeverity.HIGH,
+    district: 'ALL',
+    isPublic: true
+  });
 
   useEffect(() => {
     if (!socket) return;
@@ -50,8 +60,39 @@ export default function AlertsPage() {
     };
   }, [socket]);
 
-  const enforcedDistrict = user?.role === UserRole.ADMIN ? 'ALL' : (user as any)?.assignedDistrict || 'ALL';
+// Handle creating and broadcasting a new alert
+  const handleCreateAlert = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const newAlert: Alert = {
+      alertId: `ALT-${Math.floor(Math.random() * 10000)}`,
+      title: alertForm.title,
+      description: alertForm.description,
+      type: alertForm.type as AlertType,
+      severity: alertForm.severity as IncidentSeverity,
+      district: alertForm.district,
+      isPublic: alertForm.isPublic,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      source: `${user?.name || 'Command'} (${user?.role.replace(/_/g, ' ')})`
+    };
 
+    // Optimistic UI update
+    setAlerts(prev => [newAlert, ...prev]);
+
+    // Broadcast to server
+    if (socket) {
+      socket.emit('client:create-alert', newAlert);
+    }
+
+    // Reset and close
+    setIsCreating(false);
+    setAlertForm({
+      title: '', description: '', type: AlertType.PUBLIC_ALERT, 
+      severity: IncidentSeverity.HIGH, district: 'ALL', isPublic: true
+    });
+  };
+const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.includes('NATIONAL')) ? 'ALL' : (user as any)?.assignedDistrict || 'ALL';
   const filtered = alerts.filter(a => {
     if (search && !a.title.toLowerCase().includes(search.toLowerCase()) && !a.description.toLowerCase().includes(search.toLowerCase())) return false;
     if (typeFilter !== 'ALL' && a.type !== typeFilter) return false;
@@ -66,12 +107,22 @@ export default function AlertsPage() {
       <div className="p-8 max-w-[1400px] mx-auto">
         <div className="flex items-end justify-between mb-8">
           <div>
-            <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-3xl font-extrabold tracking-tight">System Alerts</h1>
-              {enforcedDistrict !== 'ALL' && (
-                <span className="flex items-center gap-1.5 px-3 py-1 bg-blue-500/10 border border-blue-500/30 rounded-lg text-xs font-bold text-blue-400">
-                  <MapPin size={12} /> {enforcedDistrict} Zone Only
-                </span>
+            <div className="flex items-center justify-between w-full mb-2">
+              <div className="flex items-center gap-3">
+                <h1 className="text-3xl font-extrabold tracking-tight">System Alerts</h1>
+                {enforcedDistrict !== 'ALL' && (
+                  <span className="flex items-center gap-1.5 px-3 py-1 bg-blue-500/10 border border-blue-500/30 rounded-lg text-xs font-bold text-blue-400">
+                    <MapPin size={12} /> {enforcedDistrict} Zone Only
+                  </span>
+                )}
+              </div>
+              
+              {/* NEW: Create Alert Button */}
+              {hasPermission('issue:alerts') && (
+                <button onClick={() => setIsCreating(true)}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-lg text-xs font-bold text-red-400 transition-colors shadow-[0_0_15px_rgba(239,68,68,0.1)]">
+                  <Plus size={16} /> Issue New Alert
+                </button>
               )}
             </div>
             <p className="text-sm text-slate-400">Monitor risk warnings, public alerts, and system notifications.</p>
@@ -147,6 +198,74 @@ export default function AlertsPage() {
           )}
         </div>
       </div>
+      
+      {/* NEW: Create Alert Modal */}
+      {isCreating && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#131924] border border-slate-700 rounded-xl w-full max-w-lg shadow-2xl overflow-hidden">
+            <div className="p-4 border-b border-slate-700 flex items-center justify-between bg-red-500/5">
+              <h3 className="font-bold text-red-400 flex items-center gap-2"><AlertTriangle size={18} /> Issue System Alert</h3>
+              <button onClick={() => setIsCreating(false)} className="text-slate-400 hover:text-white"><XCircle size={18} /></button>
+            </div>
+            
+            <form onSubmit={handleCreateAlert} className="p-6 space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-1.5">Alert Headline</label>
+                <input required type="text" value={alertForm.title} onChange={e => setAlertForm({...alertForm, title: e.target.value})} placeholder="e.g., Immediate Evacuation Required"
+                  className="w-full bg-[#0a0f16] border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500 text-white" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-1.5">Alert Type</label>
+                  <select value={alertForm.type} onChange={e => setAlertForm({...alertForm, type: e.target.value as AlertType})}
+                    className="w-full bg-[#0a0f16] border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500 text-white">
+                    {Object.values(AlertType).map(t => <option key={t} value={t}>{t.replace('_', ' ')}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-1.5">Severity</label>
+                  <select value={alertForm.severity} onChange={e => setAlertForm({...alertForm, severity: e.target.value as IncidentSeverity})}
+                    className="w-full bg-[#0a0f16] border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500 text-white">
+                    {Object.values(IncidentSeverity).map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-1.5">Target District</label>
+                  <select value={alertForm.district} onChange={e => setAlertForm({...alertForm, district: e.target.value})}
+                    className="w-full bg-[#0a0f16] border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500 text-white max-h-40">
+                    <option value="ALL">National (All Districts)</option>
+                    {DISTRICT_NAMES.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-1.5">Visibility</label>
+                  <select value={alertForm.isPublic ? 'true' : 'false'} onChange={e => setAlertForm({...alertForm, isPublic: e.target.value === 'true'})}
+                    className="w-full bg-[#0a0f16] border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500 text-white">
+                    <option value="true">Public (Visible to Citizens)</option>
+                    <option value="false">Internal (DMC Staff Only)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-1.5">Detailed Message</label>
+                <textarea required rows={3} value={alertForm.description} onChange={e => setAlertForm({...alertForm, description: e.target.value})} placeholder="Provide specific instructions or details..."
+                  className="w-full bg-[#0a0f16] border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500 text-white resize-none" />
+              </div>
+
+              <div className="flex gap-3 pt-4 border-t border-slate-800">
+                <button type="button" onClick={() => setIsCreating(false)} className="flex-1 py-2.5 bg-slate-800 rounded-lg text-xs font-bold text-slate-300 hover:bg-slate-700 transition-colors">Cancel</button>
+                <button type="submit" className="flex-1 py-2.5 bg-red-600 rounded-lg text-xs font-bold text-white hover:bg-red-500 transition-colors">Broadcast Alert</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

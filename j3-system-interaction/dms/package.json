@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest",
+    "test:run": "vitest run",
     "prisma": "prisma",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
@@ -25,27 +27,37 @@
     "lucide-react": "^0.408.0",
     "maplibre-gl": "^4.7.1",
     "next": "16.2.4",
+    "pg": "^8.20.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-map-gl": "^7.1.7",
     "recharts": "^3.8.1",
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
-    "sonner": "^2.0.7"
+    "sonner": "^2.0.7",
+    "sqlite3": "^6.0.1"
   },
   "devDependencies": {
     "@prisma/client": "^5.0.0",
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^20",
+    "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/sqlite3": "^3.1.11",
+    "@vitejs/plugin-react": "^6.0.1",
     "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
+    "jsdom": "^29.1.1",
     "prisma": "^5.0.0",
     "tailwindcss": "^4",
     "ts-node": "^10.9.1",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.5"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"

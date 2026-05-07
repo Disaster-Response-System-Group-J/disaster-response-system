@@ -1,0 +1,379 @@
+{
+    "abi":  [
+                {
+                    "anonymous":  false,
+                    "inputs":  [
+                                   {
+                                       "indexed":  true,
+                                       "internalType":  "uint256",
+                                       "name":  "caseId",
+                                       "type":  "uint256"
+                                   },
+                                   {
+                                       "indexed":  true,
+                                       "internalType":  "uint256",
+                                       "name":  "auditEventId",
+                                       "type":  "uint256"
+                                   },
+                                   {
+                                       "indexed":  false,
+                                       "internalType":  "string",
+                                       "name":  "eventType",
+                                       "type":  "string"
+                                   },
+                                   {
+                                       "indexed":  false,
+                                       "internalType":  "string",
+                                       "name":  "incidentId",
+                                       "type":  "string"
+                                   },
+                                   {
+                                       "indexed":  false,
+                                       "internalType":  "string",
+                                       "name":  "performedBy",
+                                       "type":  "string"
+                                   }
+                               ],
+                    "name":  "AuditEventLogged",
+                    "type":  "event"
+                },
+                {
+                    "anonymous":  false,
+                    "inputs":  [
+                                   {
+                                       "indexed":  true,
+                                       "internalType":  "uint256",
+                                       "name":  "caseId",
+                                       "type":  "uint256"
+                                   },
+                                   {
+                                       "indexed":  true,
+                                       "internalType":  "uint256",
+                                       "name":  "auditEventId",
+                                       "type":  "uint256"
+                                   },
+                                   {
+                                       "indexed":  false,
+                                       "internalType":  "string",
+                                       "name":  "incidentId",
+                                       "type":  "string"
+                                   },
+                                   {
+                                       "indexed":  false,
+                                       "internalType":  "string",
+                                       "name":  "performedBy",
+                                       "type":  "string"
+                                   },
+                                   {
+                                       "indexed":  false,
+                                       "internalType":  "string",
+                                       "name":  "district",
+                                       "type":  "string"
+                                   }
+                               ],
+                    "name":  "ManualIncidentCreated",
+                    "type":  "event"
+                },
+                {
+                    "inputs":  [
+                                   {
+                                       "internalType":  "string",
+                                       "name":  "eventId",
+                                       "type":  "string"
+                                   },
+                                   {
+                                       "internalType":  "string",
+                                       "name":  "incidentId",
+                                       "type":  "string"
+                                   },
+                                   {
+                                       "internalType":  "string",
+                                       "name":  "performedBy",
+                                       "type":  "string"
+                                   },
+                                   {
+                                       "internalType":  "string",
+                                       "name":  "performedRole",
+                                       "type":  "string"
+                                   },
+                                   {
+                                       "internalType":  "string",
+                                       "name":  "district",
+                                       "type":  "string"
+                                   },
+                                   {
+                                       "internalType":  "string",
+                                       "name":  "notes",
+                                       "type":  "string"
+                                   },
+                                   {
+                                       "internalType":  "string",
+                                       "name":  "correlationId",
+                                       "type":  "string"
+                                   }
+                               ],
+                    "name":  "createManualIncident",
+                    "outputs":  [
+                                    {
+                                        "internalType":  "uint256",
+                                        "name":  "caseId",
+                                        "type":  "uint256"
+                                    },
+                                    {
+                                        "internalType":  "uint256",
+                                        "name":  "auditEventId",
+                                        "type":  "uint256"
+                                    }
+                                ],
+                    "stateMutability":  "nonpayable",
+                    "type":  "function"
+                },
+                {
+                    "inputs":  [
+                                   {
+                                       "internalType":  "uint256",
+                                       "name":  "caseId",
+                                       "type":  "uint256"
+                                   }
+                               ],
+                    "name":  "doesCaseExist",
+                    "outputs":  [
+                                    {
+                                        "internalType":  "bool",
+                                        "name":  "",
+                                        "type":  "bool"
+                                    }
+                                ],
+                    "stateMutability":  "view",
+                    "type":  "function"
+                },
+                {
+                    "inputs":  [
+                                   {
+                                       "internalType":  "uint256",
+                                       "name":  "auditEventId",
+                                       "type":  "uint256"
+                                   }
+                               ],
+                    "name":  "getEvent",
+                    "outputs":  [
+                                    {
+                                        "components":  [
+                                                           {
+                                                               "internalType":  "uint256",
+                                                               "name":  "id",
+                                                               "type":  "uint256"
+                                                           },
+                                                           {
+                                                               "internalType":  "uint256",
+                                                               "name":  "caseId",
+                                                               "type":  "uint256"
+                                                           },
+                                                           {
+                                                               "internalType":  "string",
+                                                               "name":  "eventId",
+                                                               "type":  "string"
+                                                           },
+                                                           {
+                                                               "internalType":  "string",
+                                                               "name":  "eventType",
+                                                               "type":  "string"
+                                                           },
+                                                           {
+                                                               "internalType":  "string",
+                                                               "name":  "incidentId",
+                                                               "type":  "string"
+                                                           },
+                                                           {
+                                                               "internalType":  "string",
+                                                               "name":  "resourceId",
+                                                               "type":  "string"
+                                                           },
+                                                           {
+                                                               "internalType":  "string",
+                                                               "name":  "alertId",
+                                                               "type":  "string"
+                                                           },
+                                                           {
+                                                               "internalType":  "string",
+                                                               "name":  "performedBy",
+                                                               "type":  "string"
+                                                           },
+                                                           {
+                                                               "internalType":  "string",
+                                                               "name":  "performedRole",
+                                                               "type":  "string"
+                                                           },
+                                                           {
+                                                               "internalType":  "string",
+                                                               "name":  "previousStatus",
+                                                               "type":  "string"
+                                                           },
+                                                           {
+                                                               "internalType":  "string",
+                                                               "name":  "newStatus",
+                                                               "type":  "string"
+                                                           },
+                                                           {
+                                                               "internalType":  "string",
+                                                               "name":  "district",
+                                                               "type":  "string"
+                                                           },
+                                                           {
+                                                               "internalType":  "string",
+                                                               "name":  "notes",
+                                                               "type":  "string"
+                                                           },
+                                                           {
+                                                               "internalType":  "string",
+                                                               "name":  "correlationId",
+                                                               "type":  "string"
+                                                           },
+                                                           {
+                                                               "internalType":  "uint256",
+                                                               "name":  "timestamp",
+                                                               "type":  "uint256"
+                                                           }
+                                                       ],
+                                        "internalType":  "struct IncidentAuditLog.AuditEvent",
+                                        "name":  "",
+                                        "type":  "tuple"
+                                    }
+                                ],
+                    "stateMutability":  "view",
+                    "type":  "function"
+                },
+                {
+                    "inputs":  [
+
+                               ],
+                    "name":  "getEventCount",
+                    "outputs":  [
+                                    {
+                                        "internalType":  "uint256",
+                                        "name":  "",
+                                        "type":  "uint256"
+                                    }
+                                ],
+                    "stateMutability":  "view",
+                    "type":  "function"
+                },
+                {
+                    "inputs":  [
+                                   {
+                                       "internalType":  "uint256",
+                                       "name":  "caseId",
+                                       "type":  "uint256"
+                                   }
+                               ],
+                    "name":  "getEventIdsByCaseId",
+                    "outputs":  [
+                                    {
+                                        "internalType":  "uint256[]",
+                                        "name":  "",
+                                        "type":  "uint256[]"
+                                    }
+                                ],
+                    "stateMutability":  "view",
+                    "type":  "function"
+                },
+                {
+                    "inputs":  [
+                                   {
+                                       "internalType":  "string",
+                                       "name":  "eventType",
+                                       "type":  "string"
+                                   }
+                               ],
+                    "name":  "getEventIdsByType",
+                    "outputs":  [
+                                    {
+                                        "internalType":  "uint256[]",
+                                        "name":  "",
+                                        "type":  "uint256[]"
+                                    }
+                                ],
+                    "stateMutability":  "view",
+                    "type":  "function"
+                },
+                {
+                    "inputs":  [
+                                   {
+                                       "internalType":  "uint256",
+                                       "name":  "caseId",
+                                       "type":  "uint256"
+                                   },
+                                   {
+                                       "internalType":  "string",
+                                       "name":  "eventId",
+                                       "type":  "string"
+                                   },
+                                   {
+                                       "internalType":  "string",
+                                       "name":  "eventType",
+                                       "type":  "string"
+                                   },
+                                   {
+                                       "internalType":  "string",
+                                       "name":  "incidentId",
+                                       "type":  "string"
+                                   },
+                                   {
+                                       "internalType":  "string",
+                                       "name":  "resourceId",
+                                       "type":  "string"
+                                   },
+                                   {
+                                       "internalType":  "string",
+                                       "name":  "alertId",
+                                       "type":  "string"
+                                   },
+                                   {
+                                       "internalType":  "string",
+                                       "name":  "performedBy",
+                                       "type":  "string"
+                                   },
+                                   {
+                                       "internalType":  "string",
+                                       "name":  "performedRole",
+                                       "type":  "string"
+                                   },
+                                   {
+                                       "internalType":  "string",
+                                       "name":  "previousStatus",
+                                       "type":  "string"
+                                   },
+                                   {
+                                       "internalType":  "string",
+                                       "name":  "newStatus",
+                                       "type":  "string"
+                                   },
+                                   {
+                                       "internalType":  "string",
+                                       "name":  "district",
+                                       "type":  "string"
+                                   },
+                                   {
+                                       "internalType":  "string",
+                                       "name":  "notes",
+                                       "type":  "string"
+                                   },
+                                   {
+                                       "internalType":  "string",
+                                       "name":  "correlationId",
+                                       "type":  "string"
+                                   }
+                               ],
+                    "name":  "logAuditEvent",
+                    "outputs":  [
+                                    {
+                                        "internalType":  "uint256",
+                                        "name":  "auditEventId",
+                                        "type":  "uint256"
+                                    }
+                                ],
+                    "stateMutability":  "nonpayable",
+                    "type":  "function"
+                }
+            ]
+}

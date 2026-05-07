@@ -57,17 +57,6 @@ function DashboardShell({ children }: { children: ReactNode }) {
           </p>
         </div>
 
-        {/* Report Button */}
-        <div className="px-6 pb-6">
-          <Link
-            href="/report-incident"
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 rounded-lg font-bold text-blue-400 text-xs transition-all shadow-[0_0_15px_rgba(59,130,246,0.1)]"
-          >
-            <AlertTriangle size={16} />
-            Report Incident
-          </Link>
-        </div>
-
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-2 scrollbar-none">
           <div className="space-y-1">

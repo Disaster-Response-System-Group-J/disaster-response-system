@@ -75,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hasRole = useCallback(
     (role: UserRole) => {
       if (!user) return false;
-      if (user.role === UserRole.ADMIN) return true; // Admin has all roles
+      if (user.role === UserRole.SYSTEM_ADMIN) return true; 
       return user.role === role;
     },
     [user],
