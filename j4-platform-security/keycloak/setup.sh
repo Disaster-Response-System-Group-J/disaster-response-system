@@ -45,8 +45,14 @@ USERS=(
 
 command -v jq >/dev/null 2>&1 || { echo "ERROR: jq is required (apt install jq / brew install jq)" >&2; exit 1; }
 
+# All Keycloak calls go through this wrapper. The X-Forwarded-Proto: https
+# header lets HTTP requests through Keycloak's per-realm sslRequired check
+# (master defaults to "external" and rejects non-loopback HTTP otherwise).
+# Requires KC_PROXY_HEADERS=xforwarded on the keycloak service.
+kc_curl() { curl -H "X-Forwarded-Proto: https" "$@"; }
+
 echo "==> Waiting for Keycloak realm '$KC_REALM' to be ready..."
-until curl -sf "$KC_URL/realms/$KC_REALM/.well-known/openid-configuration" >/dev/null; do
+until kc_curl -sf "$KC_URL/realms/$KC_REALM/.well-known/openid-configuration" >/dev/null; do
   sleep 2
 done
 echo "    Realm reachable."
@@ -55,7 +61,7 @@ echo "    Realm reachable."
 
 echo ""
 echo "==> Acquiring admin access token..."
-TOKEN_RESP=$(curl -s -X POST "$KC_URL/realms/master/protocol/openid-connect/token" \
+TOKEN_RESP=$(kc_curl -s -X POST "$KC_URL/realms/master/protocol/openid-connect/token" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "grant_type=password" \
   -d "client_id=admin-cli" \
@@ -75,10 +81,10 @@ echo "    Token acquired."
 echo ""
 echo "==> Creating realm roles..."
 for role in "${ROLES[@]}"; do
-  if curl -sf -H "$AUTH_HEADER" "$KC_URL/admin/realms/$KC_REALM/roles/$role" >/dev/null 2>&1; then
+  if kc_curl -sf -H "$AUTH_HEADER" "$KC_URL/admin/realms/$KC_REALM/roles/$role" >/dev/null 2>&1; then
     echo "    $role already exists, skipping"
   else
-    curl -sf -H "$AUTH_HEADER" -H "Content-Type: application/json" \
+    kc_curl -sf -H "$AUTH_HEADER" -H "Content-Type: application/json" \
       -X POST "$KC_URL/admin/realms/$KC_REALM/roles" \
       -d "{\"name\":\"$role\"}" && echo "    $role OK"
   fi
@@ -91,12 +97,12 @@ done
 
 echo ""
 echo "==> Creating application client '$CLIENT_ID'..."
-existing_client=$(curl -sf -H "$AUTH_HEADER" \
+existing_client=$(kc_curl -sf -H "$AUTH_HEADER" \
   "$KC_URL/admin/realms/$KC_REALM/clients?clientId=$CLIENT_ID" \
   | jq -r '.[0].id // empty')
 
 if [[ -z "$existing_client" ]]; then
-  curl -sf -H "$AUTH_HEADER" -H "Content-Type: application/json" \
+  kc_curl -sf -H "$AUTH_HEADER" -H "Content-Type: application/json" \
     -X POST "$KC_URL/admin/realms/$KC_REALM/clients" \
     -d "{
       \"clientId\": \"$CLIENT_ID\",
@@ -119,14 +125,14 @@ for entry in "${USERS[@]}"; do
   username="${entry%%:*}"
   role="${entry##*:}"
 
-  user_id=$(curl -sf -H "$AUTH_HEADER" \
+  user_id=$(kc_curl -sf -H "$AUTH_HEADER" \
     "$KC_URL/admin/realms/$KC_REALM/users?username=$username&exact=true" \
     | jq -r '.[0].id // empty')
 
   if [[ -z "$user_id" ]]; then
     # email/firstName/lastName are required — Keycloak 24's default flow runs
     # VERIFY_PROFILE and rejects login with "Account is not fully set up" otherwise.
-    curl -sf -H "$AUTH_HEADER" -H "Content-Type: application/json" \
+    kc_curl -sf -H "$AUTH_HEADER" -H "Content-Type: application/json" \
       -X POST "$KC_URL/admin/realms/$KC_REALM/users" \
       -d "{
         \"username\": \"$username\",
@@ -137,7 +143,7 @@ for entry in "${USERS[@]}"; do
         \"lastName\": \"${username%-test}\",
         \"credentials\": [{\"type\":\"password\",\"value\":\"$TEST_USER_PASSWORD\",\"temporary\":false}]
       }" && echo "    $username created"
-    user_id=$(curl -sf -H "$AUTH_HEADER" \
+    user_id=$(kc_curl -sf -H "$AUTH_HEADER" \
       "$KC_URL/admin/realms/$KC_REALM/users?username=$username&exact=true" \
       | jq -r '.[0].id')
   else
@@ -145,8 +151,8 @@ for entry in "${USERS[@]}"; do
   fi
 
   # Role assignment is idempotent — Keycloak silently ignores duplicates.
-  role_repr=$(curl -sf -H "$AUTH_HEADER" "$KC_URL/admin/realms/$KC_REALM/roles/$role")
-  curl -sf -H "$AUTH_HEADER" -H "Content-Type: application/json" \
+  role_repr=$(kc_curl -sf -H "$AUTH_HEADER" "$KC_URL/admin/realms/$KC_REALM/roles/$role")
+  kc_curl -sf -H "$AUTH_HEADER" -H "Content-Type: application/json" \
     -X POST "$KC_URL/admin/realms/$KC_REALM/users/$user_id/role-mappings/realm" \
     -d "[$role_repr]" && echo "    $username ← $role"
 done
