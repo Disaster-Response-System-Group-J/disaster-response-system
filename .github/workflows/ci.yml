@@ -99,7 +99,7 @@ jobs:
         continue-on-error: true   # known lint issues tracked in issue #XX — J3 to resolve before demo
 
       - name: Run tests
-        run: npm test --if-present -- --passWithNoTests --watchAll=false
+        run: npm test --if-present -- --passWithNoTests --run
 
       - name: Build
         run: npm run build
