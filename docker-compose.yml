@@ -210,13 +210,15 @@ services:
     restart: unless-stopped
     ports:
       - "9093:9093"
+    environment:
+      ALERTMANAGER_EMAIL_PASSWORD: "${ALERTMANAGER_EMAIL_PASSWORD}"
     volumes:
-      - ./j4-platform-security/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./j4-platform-security/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml.tpl:ro
       - alertmanager_data:/alertmanager
-    command:
-      - '--config.file=/etc/alertmanager/alertmanager.yml'
-      - '--storage.path=/alertmanager'
-      - '--web.external-url=http://localhost:9093'
+    entrypoint:
+    - sh
+    - -c
+    - 'sed "s|__ALERTMANAGER_EMAIL_PASSWORD__|$${ALERTMANAGER_EMAIL_PASSWORD}|g" /etc/alertmanager/alertmanager.yml.tpl > /alertmanager/alertmanager.yml && /bin/alertmanager --config.file=/alertmanager/alertmanager.yml --storage.path=/alertmanager --web.external-url=http://localhost:9093'
     networks:
       - disaster-net
 
