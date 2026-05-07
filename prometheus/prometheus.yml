@@ -13,57 +13,19 @@ alerting:
             - alertmanager:9093
 
 scrape_configs:
-  - job_name: prometheus
-    static_configs:
-      - targets:
-          - prometheus:9090
-
-  - job_name: kong
-    metrics_path: /metrics
-    static_configs:
-      - targets:
-          - kong:8001
-
-  - job_name: keycloak
-    metrics_path: /metrics
-    static_configs:
-      - targets:
-          - keycloak:9000
-
-  - job_name: grafana
-    metrics_path: /metrics
-    static_configs:
-      - targets:
-          - grafana:3000
-
-  - job_name: postgres
-    static_configs:
-      - targets:
-          - postgres-exporter:9187
-
-  - job_name: kafka
-    metrics_path: /metrics
-    static_configs:
-      - targets:
-          - kafka-exporter:9308
-
-  - job_name: j1-device-edge
-    static_configs:
-      - targets:
-          - j1-device-edge:8081
-
-  - job_name: j2-data-intelligence
-    static_configs:
-      - targets:
-          - j2-data-intelligence:8082
-
-  - job_name: j3-dms
-    metrics_path: /api/metrics
-    static_configs:
-      - targets:
-          - j3-dms:3000
-
-  - job_name: alertmanager
-    static_configs:
-      - targets:
-          - alertmanager:9093
+  # File-based service discovery — auto-refresh when sd_config.json changes
+  - job_name: docker
+    file_sd_configs:
+      - files: ['/etc/prometheus/sd_config.json']
+        refresh_interval: 30s
+    relabel_configs:
+      # Use the job label from discovery config
+      - source_labels: [__tmp_job]
+        target_label: job
+      # Use the metrics_path from discovery config  
+      - source_labels: [__tmp_metrics_path]
+        regex: '(.+)'
+        target_label: __metrics_path__
+      - regex: ''
+        target_label: __metrics_path__
+        replacement: /metrics
