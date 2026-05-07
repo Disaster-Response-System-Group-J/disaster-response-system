@@ -32,13 +32,14 @@ receivers:
     webhook_configs:
       - url: 'http://localhost:5001/alert'
         send_resolved: true
-    # Add email, Slack, PagerDuty configs here as needed
-    # email_configs:
-    #   - to: 'disaster-response-team@example.com'
-    #     from: 'alertmanager@disaster-response.local'
-    #     smarthost: 'smtp.example.com:587'
-    #     auth_username: 'user@example.com'
-    #     auth_password: 'password'
+    email_configs:
+      - to: 'pisandeniwith@gmail.com'
+        from: 'alertmanager@disaster-response.local'
+        smarthost: 'smtp.gmail.com:587'
+        auth_username: 'pisandeniwith@gmail.com'
+        auth_password: 'REPLACE_WITH_REAL_PASSWORD'
+        require_tls: true
+        send_resolved: true
 
   - name: 'warning'
     webhook_configs:
