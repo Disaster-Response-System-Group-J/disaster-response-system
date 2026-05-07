@@ -5,12 +5,7 @@ dist
 .env
 .env.*
 coverage
-artifacts
-cache
 typechain-types
-test
-contracts
-scripts
 README.md
 AGENT_CONTEXT.md
 npm-debug.log

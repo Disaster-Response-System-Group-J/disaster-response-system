@@ -54,3 +54,4 @@ secrets/
 .pioenvs/
 .piolibdeps/
 
+**/secrets.yaml
