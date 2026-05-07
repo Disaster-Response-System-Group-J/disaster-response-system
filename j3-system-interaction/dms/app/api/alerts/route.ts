@@ -2,8 +2,7 @@ import { NextResponse } from 'next/server';
 import { localDb } from '@/lib/db';
 
 export async function GET() {
-  return new Promise((resolve) => {
-    // Fetch all active alerts from the local SQLite database
+  return new Promise<Response>((resolve) => {
     localDb.all("SELECT * FROM local_alerts WHERE status = 'ACTIVE' ORDER BY created_at DESC", [], (err, rows) => {
       if (err) {
         console.error('Database Error fetching local alerts:', err);
