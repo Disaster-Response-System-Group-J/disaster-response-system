@@ -12,6 +12,7 @@ KC_REALM="${KC_REALM:-disaster-response}"
 KC_ADMIN_USER="${KEYCLOAK_ADMIN:-admin}"
 KC_ADMIN_PASS="${KEYCLOAK_ADMIN_PASSWORD:-admin123}"
 TEST_USER_PASSWORD="${TEST_USER_PASSWORD:-test123}"
+CLIENT_ID="${CLIENT_ID:-disaster-app}"
 
 ROLES=(
   SYSTEM_ADMIN
@@ -23,6 +24,8 @@ ROLES=(
   RESOURCE_MANAGEMENT_NATIONAL
   FIELD_OFFICER
   PUBLIC_CITIZEN
+  LOGISTICS
+  RESPONSE_TEAM
 )
 
 # username : role
@@ -36,6 +39,8 @@ USERS=(
   "resource-mgmt-national-test:RESOURCE_MANAGEMENT_NATIONAL"
   "field-officer-test:FIELD_OFFICER"
   "public-citizen-test:PUBLIC_CITIZEN"
+  "logistics-test:LOGISTICS"
+  "response-team-test:RESPONSE_TEAM"
 )
 
 command -v jq >/dev/null 2>&1 || { echo "ERROR: jq is required (apt install jq / brew install jq)" >&2; exit 1; }
@@ -78,6 +83,33 @@ for role in "${ROLES[@]}"; do
       -d "{\"name\":\"$role\"}" && echo "    $role OK"
   fi
 done
+
+# ── Application client ──────────────────────────────────────────────────────
+# Public client used by J3 (and other frontends) to mint user tokens.
+# admin-cli won't do — its default scopes don't emit `realm_access.roles`,
+# so Kong has nothing to gate on. New clients get the `roles` scope by default.
+
+echo ""
+echo "==> Creating application client '$CLIENT_ID'..."
+existing_client=$(curl -sf -H "$AUTH_HEADER" \
+  "$KC_URL/admin/realms/$KC_REALM/clients?clientId=$CLIENT_ID" \
+  | jq -r '.[0].id // empty')
+
+if [[ -z "$existing_client" ]]; then
+  curl -sf -H "$AUTH_HEADER" -H "Content-Type: application/json" \
+    -X POST "$KC_URL/admin/realms/$KC_REALM/clients" \
+    -d "{
+      \"clientId\": \"$CLIENT_ID\",
+      \"enabled\": true,
+      \"publicClient\": true,
+      \"standardFlowEnabled\": true,
+      \"directAccessGrantsEnabled\": true,
+      \"redirectUris\": [\"http://localhost:3000/*\"],
+      \"webOrigins\": [\"http://localhost:3000\"]
+    }" && echo "    $CLIENT_ID created"
+else
+  echo "    $CLIENT_ID already exists, skipping"
+fi
 
 # ── Test users ──────────────────────────────────────────────────────────────
 
@@ -128,5 +160,5 @@ echo "    Test users:    one per role, suffix '-test' (password: $TEST_USER_PASS
 echo ""
 echo "    Get a test token (example):"
 echo "      curl -s -X POST $KC_URL/realms/$KC_REALM/protocol/openid-connect/token \\"
-echo "        -d grant_type=password -d client_id=admin-cli \\"
+echo "        -d grant_type=password -d client_id=$CLIENT_ID \\"
 echo "        -d username=system-admin-test -d password=$TEST_USER_PASSWORD"
