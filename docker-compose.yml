@@ -54,6 +54,11 @@ services:
     restart: unless-stopped
     ports:
       - "9308:9308"
+    labels:
+      prometheus-scrape: "true"
+      prometheus-port: "9308"
+      prometheus-path: "/metrics"
+      prometheus-job: "kafka"
     command:
       - --kafka.server=kafka:29092
     depends_on:
@@ -71,6 +76,11 @@ services:
       DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable"
     ports:
       - "9187:9187"
+    labels:
+      prometheus-scrape: "true"
+      prometheus-port: "9187"
+      prometheus-path: "/metrics"
+      prometheus-job: "postgres"
     depends_on:
       postgres:
         condition: service_healthy
@@ -114,6 +124,11 @@ services:
       KC_METRICS_PATH: "/metrics"
     ports:
       - "8180:8080"
+    labels:
+      prometheus-scrape: "true"
+      prometheus-port: "8080"
+      prometheus-path: "/metrics"
+      prometheus-job: "keycloak"
     volumes:
       - ./j4-platform-security/keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
     depends_on:
@@ -157,6 +172,11 @@ services:
     ports:
       - "8000:8000"
       - "8001:8001"
+    labels:
+      prometheus-scrape: "true"
+      prometheus-port: "8001"
+      prometheus-path: "/metrics"
+      prometheus-job: "kong"
     healthcheck:
       test: ["CMD", "kong", "health"]
       interval: 10s
@@ -205,10 +225,17 @@ services:
     restart: unless-stopped
     ports:
       - "9090:9090"
+    labels:
+      prometheus-scrape: "true"
+      prometheus-port: "9090"
+      prometheus-path: "/metrics"
+      prometheus-job: "prometheus"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - ./prometheus/sd_config.json:/etc/prometheus/sd_config.json:ro
       - prometheus_data:/prometheus
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
@@ -225,6 +252,11 @@ services:
     restart: unless-stopped
     ports:
       - "9093:9093"
+    labels:
+      prometheus-scrape: "true"
+      prometheus-port: "9093"
+      prometheus-path: "/metrics"
+      prometheus-job: "alertmanager"
     environment:
       ALERTMANAGER_EMAIL_PASSWORD: "${ALERTMANAGER_EMAIL_PASSWORD}"
     volumes:
@@ -306,6 +338,11 @@ services:
       - ./j3-system-interaction/dms/.env
     ports:
       - "3000:3000"
+    labels:
+      prometheus-scrape: "true"
+      prometheus-port: "3000"
+      prometheus-path: "/api/metrics"
+      prometheus-job: "j3-dms"
     depends_on:
       postgres:
         condition: service_healthy
