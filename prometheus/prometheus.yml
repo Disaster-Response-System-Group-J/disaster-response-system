@@ -3,7 +3,14 @@ global:
   evaluation_interval: 15s
   scrape_timeout: 10s
 
-rule_files: []
+rule_files:
+  - '/etc/prometheus/alert_rules.yml'
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
 
 scrape_configs:
   - job_name: prometheus
@@ -34,8 +41,18 @@ scrape_configs:
       - targets:
           - postgres-exporter:9187
 
-  # Add your service scrape targets below as teams integrate Prometheus exporters
-  # - job_name: j3-dms
-  #   static_configs:
-  #     - targets: ['j3-dms:3000']
-  #   metrics_path: /api/metrics
+  - job_name: j1-device-edge
+    static_configs:
+      - targets:
+          - j1-device-edge:8081
+
+  - job_name: j2-data-intelligence
+    static_configs:
+      - targets:
+          - j2-data-intelligence:8082
+
+  - job_name: j3-dms
+    metrics_path: /api/metrics
+    static_configs:
+      - targets:
+          - j3-dms:3000

@@ -63,24 +63,24 @@ services:
     networks:
       - disaster-net
 
-  # Keycloak exporter — exposes Keycloak metrics for Prometheus
-  keycloak-exporter:
-    image: quay.io/integr8ly/keycloak-exporter:2.5
-    container_name: disaster-keycloak-exporter
-    restart: unless-stopped
-    environment:
-      KC_URL: "http://keycloak:8080"
-      KC_USERNAME: "${KEYCLOAK_ADMIN}"
-      KC_PASSWORD: "${KEYCLOAK_ADMIN_PASSWORD}"
-      KC_REALM: "master"
-      METRICS_PORT: "9404"
-    ports:
-      - "9404:9404"
-    depends_on:
-      keycloak:
-        condition: service_started
-    networks:
-      - disaster-net
+  # # Keycloak exporter — exposes Keycloak metrics for Prometheus (DISABLED: image unavailable)
+  # keycloak-exporter:
+  #   image: quay.io/integr8ly/keycloak-exporter:2.5
+  #   container_name: disaster-keycloak-exporter
+  #   restart: unless-stopped
+  #   environment:
+  #     KC_URL: "http://keycloak:8080"
+  #     KC_USERNAME: "${KEYCLOAK_ADMIN}"
+  #     KC_PASSWORD: "${KEYCLOAK_ADMIN_PASSWORD}"
+  #     KC_REALM: "master"
+  #     METRICS_PORT: "9404"
+  #   ports:
+  #     - "9404:9404"
+  #   depends_on:
+  #     keycloak:
+  #       condition: service_started
+  #   networks:
+  #     - disaster-net
 
   # Keycloak — identity & access management, imports disaster-response realm on startup
   keycloak:
@@ -183,7 +183,7 @@ services:
     networks:
       - disaster-net
 
-  # Prometheus — metrics collection
+  # Prometheus — metrics collection & alert evaluation
   prometheus:
     image: prom/prometheus:v2.52.0
     container_name: disaster-prometheus
@@ -192,11 +192,31 @@ services:
       - "9090:9090"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--web.enable-lifecycle'
+    depends_on:
+      - alertmanager
+    networks:
+      - disaster-net
+
+  # Alertmanager — alert routing, deduplication, and notification delivery
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: disaster-alertmanager
+    restart: unless-stopped
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./j4-platform-security/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://localhost:9093'
     networks:
       - disaster-net
 
@@ -326,6 +346,7 @@ services:
 volumes:
   postgres_data:
   prometheus_data:
+  alertmanager_data:
   grafana_data:
 
 networks:
