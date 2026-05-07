@@ -57,6 +57,7 @@ J3 team lead provided the route list below on 2026-05-07. J1- and J2-owned user 
 - `OPS_*` = `OPERATIONS_OFFICER_{ZONAL,NATIONAL}`
 - `IC_*` = `INCIDENT_COMMANDER_{ZONAL,NATIONAL}`
 - `RM_*` = `RESOURCE_MANAGEMENT_{ZONAL,NATIONAL}`
+- `any authenticated` = JWT required (any non-empty `realm_access.roles`), no role check.
 - `SYSTEM_ADMIN` is implicitly allowed on every gated route via the bypass below — not repeated in the table.
 
 | Path | Method | Upstream | Allowed |
@@ -74,12 +75,17 @@ J3 team lead provided the route list below on 2026-05-07. J1- and J2-owned user 
 | `/api/analytics/situation` | `GET` | J3 / J2 (?) | `IC_*` |
 | `/api/predictions` | `GET` | J2 (?) | `IC_*`, `RM_*` |
 | `/api/resources/list` | `GET`, `PATCH` | J3 | `RM_*` |
+| `/api/divisions` | any (?) | J3 | `OPS_*`, `IC_*` |
+| `/api/weather` | any (?) | J3 | (`SYSTEM_ADMIN` only — via bypass) |
+| `/api/alerts` | `GET` | J3 | any authenticated |
+| `/api/alerts` | `POST` | J3 | `IC_*` |
 | `/api/activity` | `GET` | J4 `blockchain-audit` | (`SYSTEM_ADMIN` only — via bypass) |
 
 **Known gaps to close before implementation** (tracked in [Open questions](#open-questions)):
 
-- The path prefix `/api/<resource>` doesn't match the agreed `/api/v1/{subgroup}/<resource>` convention. The kong setup can't be written until that is reconciled — every `paths[]` value depends on it.
+- The path prefix `/api/<resource>` doesn't match the agreed `/api/v1/{subgroup}/<resource>` convention, but inspection of `j3-system-interaction/dms/app/api/` confirms J3 does serve at the literal `/api/<resource>` paths. Either the convention needs revising or Kong is meant to strip a prefix. Reconcile before kong setup is finalised.
 - `FIELD_OFFICER`, `LOGISTICS`, `RESPONSE_TEAM` do not appear in any row. Most plausibly they consume J1/J2 routes that haven't been spelled out yet.
+- Methods marked `any (?)` (currently `/api/divisions`, `/api/weather`) were not specified by J3. May warrant a method-level split — e.g. `/api/divisions/seed` looks like an admin-only mutation.
 - Upstreams marked `(?)` need confirmation. The J3 team lead's view groups these under "API routes" without saying which container actually serves them; Kong's per-route `service` definition must point at the real backend.
 
 ## Implementation approach
