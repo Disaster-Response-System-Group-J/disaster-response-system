@@ -37,7 +37,7 @@ receivers:
         from: 'alertmanager@disaster-response.local'
         smarthost: 'smtp.gmail.com:587'
         auth_username: 'pisandeniwith@gmail.com'
-        auth_password: 'REPLACE_WITH_REAL_PASSWORD'
+        auth_password: '__ALERTMANAGER_EMAIL_PASSWORD__'
         require_tls: true
         send_resolved: true
 
