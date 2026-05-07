@@ -288,6 +288,143 @@ services:
       - disaster-net
 
   # ─────────────────────────────────────────────────────────────
+  # ELK — logs collection, indexing, and search
+  # ─────────────────────────────────────────────────────────────
+
+  # Elasticsearch — stores all system logs
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    container_name: disaster-elasticsearch
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      xpack.security.enrollment.enabled: "false"
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - disaster-net
+
+  # Elasticsearch bootstrap — ILM policy + index template for drs-logs-*
+  elasticsearch-setup:
+    image: alpine:3.19
+    container_name: disaster-elasticsearch-setup
+    restart: "no"
+    environment:
+      ELK_LOG_RETENTION_DAYS: ${ELK_LOG_RETENTION_DAYS:-14}
+    volumes:
+      - ./j4-platform-security/elk/scripts/bootstrap-elasticsearch.sh:/setup/bootstrap-elasticsearch.sh:ro
+    entrypoint: ["sh", "/setup/bootstrap-elasticsearch.sh"]
+    depends_on:
+      - elasticsearch
+    networks:
+      - disaster-net
+
+  # Environment-specific Elasticsearch bootstraps (run with --profile dev or --profile prod)
+  elasticsearch-setup-dev:
+    image: alpine:3.19
+    container_name: disaster-elasticsearch-setup-dev
+    restart: "no"
+    profiles:
+      - dev
+    environment:
+      ELK_LOG_RETENTION_DAYS: 7
+    volumes:
+      - ./j4-platform-security/elk/scripts/bootstrap-elasticsearch.sh:/setup/bootstrap-elasticsearch.sh:ro
+    entrypoint: ["sh", "/setup/bootstrap-elasticsearch.sh"]
+    depends_on:
+      - elasticsearch
+    networks:
+      - disaster-net
+
+  elasticsearch-setup-prod:
+    image: alpine:3.19
+    container_name: disaster-elasticsearch-setup-prod
+    restart: "no"
+    profiles:
+      - prod
+    environment:
+      ELK_LOG_RETENTION_DAYS: 30
+    volumes:
+      - ./j4-platform-security/elk/scripts/bootstrap-elasticsearch.sh:/setup/bootstrap-elasticsearch.sh:ro
+    entrypoint: ["sh", "/setup/bootstrap-elasticsearch.sh"]
+    depends_on:
+      - elasticsearch
+    networks:
+      - disaster-net
+
+  # Logstash — receives Filebeat events and writes them to Elasticsearch
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.13.4
+    container_name: disaster-logstash
+    restart: unless-stopped
+    environment:
+      LS_JAVA_OPTS: -Xms256m -Xmx256m
+    ports:
+      - "5044:5044"
+      - "9600:9600"
+    volumes:
+      - ./j4-platform-security/elk/logstash/pipeline:/usr/share/logstash/pipeline:ro
+      - ./j4-platform-security/elk/logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+    depends_on:
+      - elasticsearch
+      - elasticsearch-setup
+    networks:
+      - disaster-net
+
+  # Kibana — log search and visualization UI
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.13.4
+    container_name: disaster-kibana
+    restart: unless-stopped
+    environment:
+      SERVER_HOST: 0.0.0.0
+      SERVER_NAME: disaster-kibana
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    networks:
+      - disaster-net
+
+  # Kibana bootstrap — creates a default DRS logs data view
+  kibana-setup:
+    image: alpine:3.19
+    container_name: disaster-kibana-setup
+    restart: "no"
+    volumes:
+      - ./j4-platform-security/elk/scripts/bootstrap-kibana.sh:/setup/bootstrap-kibana.sh:ro
+      - ./j4-platform-security/elk/kibana/drs-logs-dashboard.ndjson:/setup/drs-logs-dashboard.ndjson:ro
+      - ./j4-platform-security/elk/kibana/drs-kong-dashboard.ndjson:/setup/drs-kong-dashboard.ndjson:ro
+      - ./j4-platform-security/elk/kibana/drs-missing-trace-search.ndjson:/setup/drs-missing-trace-search.ndjson:ro
+      - ./j4-platform-security/elk/scripts/create-kibana-alerts.sh:/setup/create-kibana-alerts.sh:ro
+    entrypoint: ["sh", "/setup/bootstrap-kibana.sh"]
+    depends_on:
+      - kibana
+    networks:
+      - disaster-net
+
+  # Filebeat — collects container stdout/stderr and forwards to Logstash
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.13.4
+    container_name: disaster-filebeat
+    restart: unless-stopped
+    user: root
+    command: ["filebeat", "-e", "--strict.perms=false", "-c", "/usr/share/filebeat/filebeat.yml"]
+    volumes:
+      - ./j4-platform-security/elk/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - logstash
+    networks:
+      - disaster-net
+
+  # ─────────────────────────────────────────────────────────────
   # J3 — System Engineering & Interaction
   # ─────────────────────────────────────────────────────────────
 
@@ -300,22 +437,6 @@ services:
     restart: unless-stopped
     ports:
       - "3001:3001"
-    environment:
-      KAFKA_BROKER: kafka:29092
-    depends_on:
-      kafka:
-        condition: service_started
-    networks:
-      - disaster-net
-
-  # Mock Producer — feeds synthetic SOS/sensor/alert events into Kafka for testing
-  j3-mock-producer:
-    build:
-      context: ./j3-system-interaction/dms
-      dockerfile: Dockerfile.mock
-    container_name: j3-mock-producer
-    restart: unless-stopped
-    command: ["node", "mock-producer.js"]
     environment:
       KAFKA_BROKER: kafka:29092
     depends_on:
@@ -451,9 +572,12 @@ services:
 # ── Named Volumes ──────────────────────────────────────────────────────────────
 volumes:
   postgres_data:
+  elasticsearch_data:
+  logstash_data:
   prometheus_data:
   alertmanager_data:
   grafana_data:
+  kibana_data:
   hardhat-node-modules:
   audit-deployment:
 
