@@ -4,6 +4,7 @@ import { SocketProvider } from '@/context/SocketContext';
 import { AuthProvider } from '@/context/AuthContext';
 import GlobalSocketListener from '@/components/auth/GlobalSocketListener';
 import { Toaster } from 'sonner';
+import { initializeWeatherSystem } from '@/lib/weather-init';
 import './globals.css';
 
 const geistSans = Geist({
@@ -23,6 +24,11 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  // Initialize weather system on app startup
+  initializeWeatherSystem().catch(error => {
+    console.error("[Layout] Weather initialization error:", error);
+  });
+
   return (
     <html lang="en">
       <body 
