@@ -24,11 +24,7 @@ curl -s -X POST "$KONG_ADMIN/services" \
 
 curl -s -X POST "$KONG_ADMIN/services" \
   --data name=j3-system-interaction \
-  --data url=http://j3-system-interaction:8083 > /dev/null && echo "    j3-system-interaction OK"
-
-curl -s -X POST "$KONG_ADMIN/services" \
-  --data name=j4-platform-security \
-  --data url=http://j4-platform-security:8084 > /dev/null && echo "    j4-platform-security OK"
+  --data url=http://j3-dms:3000 > /dev/null && echo "    j3-system-interaction OK"
 
 # ── Routes ──────────────────────────────────────────────────────────────────
 
@@ -50,17 +46,12 @@ curl -s -X POST "$KONG_ADMIN/services/j3-system-interaction/routes" \
   --data "paths[]=/api/v1/system" \
   --data strip_path=false > /dev/null && echo "    j3-route (/api/v1/system) OK"
 
-curl -s -X POST "$KONG_ADMIN/services/j4-platform-security/routes" \
-  --data name=j4-route \
-  --data "paths[]=/api/v1/platform" \
-  --data strip_path=false > /dev/null && echo "    j4-route (/api/v1/platform) OK"
-
 # ── Rate Limiting ────────────────────────────────────────────────────────────
 
 echo ""
 echo "==> Applying rate limiting (100 req/min) to all routes..."
 
-for route in j1-route j2-route j3-route j4-route; do
+for route in j1-route j2-route j3-route; do
   curl -s -X POST "$KONG_ADMIN/routes/$route/plugins" \
     --data name=rate-limiting \
     --data config.minute=100 \

@@ -1,0 +1,57 @@
+# Build this image first:
+#   docker build -t j3-dms:latest \
+#     --build-arg NEXT_PUBLIC_API_URL=http://localhost:30800/api/v1/system \
+#     --build-arg NEXT_PUBLIC_SOCKET_URL=http://localhost:30001 \
+#     j3-system-interaction/dms
+# Then load into minikube: minikube image load j3-dms:latest
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: j3-dms
+  namespace: disaster-response
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: j3-dms
+  template:
+    metadata:
+      labels:
+        app: j3-dms
+    spec:
+      initContainers:
+        - name: wait-for-postgres
+          image: busybox:1.36
+          command: ['sh', '-c', 'until nc -z postgres 5432; do echo waiting; sleep 3; done']
+      containers:
+        - name: j3-dms
+          image: j3-dms:latest
+          imagePullPolicy: Never
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: disaster-secrets
+                  key: DATABASE_URL
+          ports:
+            - containerPort: 3000
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: j3-dms
+  namespace: disaster-response
+spec:
+  selector:
+    app: j3-dms
+  type: NodePort
+  ports:
+    - port: 3000
+      targetPort: 3000
+      nodePort: 30000

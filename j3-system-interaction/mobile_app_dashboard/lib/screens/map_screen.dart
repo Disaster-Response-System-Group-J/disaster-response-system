@@ -134,7 +134,7 @@ class _MapScreenState extends State<MapScreen> {
                 minZoom: 3.0,
                 maxZoom: 18.0,
                 onPositionChanged: (pos, _) {
-                  _mapCenter = pos.center!;
+                  _mapCenter = pos.center;
                   _currentZoom = pos.zoom ?? _currentZoom;
                 },
               ),
@@ -182,20 +182,43 @@ class _MapScreenState extends State<MapScreen> {
           Positioned(
             top: 12,
             right: 16,
-            child: Column(
-              children: [
-                _buildMapControlButton(Icons.add, onTap: _zoomIn),
-                const SizedBox(height: 8),
-                _buildMapControlButton(Icons.remove, onTap: _zoomOut),
-                const SizedBox(height: 16),
-                _buildMapControlButton(Icons.my_location, onTap: _resetZoom),
-                const SizedBox(height: 16),
-                _buildMapControlButton(Icons.layers, onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Layers menu coming soon')),
-                  );
-                }),
-              ],
+            child: IgnorePointer(
+              ignoring: false,
+              child: Material(
+                type: MaterialType.transparency,
+                child: Column(
+                  children: [
+                    _buildMapControlButton(
+                      Icons.add,
+                      tooltip: 'Zoom in',
+                      onTap: _zoomIn,
+                    ),
+                    const SizedBox(height: 8),
+                    _buildMapControlButton(
+                      Icons.remove,
+                      tooltip: 'Zoom out',
+                      onTap: _zoomOut,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildMapControlButton(
+                      Icons.my_location,
+                      tooltip: 'Reset location',
+                      onTap: _resetZoom,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildMapControlButton(
+                      Icons.layers,
+                      key: const Key('map-layers-button'),
+                      tooltip: 'Layers',
+                      onTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Layers menu coming soon')),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
 
@@ -256,22 +279,31 @@ class _MapScreenState extends State<MapScreen> {
   // ═══════════════════════════════════════
   //  MAP CONTROL BUTTON (glass panel)
   // ═══════════════════════════════════════
-  Widget _buildMapControlButton(IconData icon, {VoidCallback? onTap}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(4),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-          child: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: const Color(0xFF0B1326).withValues(alpha: 0.7),
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-            ),
-            child: Icon(
+  Widget _buildMapControlButton(
+    IconData icon, {
+    Key? key,
+    required String tooltip,
+    required VoidCallback onTap,
+  }) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(4),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: const Color(0xFF0B1326).withValues(alpha: 0.7),
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+          ),
+          child: IconButton(
+            key: key,
+            tooltip: tooltip,
+            onPressed: onTap,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints.tightFor(width: 40, height: 40),
+            icon: Icon(
               icon,
               color: AppColors.onSurface,
               size: 20,
@@ -431,42 +463,65 @@ class _MapScreenState extends State<MapScreen> {
                     spacing: 8,
                     children: [
                       ElevatedButton(
+                        key: const Key('incident-on-the-way-button'),
                         onPressed: () async {
+                          final messenger = ScaffoldMessenger.of(context);
                           await IncidentService.updateIncidentStatus(inc.id, IncidentStatus.onTheWay);
                           if (!mounted) return;
                           Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Status updated: On the way')));
+                          messenger.showSnackBar(const SnackBar(content: Text('Status updated: On the way')));
                         },
                         child: const Text('ON THE WAY'),
                       ),
                       ElevatedButton(
+                        key: const Key('incident-reached-button'),
                         onPressed: () async {
+                          final messenger = ScaffoldMessenger.of(context);
                           await IncidentService.updateIncidentStatus(inc.id, IncidentStatus.reached);
                           if (!mounted) return;
                           Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Status updated: Reached')));
+                          messenger.showSnackBar(const SnackBar(content: Text('Status updated: Reached')));
                         },
                         child: const Text('REACHED'),
                       ),
                       ElevatedButton(
+                        key: const Key('incident-verify-button'),
                         onPressed: () async {
+                          final messenger = ScaffoldMessenger.of(context);
                           await IncidentService.updateIncidentStatus(inc.id, IncidentStatus.verified);
                           if (!mounted) return;
                           Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Marked verified')));
+                          messenger.showSnackBar(const SnackBar(content: Text('Marked verified')));
                         },
                         child: const Text('VERIFY'),
                       ),
                       ElevatedButton(
+                        key: const Key('request-resources-button'),
                         onPressed: () async {
+                          final messenger = ScaffoldMessenger.of(context);
                           final res = await showDialog<String?>(context: context, builder: (dctx) {
                             final ctrl = TextEditingController();
                             return AlertDialog(
                               title: const Text('Request Resources'),
-                              content: TextField(controller: ctrl, decoration: const InputDecoration(hintText: 'e.g. Ambulance, Medical Team')),
+                              content: TextField(
+                                key: const Key('request-resources-input'),
+                                controller: ctrl,
+                                decoration: const InputDecoration(hintText: 'e.g. Ambulance, Medical Team'),
+                              ),
                               actions: [
-                                TextButton(onPressed: () => Navigator.pop(dctx), child: const Text('Cancel')),
-                                TextButton(onPressed: () => Navigator.pop(dctx, ctrl.text), child: const Text('Send')),
+                                TextButton(
+                                  key: const Key('request-resources-cancel-button'),
+                                  onPressed: () => Navigator.pop(dctx),
+                                  child: const Text('Cancel'),
+                                ),
+                                TextButton(
+                                  key: const Key('request-resources-send-button'),
+                                  onPressed: () {
+                                    final text = ctrl.text;
+                                    Navigator.pop(dctx, text);
+                                  },
+                                  child: const Text('Send'),
+                                ),
                               ],
                             );
                           });
@@ -475,7 +530,7 @@ class _MapScreenState extends State<MapScreen> {
                             await IncidentService.requestResources(inc.id, list);
                             if (!mounted) return;
                             Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Resource request sent')));
+                            messenger.showSnackBar(const SnackBar(content: Text('Resource request sent')));
                           }
                         },
                         child: const Text('REQUEST RESOURCES'),
@@ -484,15 +539,32 @@ class _MapScreenState extends State<MapScreen> {
                   ),
                   const SizedBox(height: 12),
                   ElevatedButton(
+                    key: const Key('add-observation-button'),
                     onPressed: () async {
+                      final messenger = ScaffoldMessenger.of(context);
                       final note = await showDialog<String?>(context: context, builder: (dctx) {
                         final ctrl = TextEditingController();
                         return AlertDialog(
                           title: const Text('Add Observation'),
-                          content: TextField(controller: ctrl, decoration: const InputDecoration(hintText: 'Short note')), 
+                          content: TextField(
+                            key: const Key('add-observation-input'),
+                            controller: ctrl,
+                            decoration: const InputDecoration(hintText: 'Short note'),
+                          ), 
                           actions: [
-                            TextButton(onPressed: () => Navigator.pop(dctx), child: const Text('Cancel')),
-                            TextButton(onPressed: () => Navigator.pop(dctx, ctrl.text), child: const Text('Save')),
+                            TextButton(
+                              key: const Key('add-observation-cancel-button'),
+                              onPressed: () => Navigator.pop(dctx),
+                              child: const Text('Cancel'),
+                            ),
+                            TextButton(
+                              key: const Key('add-observation-save-button'),
+                              onPressed: () {
+                                final text = ctrl.text;
+                                Navigator.pop(dctx, text);
+                              },
+                              child: const Text('Save'),
+                            ),
                           ],
                         );
                       });
@@ -500,7 +572,7 @@ class _MapScreenState extends State<MapScreen> {
                         await IncidentService.addObservation(inc.id, note.trim());
                         if (!mounted) return;
                         Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Observation added')));
+                        messenger.showSnackBar(const SnackBar(content: Text('Observation added')));
                       }
                     },
                     child: const Text('ADD OBSERVATION'),
@@ -830,6 +902,7 @@ class _MapScreenState extends State<MapScreen> {
                         color: AppColors.error.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(4),
                         child: InkWell(
+                          key: const Key('priority-dispatch-button'),
                           borderRadius: BorderRadius.circular(4),
                           onTap: () {
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -862,6 +935,7 @@ class _MapScreenState extends State<MapScreen> {
                     const SizedBox(width: 8),
                     // Visibility button
                     GestureDetector(
+                      key: const Key('priority-visibility-button'),
                       onTap: () {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Toggling incident visibility...')),
