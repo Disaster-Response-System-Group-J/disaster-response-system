@@ -67,7 +67,7 @@ async function updatePopulations() {
 
     let updated = 0;
     let failed = 0;
-    let skipped = 0;
+    const skipped = 0;
     const failedDivisions: string[] = [];
 
     // Update each division with population data

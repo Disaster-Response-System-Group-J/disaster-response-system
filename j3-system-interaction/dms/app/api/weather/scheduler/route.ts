@@ -14,7 +14,7 @@ import {
 } from "@/lib/weather-scheduler";
 
 // Global singleton to store scheduler state
-let schedulerState: {
+const schedulerState: {
   active: boolean;
   taskId: string | null;
   scheduleTime: string;
