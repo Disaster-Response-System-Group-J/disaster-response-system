@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { AlertTriangle, MapPin, Clock, Search, Filter ,Plus, XCircle} from 'lucide-react';
 import { MOCK_ALERTS } from '@/data/mock-data';
 import { IncidentSeverity, AlertType } from '@/types';
@@ -28,6 +29,7 @@ const ALERT_TYPE_STYLES: Record<string, string> = {
 type Alert = typeof MOCK_ALERTS[0];
 
 export default function AlertsPage() {
+  const searchParams = useSearchParams();
   const socket = useSocket();
   const { user, hasPermission } = useAuth();
   const [alerts, setAlerts] = useState<Alert[]>(MOCK_ALERTS);
@@ -35,6 +37,7 @@ export default function AlertsPage() {
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
   const [districtFilter, setDistrictFilter] = useState<string>('ALL');
+  const [focusedAlertId, setFocusedAlertId] = useState<string | null>(null);
 
   const [isCreating, setIsCreating] = useState(false);
   const [alertForm, setAlertForm] = useState({
@@ -59,6 +62,26 @@ export default function AlertsPage() {
       socket.off('dashboard:risk-alert', handleNewAlert);
     };
   }, [socket]);
+
+  useEffect(() => {
+    const alertId = searchParams.get('alertId');
+    if (!alertId) return;
+
+    setSearch('');
+    setTypeFilter('ALL');
+    setSeverityFilter('ALL');
+    setDistrictFilter('ALL');
+    setFocusedAlertId(alertId);
+
+    const timer = window.setTimeout(() => {
+      const target = document.getElementById(`alert-${alertId}`);
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 50);
+
+    return () => window.clearTimeout(timer);
+  }, [searchParams]);
 
 // Handle creating and broadcasting a new alert
   const handleCreateAlert = (e: React.FormEvent) => {
@@ -153,7 +176,17 @@ const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.inc
         {/* Alerts List */}
         <div className="space-y-4">
           {filtered.map((alert, index) => (
-              <div key={alert.alertId || `new-alert-${index}`} className={`bg-[#131924] border rounded-xl p-6 ${alert.severity === IncidentSeverity.CRITICAL && alert.isActive ? 'border-red-500/30' : 'border-slate-800/80'} ${!alert.isActive ? 'opacity-60' : ''}`}>
+              <div
+                id={`alert-${alert.alertId}`}
+                key={alert.alertId || `new-alert-${index}`}
+                className={`bg-[#131924] border rounded-xl p-6 ${
+                  focusedAlertId === alert.alertId
+                    ? 'border-blue-500/60 ring-1 ring-blue-500/30'
+                    : alert.severity === IncidentSeverity.CRITICAL && alert.isActive
+                    ? 'border-red-500/30'
+                    : 'border-slate-800/80'
+                } ${!alert.isActive ? 'opacity-60' : ''}`}
+              >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-4">
                   <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${alert.severity === IncidentSeverity.CRITICAL ? 'bg-red-500/10' : 'bg-blue-500/10'}`}>
