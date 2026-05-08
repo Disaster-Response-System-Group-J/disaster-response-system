@@ -30,7 +30,8 @@ type Alert = typeof MOCK_ALERTS[0];
 export default function AlertsPage() {
   const socket = useSocket();
   const { user, hasPermission } = useAuth();
-  const [alerts, setAlerts] = useState<Alert[]>(MOCK_ALERTS);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
@@ -45,6 +46,23 @@ export default function AlertsPage() {
     district: 'ALL',
     isPublic: true
   });
+
+  // Fetch initial alerts
+  useEffect(() => {
+    const fetchAlerts = async () => {
+      try {
+        const response = await fetch('/api/alerts');
+        if (!response.ok) throw new Error('Failed to fetch alerts');
+        const data = await response.json();
+        setAlerts(data);
+      } catch (err) {
+        console.error('Error fetching alerts:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchAlerts();
+  }, []);
 
   useEffect(() => {
     if (!socket) return;
@@ -111,6 +129,14 @@ const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.inc
     if (enforcedDistrict !== 'ALL' && a.district !== enforcedDistrict) return false;
     return true;
   });
+
+  if (isLoading) {
+    return (
+      <div className="flex-1 overflow-y-auto bg-[#0a0f16] text-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#0a0f16] text-white">

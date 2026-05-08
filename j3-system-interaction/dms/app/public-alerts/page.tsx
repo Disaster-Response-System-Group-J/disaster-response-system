@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useSocket } from '@/context/SocketContext';
 import Link from 'next/link';
 import { Shield, AlertTriangle, ArrowLeft, Waves, Mountain, Clock, MapPin } from 'lucide-react';
-import { MOCK_ALERTS } from '@/data/mock-data';
 import { IncidentSeverity } from '@/types';
 
 const SEVERITY_STYLES: Record<string, string> = {
@@ -16,7 +15,25 @@ const SEVERITY_STYLES: Record<string, string> = {
 
 export default function PublicAlertsPage() {
   const socket = useSocket();
-  const [publicAlerts, setPublicAlerts] = useState(() => MOCK_ALERTS.filter(a => a.isPublic && a.isActive));
+  const [publicAlerts, setPublicAlerts] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchAlerts = async () => {
+      try {
+        const response = await fetch('/api/alerts');
+        if (!response.ok) throw new Error('Failed to fetch alerts');
+        const data = await response.json();
+        // The API returns only ACTIVE alerts, we just need to filter for public ones
+        setPublicAlerts(data.filter((a: any) => a.isPublic));
+      } catch (err) {
+        console.error('Error fetching alerts:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchAlerts();
+  }, []);
 
   useEffect(() => {
     if (!socket) return;
@@ -59,7 +76,11 @@ export default function PublicAlertsPage() {
           </div>
         </div>
 
-        {publicAlerts.length === 0 ? (
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+          </div>
+        ) : publicAlerts.length === 0 ? (
           <div className="text-center py-20 text-slate-500">
             <AlertTriangle size={32} className="mx-auto mb-4 opacity-50" />
             <p className="text-sm font-medium">No active public alerts at this time.</p>

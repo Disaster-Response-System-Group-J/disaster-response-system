@@ -38,6 +38,7 @@ export default function ResourcesPage() {
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [districtFilter, setDistrictFilter] = useState<string>('ALL');
+  const [activeTab, setActiveTab] = useState<'ASSETS' | 'SHELTERS'>('ASSETS');
   
   const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.includes('NATIONAL')) ? 'ALL' : (user as any)?.assignedDistrict || 'ALL';
 
@@ -116,6 +117,8 @@ export default function ResourcesPage() {
   }, [socket]);
 
   const filtered = resources.filter(r => {
+    if (activeTab === 'ASSETS' && r.type === ResourceType.SHELTER) return false;
+    if (activeTab === 'SHELTERS' && r.type !== ResourceType.SHELTER) return false;
     if (search && !r.name.toLowerCase().includes(search.toLowerCase()) && !r.resourceId.toLowerCase().includes(search.toLowerCase())) return false;
     if (typeFilter !== 'ALL' && r.type !== typeFilter) return false;
     if (statusFilter !== 'ALL' && r.status !== statusFilter) return false;
@@ -233,16 +236,31 @@ export default function ResourcesPage() {
           </div>
         </div>
 
+        <div className="flex gap-6 border-b border-slate-800/80 mb-6">
+          <button 
+            onClick={() => setActiveTab('ASSETS')} 
+            className={`pb-3 text-sm font-bold border-b-2 transition-colors ${activeTab === 'ASSETS' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-300'}`}>
+            Deployable Assets
+          </button>
+          <button 
+            onClick={() => setActiveTab('SHELTERS')} 
+            className={`pb-3 text-sm font-bold border-b-2 transition-colors ${activeTab === 'SHELTERS' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-300'}`}>
+            Relief Shelters
+          </button>
+        </div>
+
         <div className="bg-[#131924] border border-slate-800/80 rounded-xl p-4 flex gap-4 mb-6">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
-            <input type="text" placeholder="Search resources..." value={search} onChange={e => setSearch(e.target.value)}
+            <input type="text" placeholder={`Search ${activeTab.toLowerCase()}...`} value={search} onChange={e => setSearch(e.target.value)}
               className="w-full bg-[#0a0f16] border border-slate-800 rounded-lg pl-9 pr-4 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500/50" />
           </div>
-          <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="bg-[#0a0f16] border border-slate-800 rounded-lg px-4 py-2 text-sm text-slate-300 focus:outline-none min-w-[150px]">
-            <option value="ALL">All Types</option>
-            {Object.values(ResourceType).map(t => <option key={t} value={t}>{t.replace('_', ' ')}</option>)}
-          </select>
+          {activeTab === 'ASSETS' && (
+            <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="bg-[#0a0f16] border border-slate-800 rounded-lg px-4 py-2 text-sm text-slate-300 focus:outline-none min-w-[150px]">
+              <option value="ALL">All Types</option>
+              {Object.values(ResourceType).filter(t => t !== ResourceType.SHELTER).map(t => <option key={t} value={t}>{t.replace('_', ' ')}</option>)}
+            </select>
+          )}
           <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="bg-[#0a0f16] border border-slate-800 rounded-lg px-4 py-2 text-sm text-slate-300 focus:outline-none min-w-[150px]">
             <option value="ALL">All Statuses</option>
             {Object.values(ResourceStatus).map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
@@ -269,7 +287,12 @@ export default function ResourcesPage() {
                       </div>
                       <div>
                         <p className="text-sm font-bold text-slate-200">{r.name}</p>
-                        <p className="text-[10px] text-slate-500 font-mono mt-0.5">{r.resourceId}</p>
+                        <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+                          {r.resourceId} 
+                          {r.type === ResourceType.SHELTER && r.capacity !== undefined && (
+                            <span className="ml-2 text-blue-400">({r.currentLoad}/{r.capacity} full)</span>
+                          )}
+                        </p>
                       </div>
                     </div>
                   </td>
