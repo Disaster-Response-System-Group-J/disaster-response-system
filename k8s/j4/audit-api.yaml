@@ -28,7 +28,7 @@ spec:
           command: ['sh', '-c', 'until nc -z hardhat-node 8545; do echo waiting for hardhat; sleep 3; done']
       containers:
         - name: deployer
-          image: 828479100417.dkr.ecr.ap-south-1.amazonaws.com/disaster-response/j4-hardhat:latest
+          image: j4-hardhat:latest
           imagePullPolicy: Always
           volumeMounts:
             - name: deployment
@@ -64,7 +64,7 @@ spec:
               mountPath: /deployment
       containers:
         - name: j4-audit-api
-          image: 828479100417.dkr.ecr.ap-south-1.amazonaws.com/disaster-response/j4-audit-api:latest
+          image: j4-audit-api:latest
           imagePullPolicy: Always
           env:
             - name: PORT

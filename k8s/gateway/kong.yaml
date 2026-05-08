@@ -99,16 +99,14 @@ metadata:
 spec:
   selector:
     app: kong
-  type: NodePort
+  type: LoadBalancer
   ports:
     - name: proxy
-      port: 8000
+      port: 80
       targetPort: 8000
-      nodePort: 30800
     - name: admin
       port: 8001
       targetPort: 8001
-      nodePort: 30801
 ---
 # Job runs once after Kong is ready to register the j3-dms route.
 apiVersion: batch/v1

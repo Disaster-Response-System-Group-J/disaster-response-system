@@ -118,8 +118,8 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
-      KC_DB_USERNAME: keycloak
-      KC_DB_PASSWORD: keycloak123
+      KC_DB_USERNAME: ${KC_DB_USERNAME:-keycloak}
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD:-keycloak123}
       KC_METRICS_ENABLED: "true"
       KC_METRICS_PATH: "/metrics"
       # Trust X-Forwarded-Proto so dev clients (host curl, keycloak-setup
@@ -523,8 +523,8 @@ services:
       context: ./j3-system-interaction/dms
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: http://localhost:3000
-        NEXT_PUBLIC_SOCKET_URL: http://localhost:3001
+        NEXT_PUBLIC_API_URL: http://${SERVER_IP:-localhost}:3000
+        NEXT_PUBLIC_SOCKET_URL: http://${SERVER_IP:-localhost}:3001
     container_name: j3-dms
     restart: unless-stopped
     env_file:

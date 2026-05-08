@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: j3-event-bridge
-          image: 828479100417.dkr.ecr.ap-south-1.amazonaws.com/disaster-response/j3-event-bridge:latest
+          image: j3-event-bridge:latest
           imagePullPolicy: Always
           env:
             - name: KAFKA_BROKER
