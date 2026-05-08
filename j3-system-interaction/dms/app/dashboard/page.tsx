@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { VerificationStatus, IncidentSeverity, UserRole } from '@/types';
 import { useSocket } from '@/context/SocketContext';
 import { useAuth } from '@/context/AuthContext';
+import { normalizeRiskAlert } from '@/lib/risk-alert';
 
 // Color mapping for the map pins
 const SEVERITY_COLORS: Record<string, string> = {
@@ -46,7 +47,7 @@ export default function DashboardPage() {
   const [pendingCount, setPendingCount] = useState(0);
   const [recentAlerts, setRecentAlerts] = useState<any[]>([]);
   const [mapPins, setMapPins] = useState<any[]>([]);
-  
+
   // Map viewport state
   const [viewState, setViewState] = useState({ longitude: 80.7718, latitude: 7.8731, zoom: 6.5, pitch: 0, bearing: 0 });
 
@@ -59,7 +60,7 @@ export default function DashboardPage() {
           fetch('/api/reports').then(res => res.ok ? res.json() : []),
           fetch('/api/resources/list').then(res => res.ok ? res.json() : []),
           fetch('/api/relief/shelter').then(res => res.ok ? res.json() : []),
-          fetch('/api/alerts').then(res => res.ok ? res.json() : []) 
+          fetch('/api/alerts').then(res => res.ok ? res.json() : [])
         ]);
 
         // Process Incidents
@@ -75,20 +76,20 @@ export default function DashboardPage() {
         const activeSheltersCount = sheltersRes.filter((s: any) => s.status !== 'CLOSED').length;
 
         // Process Resources
-        const resourcesArray = resourcesRes.resources || []; 
+        const resourcesArray = resourcesRes.resources || [];
 
         // 2. Process Resources using the extracted array[cite: 5]
-        const teams = resourcesArray.filter((r: any) => 
-          r.type?.toUpperCase() === 'TEAM' || 
-          r.type?.toUpperCase() === 'PERSONNEL' || 
+        const teams = resourcesArray.filter((r: any) =>
+          r.type?.toUpperCase() === 'TEAM' ||
+          r.type?.toUpperCase() === 'PERSONNEL' ||
           r.type?.toUpperCase() === 'RESCUE_TEAM'
         );
 
         const availableTeams = teams.filter((r: any) => r.status === 'AVAILABLE').length;
 
-        const machinery = resourcesArray.filter((r: any) => 
-          r.type?.toUpperCase() === 'MACHINERY' || 
-          r.type?.toUpperCase() === 'VEHICLE' || 
+        const machinery = resourcesArray.filter((r: any) =>
+          r.type?.toUpperCase() === 'MACHINERY' ||
+          r.type?.toUpperCase() === 'VEHICLE' ||
           r.type?.toUpperCase() === 'BOAT'
         );
 
@@ -112,7 +113,7 @@ export default function DashboardPage() {
         });
 
         setPendingCount(pendingReports);
-        
+
         // Map pins processing
         setMapPins(activeIncidents.map((inc: any) => ({
           incidentId: inc.incident_id.toString(),
@@ -124,7 +125,7 @@ export default function DashboardPage() {
 
         // Alerts processing
         if (Array.isArray(alertsRes)) {
-          setRecentAlerts(alertsRes);
+          setRecentAlerts(alertsRes.map((a: any) => normalizeRiskAlert(a)));
         }
       } catch (error) {
         console.error('Failed to load dashboard data:', error);
@@ -155,7 +156,8 @@ export default function DashboardPage() {
       }
     };
 
-    const handleNewAlert = (alert: any) => {
+    const handleNewAlert = (incoming: any) => {
+      const alert = normalizeRiskAlert(incoming);
       setRecentAlerts(prev => [alert, ...prev].slice(0, 5));
       if (alert.severity === IncidentSeverity.CRITICAL || alert.severity === 'CRITICAL') {
         setData(prev => ({ ...prev, criticalAlerts: prev.criticalAlerts + 1 }));
@@ -193,7 +195,7 @@ export default function DashboardPage() {
           </Link>
         </div>
       )}
-      
+
       <main className="flex-1 overflow-y-auto p-8">
         <div className="max-w-[1400px] mx-auto">
           {/* Header */}
@@ -307,7 +309,7 @@ export default function DashboardPage() {
               <div className="col-span-2 bg-[#131924] border border-slate-800/80 rounded-xl overflow-hidden relative min-h-[320px]">
                 <Map {...viewState} onMove={(evt: ViewStateChangeEvent) => setViewState(evt.viewState)}
                   mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json">
-                  
+
                   {/* DYNAMIC MARKERS */}
                   {mapPins.map(inc => (
                     <Marker
@@ -323,9 +325,9 @@ export default function DashboardPage() {
                           style={{ backgroundColor: SEVERITY_COLORS[inc.severity] || SEVERITY_COLORS['PENDING'] }}
                         />
                         {(inc.severity === 'CRITICAL' || inc.severity === 'PENDING') && (
-                          <div 
-                            className="absolute inset-0 rounded-full animate-ping opacity-75" 
-                            style={{ backgroundColor: SEVERITY_COLORS[inc.severity] || SEVERITY_COLORS['PENDING'] }} 
+                          <div
+                            className="absolute inset-0 rounded-full animate-ping opacity-75"
+                            style={{ backgroundColor: SEVERITY_COLORS[inc.severity] || SEVERITY_COLORS['PENDING'] }}
                           />
                         )}
                       </div>
@@ -384,11 +386,17 @@ export default function DashboardPage() {
                             <span className="flex items-center gap-1"><MapPin size={10} /> {alert.district}</span>
                             <span className="flex items-center gap-1"><Clock size={10} /> {new Date(alert.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
                           </div>
+                          {(alert.predictionCategory || alert.considerationScore !== undefined) && (
+                            <div className="mt-1 text-[10px] text-slate-400 flex flex-wrap gap-x-2 gap-y-1">
+                              {alert.predictionCategory && <span>Category: {alert.predictionCategory}</span>}
+                              {alert.predictionProbability !== undefined && <span>Prob: {alert.predictionProbability.toFixed(3)}</span>}
+                              {alert.considerationScore !== undefined && <span>Score: {alert.considerationScore.toFixed(3)}</span>}
+                            </div>
+                          )}
                         </div>
                       </div>
-                      <span className={`px-2.5 py-1 rounded text-[9px] font-bold tracking-widest border ${
-                        alert.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-400 border-red-500/30' : 'bg-slate-800 text-slate-300 border-slate-700'
-                      }`}>{alert.severity}</span>
+                      <span className={`px-2.5 py-1 rounded text-[9px] font-bold tracking-widest border ${alert.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-400 border-red-500/30' : 'bg-slate-800 text-slate-300 border-slate-700'
+                        }`}>{alert.severity}</span>
                     </div>
                   ))}
                 </div>

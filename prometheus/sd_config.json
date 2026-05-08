@@ -54,5 +54,12 @@
       "job": "j3-dms",
       "__metrics_path__": "/api/metrics"
     }
+  },
+  {
+    "targets": ["j2-data-intelligence:8082"],
+    "labels": {
+      "job": "j2-data-intelligence",
+      "__metrics_path__": "/metrics"
+    }
   }
 ]

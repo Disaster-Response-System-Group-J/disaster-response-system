@@ -122,6 +122,10 @@ services:
       KC_DB_PASSWORD: keycloak123
       KC_METRICS_ENABLED: "true"
       KC_METRICS_PATH: "/metrics"
+      # Trust X-Forwarded-Proto so dev clients (host curl, keycloak-setup
+      # sidecar) can talk plain HTTP without sslRequired=external rejecting
+      # them on the master realm.
+      KC_PROXY_HEADERS: xforwarded
     ports:
       - "8180:8080"
     labels:
@@ -134,6 +138,78 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - disaster-net
+
+  # HashiCorp Vault — secrets management. Dev mode for local work:
+  # in-memory storage, auto-unsealed, single root token. NOT for prod.
+  vault:
+    image: hashicorp/vault:1.17
+    container_name: disaster-vault
+    restart: unless-stopped
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_DEV_ROOT_TOKEN_ID:-dev-root-token}
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+      VAULT_ADDR: http://0.0.0.0:8200
+    ports:
+      - "8200:8200"
+    command: vault server -dev
+    networks:
+      - disaster-net
+
+  # Vault secret seeding — runs once after Vault is up. Currently writes
+  # the Keycloak admin password from .env into secret/keycloak/admin so
+  # the keycloak-setup sidecar can read it from Vault instead of env.
+  # Idempotent — KV v2 PUT is upsert.
+  vault-setup:
+    image: alpine:3.19
+    container_name: disaster-vault-setup
+    restart: "no"
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN_ID:-dev-root-token}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+    volumes:
+      - ./j4-platform-security/vault/setup.sh:/setup.sh:ro
+    entrypoint:
+      - sh
+      - -c
+      - |
+        apk add --no-cache bash curl -q
+        bash /setup.sh
+    depends_on:
+      vault:
+        condition: service_started
+    networks:
+      - disaster-net
+
+  # Keycloak realm provisioning — runs once after Keycloak is up.
+  # Creates the 11 realm roles, 11 test users, and the disaster-app client.
+  # Pulls the admin password from Vault (secret/keycloak/admin), seeded by
+  # vault-setup. Idempotent — safe to re-run.
+  keycloak-setup:
+    image: alpine:3.19
+    container_name: disaster-keycloak-setup
+    restart: "no"
+    environment:
+      KC_URL: http://keycloak:8080
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN_ID:-dev-root-token}
+    volumes:
+      - ./j4-platform-security/keycloak/setup.sh:/setup.sh:ro
+    entrypoint: >
+      sh -c "
+        apk add --no-cache bash curl jq -q &&
+        bash /setup.sh
+      "
+    depends_on:
+      keycloak:
+        condition: service_started
+      vault-setup:
+        condition: service_completed_successfully
     networks:
       - disaster-net
 
@@ -193,25 +269,21 @@ services:
     image: alpine:3.19
     container_name: disaster-kong-setup
     restart: "no"
-    entrypoint: >
-      sh -c "
-        apk add --no-cache curl -q &&
+    entrypoint:
+      - sh
+      - -c
+      - |
+        apk add --no-cache curl -q
         until curl -sf http://kong:8001 >/dev/null 2>&1; do
-          echo 'Waiting for Kong Admin API...'; sleep 3;
-        done;
-        curl -sf -X POST http://kong:8001/services \
-          --data 'name=j3-dms' \
-          --data 'url=http://j3-dms:3000' && echo 'Registered j3-dms';
-        curl -sf -X POST http://kong:8001/services/j3-dms/routes \
-          --data 'name=j3-route' \
-          --data 'paths[]=/api/v1/system' \
-          --data 'strip_path=false' && echo 'Created j3-route';
-        curl -sf -X POST http://kong:8001/routes/j3-route/plugins \
-          --data 'name=rate-limiting' \
-          --data 'config.minute=100' \
-          --data 'config.policy=local' && echo 'Rate limiting applied';
-        echo 'Kong setup complete';
-      "
+          echo 'Waiting for Kong Admin API...'; sleep 3
+        done
+        curl -sf -X POST http://kong:8001/services --data 'name=j3-dms' --data 'url=http://j3-dms:3000' && echo 'Registered j3-dms'
+        curl -sf -X POST http://kong:8001/services/j3-dms/routes --data 'name=j3-route' --data 'paths[]=/api/v1/system' --data 'strip_path=false' && echo 'Created j3-route'
+        curl -sf -X POST http://kong:8001/routes/j3-route/plugins --data 'name=rate-limiting' --data 'config.minute=100' --data 'config.policy=local' && echo 'Rate limiting applied to j3'
+        curl -sf -X POST http://kong:8001/services --data 'name=j2-data-intelligence' --data 'url=http://j2-data-intelligence:8082' && echo 'Registered j2-data-intelligence'
+        curl -sf -X POST http://kong:8001/services/j2-data-intelligence/routes --data 'name=j2-route' --data 'paths[]=/api/v1/engine' --data 'strip_path=false' && echo 'Created j2-route'
+        curl -sf -X POST http://kong:8001/routes/j2-route/plugins --data 'name=rate-limiting' --data 'config.minute=60' --data 'config.policy=local' && echo 'Rate limiting applied to j2'
+        echo 'Kong setup complete'
     depends_on:
       kong:
         condition: service_healthy
@@ -288,6 +360,143 @@ services:
       - disaster-net
 
   # ─────────────────────────────────────────────────────────────
+  # ELK — logs collection, indexing, and search
+  # ─────────────────────────────────────────────────────────────
+
+  # Elasticsearch — stores all system logs
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    container_name: disaster-elasticsearch
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      xpack.security.enrollment.enabled: "false"
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - disaster-net
+
+  # Elasticsearch bootstrap — ILM policy + index template for drs-logs-*
+  elasticsearch-setup:
+    image: alpine:3.19
+    container_name: disaster-elasticsearch-setup
+    restart: "no"
+    environment:
+      ELK_LOG_RETENTION_DAYS: ${ELK_LOG_RETENTION_DAYS:-14}
+    volumes:
+      - ./j4-platform-security/elk/scripts/bootstrap-elasticsearch.sh:/setup/bootstrap-elasticsearch.sh:ro
+    entrypoint: ["sh", "/setup/bootstrap-elasticsearch.sh"]
+    depends_on:
+      - elasticsearch
+    networks:
+      - disaster-net
+
+  # Environment-specific Elasticsearch bootstraps (run with --profile dev or --profile prod)
+  elasticsearch-setup-dev:
+    image: alpine:3.19
+    container_name: disaster-elasticsearch-setup-dev
+    restart: "no"
+    profiles:
+      - dev
+    environment:
+      ELK_LOG_RETENTION_DAYS: 7
+    volumes:
+      - ./j4-platform-security/elk/scripts/bootstrap-elasticsearch.sh:/setup/bootstrap-elasticsearch.sh:ro
+    entrypoint: ["sh", "/setup/bootstrap-elasticsearch.sh"]
+    depends_on:
+      - elasticsearch
+    networks:
+      - disaster-net
+
+  elasticsearch-setup-prod:
+    image: alpine:3.19
+    container_name: disaster-elasticsearch-setup-prod
+    restart: "no"
+    profiles:
+      - prod
+    environment:
+      ELK_LOG_RETENTION_DAYS: 30
+    volumes:
+      - ./j4-platform-security/elk/scripts/bootstrap-elasticsearch.sh:/setup/bootstrap-elasticsearch.sh:ro
+    entrypoint: ["sh", "/setup/bootstrap-elasticsearch.sh"]
+    depends_on:
+      - elasticsearch
+    networks:
+      - disaster-net
+
+  # Logstash — receives Filebeat events and writes them to Elasticsearch
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.13.4
+    container_name: disaster-logstash
+    restart: unless-stopped
+    environment:
+      LS_JAVA_OPTS: -Xms256m -Xmx256m
+    ports:
+      - "5044:5044"
+      - "9600:9600"
+    volumes:
+      - ./j4-platform-security/elk/logstash/pipeline:/usr/share/logstash/pipeline:ro
+      - ./j4-platform-security/elk/logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+    depends_on:
+      - elasticsearch
+      - elasticsearch-setup
+    networks:
+      - disaster-net
+
+  # Kibana — log search and visualization UI
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.13.4
+    container_name: disaster-kibana
+    restart: unless-stopped
+    environment:
+      SERVER_HOST: 0.0.0.0
+      SERVER_NAME: disaster-kibana
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    networks:
+      - disaster-net
+
+  # Kibana bootstrap — creates a default DRS logs data view
+  kibana-setup:
+    image: alpine:3.19
+    container_name: disaster-kibana-setup
+    restart: "no"
+    volumes:
+      - ./j4-platform-security/elk/scripts/bootstrap-kibana.sh:/setup/bootstrap-kibana.sh:ro
+      - ./j4-platform-security/elk/kibana/drs-logs-dashboard.ndjson:/setup/drs-logs-dashboard.ndjson:ro
+      - ./j4-platform-security/elk/kibana/drs-kong-dashboard.ndjson:/setup/drs-kong-dashboard.ndjson:ro
+      - ./j4-platform-security/elk/kibana/drs-missing-trace-search.ndjson:/setup/drs-missing-trace-search.ndjson:ro
+      - ./j4-platform-security/elk/scripts/create-kibana-alerts.sh:/setup/create-kibana-alerts.sh:ro
+    entrypoint: ["sh", "/setup/bootstrap-kibana.sh"]
+    depends_on:
+      - kibana
+    networks:
+      - disaster-net
+
+  # Filebeat — collects container stdout/stderr and forwards to Logstash
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.13.4
+    container_name: disaster-filebeat
+    restart: unless-stopped
+    user: root
+    command: ["filebeat", "-e", "--strict.perms=false", "-c", "/usr/share/filebeat/filebeat.yml"]
+    volumes:
+      - ./j4-platform-security/elk/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - logstash
+    networks:
+      - disaster-net
+
+  # ─────────────────────────────────────────────────────────────
   # J3 — System Engineering & Interaction
   # ─────────────────────────────────────────────────────────────
 
@@ -300,22 +509,6 @@ services:
     restart: unless-stopped
     ports:
       - "3001:3001"
-    environment:
-      KAFKA_BROKER: kafka:29092
-    depends_on:
-      kafka:
-        condition: service_started
-    networks:
-      - disaster-net
-
-  # Mock Producer — feeds synthetic SOS/sensor/alert events into Kafka for testing
-  j3-mock-producer:
-    build:
-      context: ./j3-system-interaction/dms
-      dockerfile: Dockerfile.mock
-    container_name: j3-mock-producer
-    restart: unless-stopped
-    command: ["node", "mock-producer.js"]
     environment:
       KAFKA_BROKER: kafka:29092
     depends_on:
@@ -376,9 +569,9 @@ services:
   #     - disaster-net
 
   # ─────────────────────────────────────────────────────────────
-  # J2 — Data & Intelligence  (placeholder — add when ready)
   # ─────────────────────────────────────────────────────────────
-  # j2-data-intelligence:
+  # J2 — Data & Intelligence
+  # ─────────────────────────────────────────────────────────────
   j2-data-intelligence:
     build: ./j2-data-intelligence
     container_name: j2-data-intelligence
@@ -387,6 +580,13 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       KAFKA_BROKER: kafka:29092
+      KAFKA_ALERT_THRESHOLD: "0.0"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
     depends_on:
       postgres:
         condition: service_healthy
@@ -449,9 +649,12 @@ services:
 # ── Named Volumes ──────────────────────────────────────────────────────────────
 volumes:
   postgres_data:
+  elasticsearch_data:
+  logstash_data:
   prometheus_data:
   alertmanager_data:
   grafana_data:
+  kibana_data:
   hardhat-node-modules:
   audit-deployment:
 

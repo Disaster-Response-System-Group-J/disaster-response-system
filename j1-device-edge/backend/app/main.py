@@ -1,0 +1,80 @@
+"""
+J1 Bridge API - FastAPI application entry point.
+
+Data flow: Flutter mobile app -> FastAPI bridge -> Kafka topic j1.events.
+"""
+
+from __future__ import annotations
+
+import logging
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from .config import settings
+from .kafka_producer import kafka_producer
+from .routes import events, health, resources
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(name)-12s | %(levelname)-5s | %(message)s",
+    datefmt="%H:%M:%S",
+)
+logger = logging.getLogger("j1.main")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup and shutdown lifecycle for the FastAPI application."""
+    logger.info("Starting J1 Bridge API")
+    logger.info("Kafka broker: %s", settings.KAFKA_BOOTSTRAP_SERVERS)
+    logger.info("Kafka topic: %s", settings.KAFKA_TOPIC_EVENTS)
+
+    try:
+        kafka_producer.connect()
+        logger.info("Kafka producer connected")
+    except Exception as exc:
+        logger.warning("Kafka producer failed to connect: %s", exc)
+
+    yield
+
+    logger.info("Shutting down J1 Bridge API")
+    kafka_producer.disconnect()
+    logger.info("Shutdown complete")
+
+
+app = FastAPI(
+    title="J1 Device-Edge Bridge API",
+    description="Bridge between the J1 Flutter mobile app and Kafka event stream.",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(health.router)
+app.include_router(events.router)
+app.include_router(resources.router)
+
+
+@app.get("/", tags=["Root"])
+async def root():
+    return {
+        "service": "j1-bridge-api",
+        "version": "1.0.0",
+        "docs": "/docs",
+        "health": "/health",
+        "endpoints": {
+            "ingest": "POST /api/v1/events/ingest",
+            "events": "GET /api/v1/events",
+            "resources": "GET /api/v1/resources",
+            "health": "GET /health",
+        },
+    }

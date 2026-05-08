@@ -12,30 +12,14 @@ export async function GET() {
         success: true,
         message: "Weather data system is operational",
         endpoints: {
-          fetch: {
-            method: "POST",
-            path: "/api/weather/fetch",
-            description: "Manually trigger weather data fetch for all divisions",
-            body: {
-              date: "optional: YYYY-MM-DD for historical data",
-            },
-          },
-          scheduler: {
-            method: "GET/POST",
-            path: "/api/weather/scheduler",
-            description: "Manage automated daily weather fetch",
-            GET: "Get scheduler status",
-            POST: {
-              actions: ["start", "stop", "restart"],
-              example: {
-                action: "start",
-                scheduleTime: "02:00",
-                runNow: true,
-              },
-            },
+          status: {
+            method: "GET",
+            path: "/api/weather/status",
+            description: "Get weather system status",
           },
         },
         notes: [
+          "Weather data fetching and ML predictions have been migrated to the J2 Data Intelligence Python microservice",
           "Soil moisture data from OpenMeteO is aggregated from hourly to daily values",
           "OpenMeteO provides 0-1cm, 1-3cm, 3-9cm layers - mapped to database 7-28cm, 28-100cm, 100-255cm",
           "Rate limited to ~100ms between division requests to respect API limits",

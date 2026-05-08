@@ -38,7 +38,7 @@ def engineer_features(db: Session, start_date: date, end_date: date):
     # Query Data
     import sqlalchemy as sa
     query = sa.text("""
-        SELECT r.division_id, d.name as division_name, r.date, r.rain_sum, 
+        SELECT r.division_id, d.name as division_name, d.district as district, r.date, r.rain_sum, 
                t.temperature as temperature_2m_mean,
                s.moisture_7_28cm as soil_moisture_7_to_28cm,
                s.moisture_28_100cm as soil_moisture_28_to_100cm,
@@ -84,6 +84,6 @@ def engineer_features(db: Session, start_date: date, end_date: date):
     ]
     
     # Return features along with meta info
-    meta_cols = ['division_id', 'date']
+    meta_cols = ['division_id', 'division_name', 'district', 'date']
     
     return target_df[meta_cols + FEATURES]

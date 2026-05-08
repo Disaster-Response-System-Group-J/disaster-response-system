@@ -6,6 +6,8 @@ import { IncidentSeverity, AlertType, UserRole } from '@/types';
 import { DISTRICT_NAMES } from '@/data/districts';
 import { useSocket } from '@/context/SocketContext';
 import { useAuth } from '@/context/AuthContext';
+import { UserRole } from '@/types';
+import { normalizeRiskAlert } from '@/lib/risk-alert';
 
 const SEVERITY_STYLES: Record<string, string> = {
   CRITICAL: 'bg-red-500/10 text-red-400 border-red-500/30',
@@ -39,8 +41,7 @@ type Alert = {
 export default function AlertsPage() {
   const socket = useSocket();
   const { user, hasPermission } = useAuth();
-  const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [alerts, setAlerts] = useState<Alert[]>(MOCK_ALERTS.map((alert) => normalizeRiskAlert(alert)) as Alert[]);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
@@ -76,8 +77,8 @@ export default function AlertsPage() {
   useEffect(() => {
     if (!socket) return;
 
-    const handleNewAlert = (newAlert: Alert) => {
-      setAlerts((prevAlerts) => [newAlert, ...prevAlerts]);
+    const handleNewAlert = (incoming: any) => {
+      setAlerts((prevAlerts) => [normalizeRiskAlert(incoming) as Alert, ...prevAlerts]);
     };
 
     socket.on('dashboard:risk-alert', handleNewAlert);
@@ -87,10 +88,10 @@ export default function AlertsPage() {
     };
   }, [socket]);
 
-// Handle creating and broadcasting a new alert
+  // Handle creating and broadcasting a new alert
   const handleCreateAlert = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const newAlert: Alert = {
       alertId: `ALT-${Math.floor(Math.random() * 10000)}`,
       title: alertForm.title,
@@ -125,11 +126,11 @@ export default function AlertsPage() {
     // Reset and close
     setIsCreating(false);
     setAlertForm({
-      title: '', description: '', type: AlertType.PUBLIC_ALERT, 
+      title: '', description: '', type: AlertType.PUBLIC_ALERT,
       severity: IncidentSeverity.HIGH, district: 'ALL', isPublic: true
     });
   };
-const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.includes('NATIONAL')) ? 'ALL' : (user as any)?.assignedDistrict || 'ALL';
+  const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.includes('NATIONAL')) ? 'ALL' : (user as any)?.assignedDistrict || 'ALL';
   const filtered = alerts.filter(a => {
     if (search && !a.title.toLowerCase().includes(search.toLowerCase()) && !a.description.toLowerCase().includes(search.toLowerCase())) return false;
     if (typeFilter !== 'ALL' && a.type !== typeFilter) return false;
@@ -161,7 +162,7 @@ const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.inc
                   </span>
                 )}
               </div>
-              
+
               {/* NEW: Create Alert Button */}
               {hasPermission('issue:alerts') && (
                 <button onClick={() => setIsCreating(true)}
@@ -198,7 +199,7 @@ const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.inc
         {/* Alerts List */}
         <div className="space-y-4">
           {filtered.map((alert, index) => (
-              <div key={alert.alertId || `new-alert-${index}`} className={`bg-[#131924] border rounded-xl p-6 ${alert.severity === IncidentSeverity.CRITICAL && alert.isActive ? 'border-red-500/30' : 'border-slate-800/80'} ${!alert.isActive ? 'opacity-60' : ''}`}>
+            <div key={alert.alertId || `new-alert-${index}`} className={`bg-[#131924] border rounded-xl p-6 ${alert.severity === IncidentSeverity.CRITICAL && alert.isActive ? 'border-red-500/30' : 'border-slate-800/80'} ${!alert.isActive ? 'opacity-60' : ''}`}>
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-4">
                   <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${alert.severity === IncidentSeverity.CRITICAL ? 'bg-red-500/10' : 'bg-blue-500/10'}`}>
@@ -225,6 +226,14 @@ const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.inc
                 </div>
               </div>
               <p className="text-sm text-slate-300 leading-relaxed ml-16">{alert.description}</p>
+              {(alert.predictionCategory || alert.considerationScore !== undefined) && (
+                <div className="ml-16 mt-3 flex flex-wrap gap-2 text-[10px] font-bold tracking-widest text-slate-400">
+                  {alert.predictionCategory && <span className="px-2 py-1 rounded bg-slate-800 border border-slate-700">CATEGORY {alert.predictionCategory}</span>}
+                  {alert.predictionProbability !== undefined && <span className="px-2 py-1 rounded bg-slate-800 border border-slate-700">PROB {alert.predictionProbability.toFixed(3)}</span>}
+                  {alert.considerationScore !== undefined && <span className="px-2 py-1 rounded bg-slate-800 border border-slate-700">SCORE {alert.considerationScore.toFixed(3)}</span>}
+                  {alert.topProbabilityKey && <span className="px-2 py-1 rounded bg-slate-800 border border-slate-700">TOP {alert.topProbabilityKey}</span>}
+                </div>
+              )}
               <div className="mt-4 pt-4 border-t border-slate-800/50 flex justify-between items-center ml-16">
                 <div className="text-[10px] font-bold text-slate-500 tracking-widest">
                   SOURCE: <span className="text-slate-400">{alert.source || 'SYSTEM'}</span>
@@ -243,7 +252,7 @@ const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.inc
           )}
         </div>
       </div>
-      
+
       {/* NEW: Create Alert Modal */}
       {isCreating && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
@@ -252,25 +261,25 @@ const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.inc
               <h3 className="font-bold text-red-400 flex items-center gap-2"><AlertTriangle size={18} /> Issue System Alert</h3>
               <button onClick={() => setIsCreating(false)} className="text-slate-400 hover:text-white"><XCircle size={18} /></button>
             </div>
-            
+
             <form onSubmit={handleCreateAlert} className="p-6 space-y-4">
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-1.5">Alert Headline</label>
-                <input required type="text" value={alertForm.title} onChange={e => setAlertForm({...alertForm, title: e.target.value})} placeholder="e.g., Immediate Evacuation Required"
+                <input required type="text" value={alertForm.title} onChange={e => setAlertForm({ ...alertForm, title: e.target.value })} placeholder="e.g., Immediate Evacuation Required"
                   className="w-full bg-[#0a0f16] border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500 text-white" />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-1.5">Alert Type</label>
-                  <select value={alertForm.type} onChange={e => setAlertForm({...alertForm, type: e.target.value as AlertType})}
+                  <select value={alertForm.type} onChange={e => setAlertForm({ ...alertForm, type: e.target.value as AlertType })}
                     className="w-full bg-[#0a0f16] border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500 text-white">
                     {Object.values(AlertType).map(t => <option key={t} value={t}>{t.replace('_', ' ')}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-1.5">Severity</label>
-                  <select value={alertForm.severity} onChange={e => setAlertForm({...alertForm, severity: e.target.value as IncidentSeverity})}
+                  <select value={alertForm.severity} onChange={e => setAlertForm({ ...alertForm, severity: e.target.value as IncidentSeverity })}
                     className="w-full bg-[#0a0f16] border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500 text-white">
                     {Object.values(IncidentSeverity).map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
@@ -280,7 +289,7 @@ const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.inc
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-1.5">Target District</label>
-                  <select value={alertForm.district} onChange={e => setAlertForm({...alertForm, district: e.target.value})}
+                  <select value={alertForm.district} onChange={e => setAlertForm({ ...alertForm, district: e.target.value })}
                     className="w-full bg-[#0a0f16] border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500 text-white max-h-40">
                     <option value="ALL">National (All Districts)</option>
                     {DISTRICT_NAMES.map(d => <option key={d} value={d}>{d}</option>)}
@@ -288,7 +297,7 @@ const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.inc
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-1.5">Visibility</label>
-                  <select value={alertForm.isPublic ? 'true' : 'false'} onChange={e => setAlertForm({...alertForm, isPublic: e.target.value === 'true'})}
+                  <select value={alertForm.isPublic ? 'true' : 'false'} onChange={e => setAlertForm({ ...alertForm, isPublic: e.target.value === 'true' })}
                     className="w-full bg-[#0a0f16] border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500 text-white">
                     <option value="true">Public (Visible to Citizens)</option>
                     <option value="false">Internal (DMC Staff Only)</option>
@@ -298,7 +307,7 @@ const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.inc
 
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-1.5">Detailed Message</label>
-                <textarea required rows={3} value={alertForm.description} onChange={e => setAlertForm({...alertForm, description: e.target.value})} placeholder="Provide specific instructions or details..."
+                <textarea required rows={3} value={alertForm.description} onChange={e => setAlertForm({ ...alertForm, description: e.target.value })} placeholder="Provide specific instructions or details..."
                   className="w-full bg-[#0a0f16] border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500 text-white resize-none" />
               </div>
 

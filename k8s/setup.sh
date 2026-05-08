@@ -41,6 +41,9 @@ docker build -t j3-mock-producer:latest \
   -f j3-system-interaction/dms/Dockerfile.mock \
   j3-system-interaction/dms
 
+docker build -t j2-data-intelligence:latest \
+  j2-data-intelligence
+
 docker build -t j4-audit-api:latest \
   j4-platform-security/blockchain-audit
 
@@ -59,6 +62,7 @@ kubectl apply -f k8s/infrastructure/
 kubectl apply -f k8s/auth/
 kubectl apply -f k8s/gateway/
 kubectl apply -f k8s/monitoring/
+kubectl apply -f k8s/j2/
 kubectl apply -f k8s/j3/
 kubectl apply -f k8s/j4/
 
@@ -73,5 +77,6 @@ echo "    Kong Proxy:     http://MINIKUBE_IP:30800"
 echo "    Keycloak:       http://MINIKUBE_IP:30180"
 echo "    Prometheus:     http://MINIKUBE_IP:30090"
 echo "    Grafana:        http://MINIKUBE_IP:30030  (admin / your-password)"
+echo "    J2 Engine API:  http://MINIKUBE_IP:30800/api/v1/engine (via Kong)"
 echo "    J4 Audit API:   http://MINIKUBE_IP:30084"
 echo "    Hardhat RPC:    http://MINIKUBE_IP:30545"
