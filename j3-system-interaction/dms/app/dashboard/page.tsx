@@ -120,14 +120,7 @@ export default function DashboardPage() {
 
         // Alerts processing
         if (Array.isArray(alertsRes)) {
-          setRecentAlerts(alertsRes.map(a => ({
-            alertId: a.id,
-            title: a.title,
-            severity: a.severity_level || 'HIGH',
-            district: a.district || 'National',
-            createdAt: a.created_at,
-            isActive: true
-          })));
+          setRecentAlerts(alertsRes);
         }
       } catch (error) {
         console.error('Failed to load dashboard data:', error);
