@@ -55,7 +55,7 @@ Duplicate idempotency keys return `409 Conflict`. Kafka failures return `503 Ser
 
 | Variable | Default | Description |
 |---|---|---|
-| `KAFKA_BOOTSTRAP_SERVERS` | `kafka:9092` | Kafka broker address |
+| `KAFKA_BOOTSTRAP_SERVERS` | `kafka:29092` | Kafka broker address |
 | `KAFKA_TOPIC_EVENTS` | `j1.events` | Target Kafka topic |
 | `KAFKA_PRODUCER_TIMEOUT` | `10` | Delivery timeout in seconds |
 | `API_HOST` | `0.0.0.0` | API bind address |
