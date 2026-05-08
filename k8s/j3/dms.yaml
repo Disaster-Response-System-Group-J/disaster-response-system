@@ -25,8 +25,8 @@ spec:
           command: ['sh', '-c', 'until nc -z postgres 5432; do echo waiting; sleep 3; done']
       containers:
         - name: j3-dms
-          image: j3-dms:latest
-          imagePullPolicy: Never
+          image: 828479100417.dkr.ecr.ap-south-1.amazonaws.com/disaster-response/j3-dms:latest
+          imagePullPolicy: Always
           env:
             - name: DATABASE_URL
               valueFrom:

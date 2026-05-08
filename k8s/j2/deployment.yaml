@@ -25,8 +25,8 @@ spec:
           command: ['sh', '-c', 'until nc -z kafka 29092; do echo waiting for kafka; sleep 3; done']
       containers:
         - name: j2-data-intelligence
-          image: j2-data-intelligence:latest
-          imagePullPolicy: Never
+          image: 828479100417.dkr.ecr.ap-south-1.amazonaws.com/disaster-response/j2-data-intelligence:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8082
           env:

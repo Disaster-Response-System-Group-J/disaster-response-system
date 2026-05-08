@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
         summary: {
           totalExpected: DS_LOCATIONS.length,
           totalInDatabase: totalDivisions,
-          byProvince: byProvince.map((group) => ({
+          byProvince: byProvince.map((group: any) => ({
             province: group.province,
             count: group._count.divisionId,
           })),
