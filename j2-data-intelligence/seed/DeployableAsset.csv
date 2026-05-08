@@ -1,0 +1,21 @@
+asset_id,name,type,status,base_location,current_latitude,current_longitude
+1,Navy Rescue Team Alpha,RESCUE_TEAM,AVAILABLE,Trincomalee,8.58,81.24
+2,Red Cross Ambulance 1,AMBULANCE,ASSIGNED,Kandy,7.29,80.64
+3,Fire Brigade Unit 3,RESCUE_TEAM,AVAILABLE,Badulla,6.99,81.05
+4,Excavator Unit A,HEAVY_MACHINERY,MAINTENANCE,Nuwara Eliya,6.97,80.78
+5,Police Rapid Response 2,RESCUE_TEAM,AVAILABLE,Matale,7.47,80.62
+6,Army Field Hospital,MEDICAL_TEAM,ASSIGNED,Kandy,7.30,80.83
+7,Boat Team Delta,RESCUE_TEAM,AVAILABLE,Batticaloa,7.73,81.70
+8,Ambulance 2,AMBULANCE,AVAILABLE,Badulla,6.98,81.03
+9,Heavy Loader B,HEAVY_MACHINERY,ASSIGNED,Kegalle,7.25,80.35
+10,Rescue Drone Squad,DRONE_TEAM,AVAILABLE,Colombo,6.93,79.85
+11,Water Purification Unit,UTILITY_TEAM,AVAILABLE,Passara,7.05,81.00
+12,Navy Rescue Team Beta,RESCUE_TEAM,ASSIGNED,Trincomalee,8.57,81.23
+13,Fire Engine 5,RESCUE_TEAM,AVAILABLE,Kandy,7.29,80.65
+14,Ambulance 3,AMBULANCE,AVAILABLE,Nuwara Eliya,6.97,80.78
+15,Bridge Repair Team,ENGINEERING_TEAM,AVAILABLE,Badulla,6.98,81.05
+16,Supply Truck 7,LOGISTICS,ASSIGNED,Matale,7.46,80.62
+17,Search Dog Unit,RESCUE_TEAM,AVAILABLE,Kandy,7.31,80.84
+18,Helicopter Evac 1,AIR_SUPPORT,AVAILABLE,Colombo,6.92,79.86
+19,Mobile Command Center,COMMAND_UNIT,AVAILABLE,Kandy,7.30,80.83
+20,Ambulance 4,AMBULANCE,MAINTENANCE,Badulla,6.99,81.04
