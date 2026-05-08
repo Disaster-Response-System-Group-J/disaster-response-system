@@ -116,7 +116,7 @@ export default function AdminPanelPage() {
   };
 
   const removeDisasterType = (type: string) => {
-    if (Object.values(DISASTER_TYPES).includes(type as any)) return showMessage('Cannot remove core disaster types');
+    if ((Object.values(DISASTER_TYPES) as string[]).includes(type)) return showMessage('Cannot remove core disaster types');
     setDisasterTypes(disasterTypes.filter(t => t !== type));
     showMessage('Disaster type removed successfully');
   };
@@ -162,7 +162,7 @@ export default function AdminPanelPage() {
           ].map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id as typeof activeTab)}
               className={`flex-1 min-w-[150px] py-2.5 px-4 rounded-md text-xs font-bold transition-colors flex items-center justify-center gap-2 ${
                 activeTab === tab.id 
                   ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' 
@@ -297,9 +297,9 @@ export default function AdminPanelPage() {
                       <div className="flex items-center gap-3">
                         <div className={`w-3 h-3 rounded-full ${type === DISASTER_TYPES.FLOOD ? 'bg-blue-400' : type === DISASTER_TYPES.LANDSLIDE ? 'bg-orange-400' : type === DISASTER_TYPES.DROUGHT ? 'bg-yellow-400' : 'bg-purple-400'}`} />
                         <span className="text-sm font-semibold text-slate-200">{type}</span>
-                        {Object.values(DISASTER_TYPES).includes(type as any) && <span className="px-1.5 py-0.5 text-[8px] bg-blue-500/20 text-blue-400 rounded border border-blue-500/20">CORE</span>}
+                        {(Object.values(DISASTER_TYPES) as string[]).includes(type) && <span className="px-1.5 py-0.5 text-[8px] bg-blue-500/20 text-blue-400 rounded border border-blue-500/20">CORE</span>}
                       </div>
-                      {!Object.values(DISASTER_TYPES).includes(type as any) && <button onClick={() => removeDisasterType(type)} className="text-slate-500 hover:text-red-400 transition-colors"><Trash2 size={14} /></button>}
+                      {!(Object.values(DISASTER_TYPES) as string[]).includes(type) && <button onClick={() => removeDisasterType(type)} className="text-slate-500 hover:text-red-400 transition-colors"><Trash2 size={14} /></button>}
                     </div>
                   ))}
                 </div>

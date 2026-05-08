@@ -14,7 +14,22 @@ const SEVERITY_COLORS = {
 };
 
 export default function AnalyticsPage() {
-  const [incidents, setIncidents] = useState<any[]>([]);
+  interface AnalyticsIncident {
+    severity?: string;
+    district?: string;
+    location?: string;
+    title?: string;
+    created_at?: string;
+    affected_population?: number;
+    status?: string;
+  }
+
+  interface AnalyticsShelter {
+    max_capacity?: number;
+    current_occupancy?: number;
+  }
+
+  const [incidents, setIncidents] = useState<AnalyticsIncident[]>([]);
   const [shelterStats, setShelterStats] = useState({ utilization: 0 });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -29,8 +44,9 @@ export default function AnalyticsPage() {
 
         setIncidents(incidentsRes);
 
-        const totalCapacity = sheltersRes.reduce((sum: number, s: any) => sum + (s.max_capacity || 0), 0);
-        const totalOccupancy = sheltersRes.reduce((sum: number, s: any) => sum + (s.current_occupancy || 0), 0);
+        const shelters = sheltersRes as AnalyticsShelter[];
+        const totalCapacity = shelters.reduce((sum: number, s) => sum + (s.max_capacity || 0), 0);
+        const totalOccupancy = shelters.reduce((sum: number, s) => sum + (s.current_occupancy || 0), 0);
         setShelterStats({ 
           utilization: totalCapacity > 0 ? Math.round((totalOccupancy / totalCapacity) * 100) : 0 
         });

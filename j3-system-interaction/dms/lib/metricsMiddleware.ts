@@ -12,7 +12,7 @@ export function instrumentRoute(handler: (req: Request) => Promise<Response | Ne
 
     try {
       const res = await handler(req as Request);
-      const status = (res && typeof (res as any).status === 'number') ? (res as any).status : 200;
+      const status = res.status;
       httpRequestCounter.inc({ method, path, status: String(status) });
       end({ method, path, status: String(status) });
       return res;

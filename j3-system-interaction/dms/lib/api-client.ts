@@ -5,7 +5,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 interface RequestOptions {
   method?: "GET" | "POST" | "PUT" | "DELETE";
   headers?: Record<string, string>;
-  body?: any;
+  body?: unknown;
 }
 
 // Added 'export' to fix the module error
@@ -54,7 +54,7 @@ export const activityAPI = {
 export const incidentsAPI = {
   getIncidents: () => apiRequest("/incidents"),
   getIncidentById: (id: string) => apiRequest(`/incidents/${id}`),
-  updateIncident: (id: string, data: any) =>
+  updateIncident: (id: string, data: unknown) =>
     apiRequest(`/incidents/${id}`, {
       method: "PUT",
       body: data,

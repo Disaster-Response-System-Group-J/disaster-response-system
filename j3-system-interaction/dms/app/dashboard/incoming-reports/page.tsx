@@ -40,7 +40,7 @@ export default function IncomingReportsPage() {
     affectedPeople: 0 
   });
 
-  const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.includes('NATIONAL')) ? 'ALL' : (user as any)?.assignedDistrict || 'ALL';
+  const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.includes('NATIONAL')) ? 'ALL' : (user as { assignedDistrict?: string })?.assignedDistrict || 'ALL';
 
   // Fetch initial data from database
   useEffect(() => {
@@ -52,7 +52,18 @@ export default function IncomingReportsPage() {
         const data = await response.json();
         
         // Map database row schema to the UI's IncomingReport type
-        const mappedReports: IncomingReport[] = data.map((row: any) => ({
+        interface ApiReportRow {
+          report_id: number | string;
+          source_channel?: string;
+          status?: string;
+          latitude?: number;
+          longitude?: number;
+          media_url?: string;
+          contact_info?: string;
+          created_at?: string;
+          description?: string;
+        }
+        const mappedReports: IncomingReport[] = (data as ApiReportRow[]).map((row) => ({
           reportId: row.report_id.toString(),
           source: row.source_channel as ReportSource,
           verificationStatus: row.status as VerificationStatus,

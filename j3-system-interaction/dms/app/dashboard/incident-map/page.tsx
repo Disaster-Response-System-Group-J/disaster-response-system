@@ -9,6 +9,39 @@ import { SRI_LANKA_CENTER, DISTRICT_NAMES } from '@/data/districts';
 import { useAuth } from '@/context/AuthContext';
 import { useSocket } from '@/context/SocketContext';
 
+interface ApiIncident {
+  incident_id: number | string;
+  title?: string;
+  status?: string;
+  severity?: string;
+  latitude?: number;
+  longitude?: number;
+  affected_population?: number;
+  created_at?: string;
+}
+
+interface MapIncident {
+  incidentId: string;
+  title: string;
+  disasterType: string;
+  severity: string;
+  status: string;
+  latitude: number;
+  longitude: number;
+  affectedPeople: number;
+  district: string;
+  description: string;
+}
+
+interface SocketReportPayload {
+  reportId?: string;
+  disasterType?: string;
+  latitude?: number;
+  longitude?: number;
+  district?: string;
+  description?: string;
+}
+
 const SEVERITY_COLORS: Record<string, string> = {
   CRITICAL: '#ef4444', 
   HIGH: '#f97316', 
@@ -22,10 +55,10 @@ export default function IncidentMapPage() {
   const socket = useSocket();
 
   const [viewState, setViewState] = useState(SRI_LANKA_CENTER);
-  const [selectedIncident, setSelectedIncident] = useState<any | null>(null);
-  
+  const [selectedIncident, setSelectedIncident] = useState<MapIncident | null>(null);
+
   // Start with an empty array instead of mock data
-  const [mapPins, setMapPins] = useState<any[]>([]);
+  const [mapPins, setMapPins] = useState<MapIncident[]>([]);
 
   // Filters
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
@@ -33,7 +66,7 @@ export default function IncidentMapPage() {
   const [districtFilter, setDistrictFilter] = useState<string>('ALL');
   const [showFilters, setShowFilters] = useState(false);
 
-  const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.includes('NATIONAL')) ? 'ALL' : (user as any)?.assignedDistrict || 'ALL';
+  const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.includes('NATIONAL')) ? 'ALL' : (user as { assignedDistrict?: string })?.assignedDistrict || 'ALL';
 
   // Fetch initial data from database
   useEffect(() => {
@@ -45,18 +78,18 @@ export default function IncidentMapPage() {
         const data = await response.json();
         
         // Map database schema to the UI's expected format
-        const mappedPins = data.map((inc: any) => ({
+        const mappedPins = (data as ApiIncident[]).map((inc) => ({
           incidentId: inc.incident_id.toString(),
-          title: inc.title,
-          disasterType: inc.title?.toUpperCase().includes('FLOOD') ? 'FLOOD' : 
+          title: inc.title ?? 'Unnamed Incident',
+          disasterType: inc.title?.toUpperCase().includes('FLOOD') ? 'FLOOD' :
                         inc.title?.toUpperCase().includes('LANDSLIDE') ? 'LANDSLIDE' : 'UNKNOWN',
           severity: inc.severity || 'LOW',
           status: inc.status || 'ACTIVE',
           latitude: Number(inc.latitude) || 0,
           longitude: Number(inc.longitude) || 0,
           affectedPeople: inc.affected_population || 0,
-          district: 'UNASSIGNED', // Fallback, could map from division_id if joined in API
-          description: `Reported at ${new Date(inc.created_at).toLocaleString()}`
+          district: 'UNASSIGNED',
+          description: `Reported at ${new Date(inc.created_at ?? Date.now()).toLocaleString()}`
         }));
 
         setMapPins(mappedPins);
@@ -88,21 +121,22 @@ export default function IncidentMapPage() {
   useEffect(() => {
     if (!socket) return;
 
-    const handleNewReport = (report: any) => {
+    const handleNewReport = (report: SocketReportPayload) => {
       // Ensure the report has coordinates before mapping it
       if (report.latitude && report.longitude) {
-        const newPin = {
-          incidentId: report.reportId,
-          disasterType: report.disasterType,
-          severity: 'PENDING', // Assign our new custom severity
+        const newPin: MapIncident = {
+          incidentId: report.reportId ?? `new-${Date.now()}`,
+          disasterType: report.disasterType ?? 'UNKNOWN',
+          severity: 'PENDING',
           status: 'UNVERIFIED',
           latitude: report.latitude,
           longitude: report.longitude,
-          title: `SOS Report: ${report.disasterType}`,
-          district: report.district,
-          description: report.description
+          title: `SOS Report: ${report.disasterType ?? 'Unknown'}`,
+          district: report.district ?? 'Unknown',
+          description: report.description ?? '',
+          affectedPeople: 0,
         };
-        
+
         setMapPins(prev => [...prev, newPin]);
       }
     };

@@ -5,6 +5,13 @@ import { AlertTriangle, BrainCircuit, Clock3, RefreshCcw, ShieldAlert, Waves } f
 
 type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
+interface ApiPredictionRow {
+  division_name?: string;
+  score?: number;
+  risk_level?: string;
+  disaster_type?: string;
+}
+
 interface PredictionZone {
   zone: string;
   district: string;
@@ -42,11 +49,11 @@ export default function PredictionsPage() {
       const data = await response.json();
       
       // Map database rows to the UI format
-      const mappedZones: PredictionZone[] = data.map((row: any) => ({
+      const mappedZones: PredictionZone[] = (data as ApiPredictionRow[]).map((row) => ({
         zone: row.division_name || 'Unknown Zone',
         district: 'Assigned Region', // Fallback, since district isn't directly in DisasterRisk table
         // Convert score to a 0-100 scale if it's a probability (0-1), otherwise use directly
-        riskScore: row.score > 1 ? Math.round(row.score) : Math.round((row.score || 0) * 100),
+        riskScore: (row.score ?? 0) > 1 ? Math.round(row.score ?? 0) : Math.round((row.score ?? 0) * 100),
         riskLevel: (row.risk_level as RiskLevel) || 'LOW',
         confidence: 85, // Placeholder: ML confidence score
         leadTimeHours: 24, // Placeholder: Target horizon

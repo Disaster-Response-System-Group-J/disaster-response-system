@@ -6,8 +6,22 @@ import {
   collectDefaultMetrics,
 } from "prom-client";
 
+interface GlobalWithMetrics {
+  __prom_registry?: Registry;
+  __prom_metrics_initialized?: boolean;
+  __prom_metrics_httpRequestCounter?: Counter;
+  __prom_metrics_httpRequestDuration?: Histogram;
+  __prom_metrics_activeIncidentsGauge?: Gauge;
+  __prom_metrics_alertsIssuedCounter?: Counter;
+  __prom_metrics_apiCallsCounter?: Counter;
+  __prom_metrics_processingTimeHistogram?: Histogram;
+  __prom_metrics_eventsProcessedCounter?: Counter;
+  __prom_metrics_dbConnectionsGauge?: Gauge;
+  __prom_metrics_dbQueryDuration?: Histogram;
+}
+
 // Use a global guard so metrics are not registered multiple times across hot reloads
-const g: any = globalThis as any;
+const g = globalThis as typeof globalThis & GlobalWithMetrics;
 if (!g.__prom_registry) {
   g.__prom_registry = new Registry();
 }

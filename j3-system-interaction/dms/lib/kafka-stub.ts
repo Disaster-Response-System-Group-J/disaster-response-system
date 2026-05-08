@@ -4,7 +4,7 @@
 // This file serves as the contract and stub for integration with J4.
 // When actual Kafka is deployed, this will be replaced with kafkajs implementation.
 
-import { KafkaEvent, SOSReportEvent, PublicReportEvent, RiskAlertEvent } from '@/types';
+import { KafkaEvent, SOSReportEvent, PublicReportEvent, RiskAlertEvent, ReportSource } from '@/types';
 
 type EventHandler = (event: KafkaEvent) => Promise<void>;
 
@@ -54,7 +54,7 @@ class KafkaClientStub {
       timestamp: new Date().toISOString(),
       payload: {
         sosId: `SOS-${Math.floor(Math.random() * 1000)}`,
-        source: 'J1_SOS_APP' as any,
+        source: ReportSource.J1_SOS_APP,
         sosType: 'FLOOD',
         district: 'Ratnapura',
         latitude: 6.68,

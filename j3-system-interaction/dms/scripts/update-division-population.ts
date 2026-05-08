@@ -19,7 +19,7 @@ function readPopulationCSV(filePath: string): Promise<Map<string, number>> {
 
     fs.createReadStream(filePath)
       .pipe(csv())
-      .on("data", (row: any) => {
+      .on("data", (row: Record<string, string>) => {
         const divisionName = row.division?.trim();
         const population = parseInt(row.population, 10);
 

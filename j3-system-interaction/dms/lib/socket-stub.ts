@@ -4,7 +4,7 @@
 // This service will push real-time updates to the browser clients
 // when the backend receives new Kafka events or DB updates.
 
-type SocketEventHandler = (data: any) => void;
+type SocketEventHandler = (data: unknown) => void;
 
 class SocketServiceStub {
   private listeners: Map<string, SocketEventHandler[]> = new Map();
@@ -47,7 +47,7 @@ class SocketServiceStub {
   /**
    * Emit event to clients (Server side)
    */
-  public emitToClients(event: string, data: any) {
+  public emitToClients(event: string, data: unknown) {
     console.log(`[Socket Stub] Broadcasting event ${event} to clients`);
     const handlers = this.listeners.get(event) || [];
     handlers.forEach(h => h(data));

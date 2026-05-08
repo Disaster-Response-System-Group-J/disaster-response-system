@@ -10,6 +10,53 @@ import { useAuth } from '@/context/AuthContext';
 import { DISTRICT_NAMES } from '@/data/districts';
 import { useSocket } from '@/context/SocketContext';
 
+interface ApiAsset {
+  asset_id: number | string;
+  name?: string;
+  type?: string;
+  status?: string;
+  base_location?: string;
+  current_latitude?: number;
+  current_longitude?: number;
+}
+
+interface ApiShelterRow {
+  shelter_id: number | string;
+  name?: string;
+  status?: string;
+  max_capacity?: number;
+  current_occupancy?: number;
+  updated_at?: string;
+}
+
+interface ApiIncidentRow {
+  incident_id: number | string;
+  status?: string;
+  title?: string;
+}
+
+interface MappedResource {
+  resourceId: string;
+  dbId: number | string;
+  name: string;
+  type: string;
+  status: string;
+  district: string;
+  latitude?: number;
+  longitude?: number;
+  capacity?: number;
+  currentLoad?: number;
+  lastUpdated?: string;
+}
+
+interface SocketResourceUpdate {
+  resourceId: string;
+  status: string;
+  lastUpdated: string;
+  capacity?: number;
+  currentLoad?: number;
+}
+
 const STATUS_STYLES: Record<string, string> = {
   AVAILABLE: 'bg-green-500/10 text-green-400 border-green-500/20',
   ASSIGNED: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
@@ -30,8 +77,8 @@ export default function ResourcesPage() {
   const { hasPermission, user } = useAuth();
   const socket = useSocket();
 
-  const [resources, setResources] = useState<any[]>([]);
-  const [activeIncidents, setActiveIncidents] = useState<any[]>([]);
+  const [resources, setResources] = useState<MappedResource[]>([]);
+  const [activeIncidents, setActiveIncidents] = useState<ApiIncidentRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
   const [search, setSearch] = useState('');
@@ -39,7 +86,7 @@ export default function ResourcesPage() {
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [districtFilter, setDistrictFilter] = useState<string>('ALL');
   
-  const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.includes('NATIONAL')) ? 'ALL' : (user as any)?.assignedDistrict || 'ALL';
+  const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.includes('NATIONAL')) ? 'ALL' : (user as { assignedDistrict?: string })?.assignedDistrict || 'ALL';
 
   // State for modals
   const [assignModal, setAssignModal] = useState<string | null>(null);
@@ -60,36 +107,36 @@ export default function ResourcesPage() {
       const assetsArray = assetsData.resources || []; 
 
       // Map Assets
-      const mappedAssets = assetsArray.map((a: any) => ({
+      const mappedAssets: MappedResource[] = (assetsArray as ApiAsset[]).map((a) => ({
         resourceId: `ASSET-${a.asset_id}`,
         dbId: a.asset_id,
-        name: a.name,
-        type: a.type as ResourceType,
-        status: a.status as ResourceStatus,
+        name: a.name ?? 'Unknown',
+        type: a.type ?? 'UNKNOWN',
+        status: a.status ?? 'UNKNOWN',
         district: a.base_location || 'Unassigned',
         latitude: a.current_latitude,
         longitude: a.current_longitude,
-        lastUpdated: new Date().toISOString()
+        lastUpdated: new Date().toISOString(),
       }));
 
       // Map Shelters (Ensure sheltersRes is handled as an array)
-      const mappedShelters = (Array.isArray(sheltersRes) ? sheltersRes : []).map((s: any) => ({
+      const mappedShelters: MappedResource[] = (Array.isArray(sheltersRes) ? sheltersRes as ApiShelterRow[] : []).map((s) => ({
         resourceId: `SHELTER-${s.shelter_id}`,
-        dbId: s.shelter_id,
-        name: s.name,
+        dbId: s.shelter_id ?? 0,
+        name: s.name ?? 'Unknown Shelter',
         type: ResourceType.SHELTER,
         status: s.status === 'OPEN' ? ResourceStatus.AVAILABLE : ResourceStatus.OUT_OF_SERVICE,
-        district: 'Unassigned', 
+        district: 'Unassigned',
         capacity: s.max_capacity,
         currentLoad: s.current_occupancy,
-        lastUpdated: s.updated_at
+        lastUpdated: s.updated_at,
       }));
 
       setResources([...mappedAssets, ...mappedShelters]);
-      
-      // Ensure incidentsRes is handled as an array before filtering[cite: 6]
-      const incidentsArray = Array.isArray(incidentsRes) ? incidentsRes : [];
-      setActiveIncidents(incidentsArray.filter((i: any) => i.status === 'ACTIVE'));
+
+      // Ensure incidentsRes is handled as an array before filtering
+      const incidentsArray = (Array.isArray(incidentsRes) ? incidentsRes : []) as ApiIncidentRow[];
+      setActiveIncidents(incidentsArray.filter((i) => i.status === 'ACTIVE'));
       
     } catch (err) {
       console.error('Error loading resources:', err);
@@ -103,7 +150,7 @@ export default function ResourcesPage() {
 
   useEffect(() => {
     if (!socket) return;
-    const handleResourceUpdated = (data: any) => {
+    const handleResourceUpdated = (data: SocketResourceUpdate) => {
       setResources(prev => prev.map(r => 
         r.resourceId === data.resourceId 
           ? { ...r, status: data.status, lastUpdated: data.lastUpdated,
@@ -145,7 +192,7 @@ export default function ResourcesPage() {
     setSelectedIncidentId('');
   };
 
-  const openShelterModal = (resource: any) => {
+  const openShelterModal = (resource: MappedResource) => {
     setShelterModal(resource.resourceId);
     setShelterForm({ capacity: resource.capacity || 0, currentLoad: resource.currentLoad || 0 });
   };

@@ -5,6 +5,24 @@ import { Activity, Battery, MapPin, Pencil, Plus, RadioTower, Search, Trash2, Wi
 import { useSocket } from '@/context/SocketContext';
 
 type SensorStatus = 'ONLINE' | 'OFFLINE' | 'MAINTENANCE';
+
+interface ApiDevice {
+  device_id: string;
+  status?: string;
+  division_name?: string;
+  division_id?: number;
+}
+interface ApiWaterLevel { device_id: string; timestamp: string; current_level?: number }
+interface ApiRainfall { division_id: number; date: string; rain_sum?: number }
+interface ApiSoilMoisture { division_id: number; date: string; moisture_7_28cm?: number }
+interface ApiTemperature { division_id: number; date: string; temperature?: number }
+interface ApiSensorData {
+  devices: ApiDevice[];
+  waterLevels: ApiWaterLevel[];
+  rainfall: ApiRainfall[];
+  soilMoisture: ApiSoilMoisture[];
+  temperatures: ApiTemperature[];
+}
 type SensorMetric = 'Water Level' | 'Rainfall' | 'River Flow' | 'Soil Moisture' | 'Temperature';
 
 interface SensorNode {
@@ -53,16 +71,16 @@ export default function SensorsPage() {
         const response = await fetch('/api/sensors');
         if (!response.ok) throw new Error('Failed to fetch sensor data');
         
-        const data = await response.json();
+        const data = await response.json() as ApiSensorData;
         const mappedSensors: SensorNode[] = [];
         const now = new Date().getTime();
-        
+
         // Map database schema to SensorNode UI format
-        data.devices.forEach((device: any) => {
-          const water = data.waterLevels.find((w: any) => w.device_id === device.device_id);
-          const rain = data.rainfall.find((r: any) => r.division_id === device.division_id);
-          const soil = data.soilMoisture.find((s: any) => s.division_id === device.division_id);
-          const temp = data.temperatures.find((t: any) => t.division_id === device.division_id);
+        data.devices.forEach((device) => {
+          const water = data.waterLevels.find((w) => w.device_id === device.device_id);
+          const rain = data.rainfall.find((r) => r.division_id === device.division_id);
+          const soil = data.soilMoisture.find((s) => s.division_id === device.division_id);
+          const temp = data.temperatures.find((t) => t.division_id === device.division_id);
 
           const baseNode = {
             location: device.division_name || 'Unknown Location',

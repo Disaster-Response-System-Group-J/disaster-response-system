@@ -11,6 +11,61 @@ import Link from 'next/link';
 import { VerificationStatus, IncidentSeverity } from '@/types';
 import { useSocket } from '@/context/SocketContext';
 
+interface ApiIncident {
+  incident_id: number | string;
+  title?: string;
+  status: string;
+  affected_population?: number;
+  latitude?: number;
+  longitude?: number;
+  severity?: string;
+}
+
+interface ApiReport {
+  status: string;
+}
+
+interface ApiShelter {
+  current_occupancy?: number;
+  status?: string;
+}
+
+interface ApiResource {
+  type?: string;
+  status?: string;
+}
+
+interface ApiAlert {
+  id: string;
+  title: string;
+  severity_level?: string;
+  district?: string;
+  created_at: string;
+}
+
+interface MappedAlert {
+  alertId: string;
+  title: string;
+  severity: string;
+  district: string;
+  createdAt: string;
+  isActive: boolean;
+}
+
+interface MapPin {
+  incidentId: string;
+  severity: string;
+  status: string;
+  latitude: number;
+  longitude: number;
+}
+
+interface SocketReport {
+  reportId?: string;
+  latitude?: number;
+  longitude?: number;
+}
+
 // Color mapping for the map pins
 const SEVERITY_COLORS: Record<string, string> = {
   CRITICAL: '#ef4444', // red-500
@@ -40,8 +95,8 @@ export default function DashboardPage() {
   });
 
   const [pendingCount, setPendingCount] = useState(0);
-  const [recentAlerts, setRecentAlerts] = useState<any[]>([]);
-  const [mapPins, setMapPins] = useState<any[]>([]);
+  const [recentAlerts, setRecentAlerts] = useState<MappedAlert[]>([]);
+  const [mapPins, setMapPins] = useState<MapPin[]>([]);
   
   // Map viewport state
   const [viewState, setViewState] = useState({ longitude: 80.7718, latitude: 7.8731, zoom: 6.5, pitch: 0, bearing: 0 });
@@ -50,48 +105,52 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const [incidentsRes, reportsRes, resourcesRes, sheltersRes, alertsRes] = await Promise.all([
+        const results = await Promise.all([
           fetch('/api/incidents').then(res => res.ok ? res.json() : []),
           fetch('/api/reports').then(res => res.ok ? res.json() : []),
-          fetch('/api/resources/list').then(res => res.ok ? res.json() : []),
+          fetch('/api/resources/list').then(res => res.ok ? res.json() : {}),
           fetch('/api/relief/shelter').then(res => res.ok ? res.json() : []),
-          fetch('/api/alerts').then(res => res.ok ? res.json() : []) 
+          fetch('/api/alerts').then(res => res.ok ? res.json() : []),
         ]);
+        const incidentsRes = results[0] as ApiIncident[];
+        const reportsRes = results[1] as ApiReport[];
+        const resourcesRes = results[2] as { resources: ApiResource[] };
+        const sheltersRes = results[3] as ApiShelter[];
+        const alertsRes = results[4] as ApiAlert[];
 
         // Process Incidents
-        const activeIncidents = incidentsRes.filter((i: any) => i.status === 'ACTIVE');
-        const floods = activeIncidents.filter((i: any) => i.title?.toUpperCase().includes('FLOOD')).length;
-        const landslides = activeIncidents.filter((i: any) => i.title?.toUpperCase().includes('LANDSLIDE')).length;
-        const droughts = activeIncidents.filter((i: any) => i.title?.toUpperCase().includes('DROUGHT')).length;
+        const activeIncidents = incidentsRes.filter((i) => i.status === 'ACTIVE');
+        const floods = activeIncidents.filter((i) => i.title?.toUpperCase().includes('FLOOD')).length;
+        const landslides = activeIncidents.filter((i) => i.title?.toUpperCase().includes('LANDSLIDE')).length;
+        const droughts = activeIncidents.filter((i) => i.title?.toUpperCase().includes('DROUGHT')).length;
         const other = activeIncidents.length - (floods + landslides + droughts);
-        const peopleAffected = activeIncidents.reduce((sum: number, i: any) => sum + (i.affected_population || 0), 0);
+        const peopleAffected = activeIncidents.reduce((sum, i) => sum + (i.affected_population || 0), 0);
 
         // Process Shelters
-        const inShelters = sheltersRes.reduce((sum: number, s: any) => sum + (s.current_occupancy || 0), 0);
-        const activeSheltersCount = sheltersRes.filter((s: any) => s.status !== 'CLOSED').length;
+        const inShelters = sheltersRes.reduce((sum, s) => sum + (s.current_occupancy || 0), 0);
+        const activeSheltersCount = sheltersRes.filter((s) => s.status !== 'CLOSED').length;
 
         // Process Resources
-        const resourcesArray = resourcesRes.resources || []; 
+        const resourcesArray = resourcesRes.resources || [];
 
-        // 2. Process Resources using the extracted array[cite: 5]
-        const teams = resourcesArray.filter((r: any) => 
-          r.type?.toUpperCase() === 'TEAM' || 
-          r.type?.toUpperCase() === 'PERSONNEL' || 
+        const teams = resourcesArray.filter((r) =>
+          r.type?.toUpperCase() === 'TEAM' ||
+          r.type?.toUpperCase() === 'PERSONNEL' ||
           r.type?.toUpperCase() === 'RESCUE_TEAM'
         );
 
-        const availableTeams = teams.filter((r: any) => r.status === 'AVAILABLE').length;
+        const availableTeams = teams.filter((r) => r.status === 'AVAILABLE').length;
 
-        const machinery = resourcesArray.filter((r: any) => 
-          r.type?.toUpperCase() === 'MACHINERY' || 
-          r.type?.toUpperCase() === 'VEHICLE' || 
+        const machinery = resourcesArray.filter((r) =>
+          r.type?.toUpperCase() === 'MACHINERY' ||
+          r.type?.toUpperCase() === 'VEHICLE' ||
           r.type?.toUpperCase() === 'BOAT'
         );
 
-        const availableMachinery = machinery.filter((r: any) => r.status === 'AVAILABLE').length;
+        const availableMachinery = machinery.filter((r) => r.status === 'AVAILABLE').length;
         // Process Alerts & Reports
-        const pendingReports = reportsRes.filter((r: any) => r.status === 'PENDING_REVIEW').length;
-        const criticalAlertsCount = Array.isArray(alertsRes) ? alertsRes.filter((a: any) => a.severity_level === 'CRITICAL').length : 0;
+        const pendingReports = reportsRes.filter((r) => r.status === 'PENDING_REVIEW').length;
+        const criticalAlertsCount = Array.isArray(alertsRes) ? alertsRes.filter((a) => a.severity_level === 'CRITICAL').length : 0;
 
         setData({
           activeIncidents: activeIncidents.length,
@@ -110,7 +169,7 @@ export default function DashboardPage() {
         setPendingCount(pendingReports);
         
         // Map pins processing
-        setMapPins(activeIncidents.map((inc: any) => ({
+        setMapPins(activeIncidents.map((inc) => ({
           incidentId: inc.incident_id.toString(),
           severity: inc.severity || 'LOW',
           status: inc.status,
@@ -120,7 +179,7 @@ export default function DashboardPage() {
 
         // Alerts processing
         if (Array.isArray(alertsRes)) {
-          setRecentAlerts(alertsRes.map(a => ({
+          setRecentAlerts(alertsRes.map((a) => ({
             alertId: a.id,
             title: a.title,
             severity: a.severity_level || 'HIGH',
@@ -145,7 +204,7 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!socket) return;
 
-    const handleNewReport = (report: any) => {
+    const handleNewReport = (report: SocketReport) => {
       setPendingCount(prev => prev + 1);
       if (report.latitude && report.longitude) {
         setMapPins(prev => [...prev, {
@@ -158,7 +217,7 @@ export default function DashboardPage() {
       }
     };
 
-    const handleNewAlert = (alert: any) => {
+    const handleNewAlert = (alert: MappedAlert) => {
       setRecentAlerts(prev => [alert, ...prev].slice(0, 5));
       if (alert.severity === IncidentSeverity.CRITICAL || alert.severity === 'CRITICAL') {
         setData(prev => ({ ...prev, criticalAlerts: prev.criticalAlerts + 1 }));

@@ -92,7 +92,7 @@ export default function AlertsPage() {
       severity: IncidentSeverity.HIGH, district: 'ALL', isPublic: true
     });
   };
-const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.includes('NATIONAL')) ? 'ALL' : (user as any)?.assignedDistrict || 'ALL';
+const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.includes('NATIONAL')) ? 'ALL' : (user as { assignedDistrict?: string })?.assignedDistrict || 'ALL';
   const filtered = alerts.filter(a => {
     if (search && !a.title.toLowerCase().includes(search.toLowerCase()) && !a.description.toLowerCase().includes(search.toLowerCase())) return false;
     if (typeFilter !== 'ALL' && a.type !== typeFilter) return false;

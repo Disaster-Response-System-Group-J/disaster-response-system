@@ -15,7 +15,7 @@ export default function GlobalSocketListener() {
     if (!socket) return;
 
     // 1. Listen for new Risk Alerts
-    const handleNewAlert = (alert: any) => {
+    const handleNewAlert = (alert: { severity: string; title: string; district: string; source?: string }) => {
       if (alert.severity === IncidentSeverity.CRITICAL || alert.severity === IncidentSeverity.HIGH) {
         toast.error(`${alert.severity} ALERT: ${alert.title}`, {
           description: `Location: ${alert.district} | Source: ${alert.source || 'System'}`,
@@ -39,7 +39,7 @@ export default function GlobalSocketListener() {
     };
 
     // 2. Listen for new SOS Reports
-    const handleNewReport = (report: any) => {
+    const handleNewReport = (report: { disasterType: string; district: string }) => {
       toast(`New SOS Report: ${report.disasterType}`, {
         description: `Location: ${report.district} | Pending Verification`,
         icon: <FileText size={16} className="text-orange-400" />,
