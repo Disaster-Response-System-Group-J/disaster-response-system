@@ -70,8 +70,8 @@ export async function GET(request: NextRequest) {
           totalPages: Math.ceil(total / limit),
         },
         filters: {
-          availableProvinces: provinces.map((p) => p.province).filter(Boolean),
-          availableDistricts: districts.map((d) => d.district).filter(Boolean),
+          availableProvinces: provinces.map((p: any) => p.province).filter(Boolean),
+          availableDistricts: districts.map((d: any) => d.district).filter(Boolean),
           currentFilters: {
             province: province || null,
             district: district || null,
