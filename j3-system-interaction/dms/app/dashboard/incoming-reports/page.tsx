@@ -112,9 +112,21 @@ export default function IncomingReportsPage() {
 
   const pendingCount = reports.filter(r => r.verificationStatus === VerificationStatus.PENDING_REVIEW).length;
 
-  const handleAction = (reportId: string, action: 'verify' | 'reject' | 'duplicate') => {
+  const handleAction = async (reportId: string, action: 'verify' | 'reject' | 'duplicate') => {
     const statusMap = { verify: VerificationStatus.VERIFIED, reject: VerificationStatus.REJECTED, duplicate: VerificationStatus.DUPLICATE };
     const newStatus = statusMap[action];
+    
+    // 1. Persist to Database
+    try {
+      await fetch('/api/reports', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reportId, status: newStatus }),
+      });
+    } catch (err) {
+      console.error('Failed to update DB', err);
+    }
+
     setReports(prev => prev.map(r => {
       if (r.reportId !== reportId) return r;
       return { ...r, verificationStatus: newStatus, reviewedAt: new Date().toISOString() };
@@ -125,9 +137,38 @@ export default function IncomingReportsPage() {
     }
   };
 
-  const handleElevate = (e: React.FormEvent) => {
+  const handleElevate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedReport) return;
+
+    const payload = {
+      sourceReportId: selectedReport.reportId,
+      title: incidentForm.title,
+      severity: incidentForm.severity,
+      affectedPeople: incidentForm.affectedPeople,
+      latitude: selectedReport.latitude,
+      longitude: selectedReport.longitude,
+      district: selectedReport.district,
+      disasterType: selectedReport.disasterType,
+    };
+
+    try {
+      // 1. Create Incident in Database
+      await fetch('/api/incidents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      // 2. Update Report Status in Database
+      await fetch('/api/reports', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reportId: selectedReport.reportId, status: VerificationStatus.CONVERTED_TO_INCIDENT }),
+      });
+    } catch (err) {
+      console.error('Failed to save to database', err);
+    }
 
     // 1. Update the report status locally to CONVERTED
     setReports(prev => prev.map(r => r.reportId === selectedReport.reportId ? { ...r, verificationStatus: VerificationStatus.CONVERTED_TO_INCIDENT } : r));
@@ -135,16 +176,7 @@ export default function IncomingReportsPage() {
     // 2. Emit the new incident to the server via Socket
     if (socket) {
       // Tell J2/J3 backend to create the incident
-      socket.emit('client:create-incident', {
-        sourceReportId: selectedReport.reportId,
-        title: incidentForm.title,
-        severity: incidentForm.severity,
-        affectedPeople: incidentForm.affectedPeople,
-        latitude: selectedReport.latitude,
-        longitude: selectedReport.longitude,
-        district: selectedReport.district,
-        disasterType: selectedReport.disasterType,
-      });
+      socket.emit('client:create-incident', payload);
       // Tell backend the report is now converted
       socket.emit('client:update-report-status', { 
         reportId: selectedReport.reportId, 

@@ -73,8 +73,11 @@ async function startBridge() {
     });
 
     socket.on('client:create-alert', async (data) => {
-      // Broadcast alert to all clients immediately
-      io.emit('dashboard:risk-alert', data);
+      console.log(`[UI -> Kafka] Publishing manual alert to j2.engine.risk-alerts`);
+      await producer.send({ 
+        topic: 'j2.engine.risk-alerts', 
+        messages: [{ value: JSON.stringify(data) }] 
+      });
     });
   });
 }

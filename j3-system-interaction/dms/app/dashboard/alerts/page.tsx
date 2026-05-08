@@ -61,7 +61,7 @@ export default function AlertsPage() {
   }, [socket]);
 
 // Handle creating and broadcasting a new alert
-  const handleCreateAlert = (e: React.FormEvent) => {
+  const handleCreateAlert = async (e: React.FormEvent) => {
     e.preventDefault();
     
     const newAlert: Alert = {
@@ -81,6 +81,16 @@ export default function AlertsPage() {
     setAlerts(prev => [newAlert, ...prev]);
 
     // Broadcast to server
+    try {
+      await fetch('/api/alerts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newAlert),
+      });
+    } catch (err) {
+      console.error('Failed to save alert to database', err);
+    }
+
     if (socket) {
       socket.emit('client:create-alert', newAlert);
     }

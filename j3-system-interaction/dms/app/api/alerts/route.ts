@@ -13,3 +13,22 @@ export async function GET(): Promise<Response> {
     });
   });
 }
+
+export async function POST(req: Request): Promise<Response> {
+  try {
+    const data = await req.json();
+    await new Promise((resolve, reject) => {
+      localDb.run(
+        `INSERT INTO local_alerts (title, message, severity_level, status) VALUES (?, ?, ?, ?)`,
+        [data.title, data.description, data.severity, 'ACTIVE'],
+        function(err) {
+          if (err) reject(err);
+          else resolve(this.lastID);
+        }
+      );
+    });
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    return NextResponse.json({ error: 'Failed to create alert' }, { status: 500 });
+  }
+}

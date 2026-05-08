@@ -68,7 +68,17 @@ export default function IncidentMapPage() {
     fetchIncidents();
   }, []);
 
-  const handleStatusUpdate = (incidentId: string, newStatus: IncidentStatus) => {
+  const handleStatusUpdate = async (incidentId: string, newStatus: IncidentStatus) => {
+    try {
+      await fetch('/api/incidents', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ incidentId, status: newStatus }),
+      });
+    } catch (err) {
+      console.error('Failed to update DB', err);
+    }
+    
     // Optimistic UI update
     setMapPins(prev => prev.map(inc => 
       inc.incidentId === incidentId ? { ...inc, status: newStatus } : inc

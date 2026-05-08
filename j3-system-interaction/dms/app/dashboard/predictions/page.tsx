@@ -74,7 +74,7 @@ export default function PredictionsPage() {
     fetchPredictions();
   }, []);
 
-  const handleIssueAlert = (zone: PredictionZone) => {
+  const handleIssueAlert = async (zone: PredictionZone) => {
     if (!socket) {
       toast.error('Socket connection not available');
       return;
@@ -92,6 +92,16 @@ export default function PredictionsPage() {
       createdAt: new Date().toISOString(),
       source: 'AI Prediction System'
     };
+    
+    try {
+      await fetch('/api/alerts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newAlert),
+      });
+    } catch (err) {
+      console.error('Failed to save alert to database', err);
+    }
     
     socket.emit('client:create-alert', newAlert);
     toast.success(`Public Alert issued for ${zone.zone}`);

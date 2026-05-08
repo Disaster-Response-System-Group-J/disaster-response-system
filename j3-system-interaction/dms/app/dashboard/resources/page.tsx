@@ -127,8 +127,25 @@ export default function ResourcesPage() {
   const availableCount = filtered.filter(r => r.status === ResourceStatus.AVAILABLE).length;
   const assignedCount = filtered.filter(r => r.status === ResourceStatus.ASSIGNED || r.status === ResourceStatus.BUSY).length;
 
-  const handleStatusUpdate = (id: string, newStatus: ResourceStatus) => {
+  const handleStatusUpdate = async (id: string, newStatus: ResourceStatus) => {
     const timestamp = new Date().toISOString();
+    
+    try {
+      const isAsset = id.startsWith('ASSET-');
+      if (isAsset) {
+        const dbId = id.split('-')[1];
+        await fetch('/api/resources/list', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ assetId: dbId, status: newStatus }),
+        });
+      } else {
+        // Shelter status logic if needed
+      }
+    } catch (err) {
+      console.error('Failed to update DB', err);
+    }
+
     setResources(prev => prev.map(r => r.resourceId === id ? { ...r, status: newStatus, lastUpdated: timestamp } : r));
     if (socket) {
       socket.emit('client:update-resource-status', { resourceId: id, status: newStatus, lastUpdated: timestamp });
