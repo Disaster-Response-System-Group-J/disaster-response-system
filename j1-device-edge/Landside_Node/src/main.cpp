@@ -137,7 +137,11 @@ void loop() {
         delay(random(10, 800));
         LoRa.beginPacket();
         LoRa.print(jsonString);
-        LoRa.endPacket(); // Standard blocking TX is now safe
-        Serial.println("✅ LoRa packet transmitted successfully!\n");
+        int txResult = LoRa.endPacket();
+        if (txResult) {
+            Serial.println("✅ LoRa packet transmitted successfully!\n");
+        } else {
+            Serial.println("❌ LoRa transmission FAILED! Check antenna/power.\n");
+        }
     }
 }
