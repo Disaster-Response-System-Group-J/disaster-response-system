@@ -25,7 +25,7 @@ const SEVERITY_COLORS: Record<string, string> = {
 export default function DashboardPage() {
   const socket = useSocket();
   const { user } = useAuth();
-  const isNationalLevel = !user || user.role === UserRole.SYSTEM_ADMIN || user.role.includes('NATIONAL') || user.role === UserRole.NATIONAL_COMMANDER;
+  const isNationalLevel = !user || user.role === UserRole.SYSTEM_ADMIN || user.role.includes('NATIONAL') || user.role === UserRole.INCIDENT_COMMANDER_NATIONAL;
   const scopedDistrict = isNationalLevel ? null : (user as any)?.assignedDistrict || null;
   const [isLoading, setIsLoading] = useState(true);
 

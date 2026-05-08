@@ -6,8 +6,7 @@ import { IncidentSeverity, AlertType, UserRole } from '@/types';
 import { DISTRICT_NAMES } from '@/data/districts';
 import { useSocket } from '@/context/SocketContext';
 import { useAuth } from '@/context/AuthContext';
-import { UserRole } from '@/types';
-import { normalizeRiskAlert } from '@/lib/risk-alert';
+import { normalizeRiskAlert, NormalizedRiskAlert } from '@/lib/risk-alert';
 
 const SEVERITY_STYLES: Record<string, string> = {
   CRITICAL: 'bg-red-500/10 text-red-400 border-red-500/30',
@@ -24,24 +23,16 @@ const ALERT_TYPE_STYLES: Record<string, string> = {
   INCIDENT_STATUS: 'bg-slate-800 text-slate-300 border-slate-700',
 };
 
-// Alert interface matching the API response shape
-type Alert = {
-  alertId: string;
-  title: string;
-  description: string;
-  type: AlertType;
-  severity: IncidentSeverity;
-  district: string;
-  isPublic: boolean;
-  isActive: boolean;
-  createdAt: string;
-  source?: string;
+// Alert interface — extends the normalized risk alert shape
+type Alert = NormalizedRiskAlert & {
+  type: AlertType | string;
 };
 
 export default function AlertsPage() {
   const socket = useSocket();
   const { user, hasPermission } = useAuth();
-  const [alerts, setAlerts] = useState<Alert[]>(MOCK_ALERTS.map((alert) => normalizeRiskAlert(alert)) as Alert[]);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
@@ -57,14 +48,14 @@ export default function AlertsPage() {
     isPublic: true
   });
 
-  // Fetch initial alerts
+  // Fetch initial alerts from DB and normalize
   useEffect(() => {
     const fetchAlerts = async () => {
       try {
         const response = await fetch('/api/alerts');
         if (!response.ok) throw new Error('Failed to fetch alerts');
         const data = await response.json();
-        setAlerts(data);
+        setAlerts((data as any[]).map(normalizeRiskAlert) as Alert[]);
       } catch (err) {
         console.error('Error fetching alerts:', err);
       } finally {
