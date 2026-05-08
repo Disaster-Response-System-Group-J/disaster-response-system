@@ -5,7 +5,11 @@
 
 import { PrismaClient } from "@prisma/client";
 
-const prisma = new PrismaClient();
+let _prisma: PrismaClient | null = null;
+function getPrisma(): PrismaClient {
+  if (!_prisma) _prisma = new PrismaClient();
+  return _prisma;
+}
 
 export interface WeatherDataPayload {
   divisionId: number;
@@ -26,7 +30,7 @@ export async function saveRainfallData(
   rainSum: number | null
 ) {
   try {
-    const result = await prisma.rainfallData.upsert({
+    const result = await getPrisma().rainfallData.upsert({
       where: {
         divisionId_date: {
           divisionId,
@@ -60,7 +64,7 @@ export async function saveSoilMoistureData(
   moisture_100_255cm: number | null
 ) {
   try {
-    const result = await prisma.soilMoisture.upsert({
+    const result = await getPrisma().soilMoisture.upsert({
       where: {
         divisionId_date: {
           divisionId,
@@ -96,7 +100,7 @@ export async function saveTemperatureData(
   temperature: number | null
 ) {
   try {
-    const result = await prisma.temperatureData.upsert({
+    const result = await getPrisma().temperatureData.upsert({
       where: {
         divisionId_date: {
           divisionId,
@@ -156,7 +160,7 @@ export async function saveAllWeatherData(payload: WeatherDataPayload) {
  */
 export async function getAllDivisionsForWeatherFetch() {
   try {
-    const divisions = await prisma.division.findMany({
+    const divisions = await getPrisma().division.findMany({
       where: {
         latitude: {
           not: null,
@@ -186,15 +190,15 @@ export async function getAllDivisionsForWeatherFetch() {
 export async function getLatestWeatherData(divisionId: number) {
   try {
     const [rainfall, soilMoisture, temperature] = await Promise.all([
-      prisma.rainfallData.findFirst({
+      getPrisma().rainfallData.findFirst({
         where: { divisionId },
         orderBy: { date: "desc" },
       }),
-      prisma.soilMoisture.findFirst({
+      getPrisma().soilMoisture.findFirst({
         where: { divisionId },
         orderBy: { date: "desc" },
       }),
-      prisma.temperatureData.findFirst({
+      getPrisma().temperatureData.findFirst({
         where: { divisionId },
         orderBy: { date: "desc" },
       }),
