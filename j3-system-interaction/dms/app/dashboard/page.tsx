@@ -8,7 +8,6 @@ import {
 import Map, { Marker, ViewStateChangeEvent } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import Link from 'next/link';
-import { MOCK_DASHBOARD_SUMMARY, MOCK_ALERTS, MOCK_INCOMING_REPORTS, MOCK_CONFIRMED_INCIDENTS } from '@/data/mock-data';
 import { VerificationStatus, IncidentSeverity } from '@/types';
 import { useSocket } from '@/context/SocketContext';
 
@@ -23,48 +22,145 @@ const SEVERITY_COLORS: Record<string, string> = {
 
 export default function DashboardPage() {
   const socket = useSocket();
+  const [isLoading, setIsLoading] = useState(true);
 
-  const [data, setData] = useState(MOCK_DASHBOARD_SUMMARY);
-  const [pendingCount, setPendingCount] = useState(
-    MOCK_INCOMING_REPORTS.filter(r => r.verificationStatus === VerificationStatus.PENDING_REVIEW).length
-  );
-  const [recentAlerts, setRecentAlerts] = useState(
-    MOCK_ALERTS.filter(a => a.isActive)
-  );
-  
-  // State for map pins, initialized with confirmed incidents
-  const [mapPins, setMapPins] = useState<any[]>(MOCK_CONFIRMED_INCIDENTS);
+  // Aggregated live data state
+  const [data, setData] = useState({
+    activeIncidents: 0,
+    activeIncidentsChange: 2, // Simulated 24h trend
+    criticalAlerts: 0,
+    peopleAffected: 0,
+    inShelters: 0,
+    incidents: { floods: 0, landslides: 0, droughts: 0, other: 0 },
+    resources: {
+      availableTeams: { current: 0, total: 0 },
+      activeShelters: { current: 0, total: 0 },
+      heavyMachinery: { current: 0, total: 0 }
+    }
+  });
+
+  const [pendingCount, setPendingCount] = useState(0);
+  const [recentAlerts, setRecentAlerts] = useState<any[]>([]);
+  const [mapPins, setMapPins] = useState<any[]>([]);
   
   // Map viewport state
   const [viewState, setViewState] = useState({ longitude: 80.7718, latitude: 7.8731, zoom: 6.5, pitch: 0, bearing: 0 });
 
-  const criticalAlerts = recentAlerts.filter(a => a.severity === IncidentSeverity.CRITICAL);
+  // Fetch all initial data from APIs
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        const [incidentsRes, reportsRes, resourcesRes, sheltersRes, alertsRes] = await Promise.all([
+          fetch('/api/incidents').then(res => res.ok ? res.json() : []),
+          fetch('/api/reports').then(res => res.ok ? res.json() : []),
+          fetch('/api/resources/list').then(res => res.ok ? res.json() : []),
+          fetch('/api/relief/shelter').then(res => res.ok ? res.json() : []),
+          fetch('/api/alerts').then(res => res.ok ? res.json() : []) 
+        ]);
 
-  // Listen for real-time events from the Event Bridge / Kafka
+        // Process Incidents
+        const activeIncidents = incidentsRes.filter((i: any) => i.status === 'ACTIVE');
+        const floods = activeIncidents.filter((i: any) => i.title?.toUpperCase().includes('FLOOD')).length;
+        const landslides = activeIncidents.filter((i: any) => i.title?.toUpperCase().includes('LANDSLIDE')).length;
+        const droughts = activeIncidents.filter((i: any) => i.title?.toUpperCase().includes('DROUGHT')).length;
+        const other = activeIncidents.length - (floods + landslides + droughts);
+        const peopleAffected = activeIncidents.reduce((sum: number, i: any) => sum + (i.affected_population || 0), 0);
+
+        // Process Shelters
+        const inShelters = sheltersRes.reduce((sum: number, s: any) => sum + (s.current_occupancy || 0), 0);
+        const activeSheltersCount = sheltersRes.filter((s: any) => s.status !== 'CLOSED').length;
+
+        // Process Resources
+        const resourcesArray = resourcesRes.resources || []; 
+
+        // 2. Process Resources using the extracted array[cite: 5]
+        const teams = resourcesArray.filter((r: any) => 
+          r.type?.toUpperCase() === 'TEAM' || 
+          r.type?.toUpperCase() === 'PERSONNEL' || 
+          r.type?.toUpperCase() === 'RESCUE_TEAM'
+        );
+
+        const availableTeams = teams.filter((r: any) => r.status === 'AVAILABLE').length;
+
+        const machinery = resourcesArray.filter((r: any) => 
+          r.type?.toUpperCase() === 'MACHINERY' || 
+          r.type?.toUpperCase() === 'VEHICLE' || 
+          r.type?.toUpperCase() === 'BOAT'
+        );
+
+        const availableMachinery = machinery.filter((r: any) => r.status === 'AVAILABLE').length;
+        // Process Alerts & Reports
+        const pendingReports = reportsRes.filter((r: any) => r.status === 'PENDING_REVIEW').length;
+        const criticalAlertsCount = Array.isArray(alertsRes) ? alertsRes.filter((a: any) => a.severity_level === 'CRITICAL').length : 0;
+
+        setData({
+          activeIncidents: activeIncidents.length,
+          activeIncidentsChange: 2,
+          criticalAlerts: criticalAlertsCount,
+          peopleAffected,
+          inShelters,
+          incidents: { floods, landslides, droughts, other },
+          resources: {
+            availableTeams: { current: availableTeams, total: teams.length || 1 },
+            activeShelters: { current: activeSheltersCount, total: sheltersRes.length || 1 },
+            heavyMachinery: { current: availableMachinery, total: machinery.length || 1 }
+          }
+        });
+
+        setPendingCount(pendingReports);
+        
+        // Map pins processing
+        setMapPins(activeIncidents.map((inc: any) => ({
+          incidentId: inc.incident_id.toString(),
+          severity: inc.severity || 'LOW',
+          status: inc.status,
+          latitude: Number(inc.latitude) || 0,
+          longitude: Number(inc.longitude) || 0,
+        })));
+
+        // Alerts processing
+        if (Array.isArray(alertsRes)) {
+          setRecentAlerts(alertsRes.map(a => ({
+            alertId: a.id,
+            title: a.title,
+            severity: a.severity_level || 'HIGH',
+            district: a.district || 'National',
+            createdAt: a.created_at,
+            isActive: true
+          })));
+        }
+      } catch (error) {
+        console.error('Failed to load dashboard data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
+
+  const criticalAlerts = recentAlerts.filter(a => a.severity === 'CRITICAL' || a.severity === IncidentSeverity.CRITICAL);
+
+  // Listen for real-time events from Socket
   useEffect(() => {
     if (!socket) return;
 
-    // Handle new incoming SOS reports
     const handleNewReport = (report: any) => {
       setPendingCount(prev => prev + 1);
-      
-      // If the report has coordinates, drop a pending pin on the map
       if (report.latitude && report.longitude) {
-        const newPin = {
+        setMapPins(prev => [...prev, {
           incidentId: report.reportId || `new-${Date.now()}`,
           severity: 'PENDING',
           status: 'UNVERIFIED',
           latitude: report.latitude,
           longitude: report.longitude,
-        };
-        setMapPins(prev => [...prev, newPin]);
+        }]);
       }
     };
 
-    // Handle new alerts from the J2 Risk Engine
     const handleNewAlert = (alert: any) => {
-      setRecentAlerts(prev => [alert, ...prev].slice(0, 5)); // Keep only top 5 recent
-      if (alert.severity === IncidentSeverity.CRITICAL) {
+      setRecentAlerts(prev => [alert, ...prev].slice(0, 5));
+      if (alert.severity === IncidentSeverity.CRITICAL || alert.severity === 'CRITICAL') {
         setData(prev => ({ ...prev, criticalAlerts: prev.criticalAlerts + 1 }));
       }
     };
@@ -77,6 +173,14 @@ export default function DashboardPage() {
       socket.off('dashboard:risk-alert', handleNewAlert);
     };
   }, [socket]);
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col min-h-full bg-[#0a0f16] text-white items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-full bg-[#0a0f16] text-white overflow-hidden">
@@ -164,7 +268,7 @@ export default function DashboardPage() {
                   <Users className="text-slate-500 w-4 h-4" />
                 </div>
                 <span className="text-4xl font-bold tracking-tight my-4">
-                  {(data.peopleAffected / 1000).toFixed(1)}K
+                  {data.peopleAffected > 1000 ? `${(data.peopleAffected / 1000).toFixed(1)}K` : data.peopleAffected}
                 </span>
                 <div>
                   <div className="flex justify-between text-xs font-semibold text-slate-400 mb-2">
@@ -172,7 +276,7 @@ export default function DashboardPage() {
                     <span className="text-white">{data.inShelters.toLocaleString()}</span>
                   </div>
                   <div className="w-full bg-slate-800/80 h-1.5 rounded-full overflow-hidden">
-                    <div className="bg-indigo-400 h-full rounded-full" style={{ width: `${(data.inShelters / data.peopleAffected) * 100}%` }} />
+                    <div className="bg-indigo-400 h-full rounded-full" style={{ width: `${Math.min(100, (data.inShelters / (data.peopleAffected || 1)) * 100)}%` }} />
                   </div>
                 </div>
               </div>
@@ -212,7 +316,6 @@ export default function DashboardPage() {
                           className="w-3 h-3 rounded-full border-2 border-white shadow-lg z-10 relative"
                           style={{ backgroundColor: SEVERITY_COLORS[inc.severity] || SEVERITY_COLORS['PENDING'] }}
                         />
-                        {/* Add pulse effect for Critical or Pending pins */}
                         {(inc.severity === 'CRITICAL' || inc.severity === 'PENDING') && (
                           <div 
                             className="absolute inset-0 rounded-full animate-ping opacity-75" 
@@ -261,11 +364,13 @@ export default function DashboardPage() {
                   <Link href="/dashboard/alerts" className="text-xs text-slate-400 hover:text-white font-semibold transition-colors">View All</Link>
                 </div>
                 <div className="space-y-2">
-                  {recentAlerts.slice(0, 4).map((alert) => (
+                  {recentAlerts.length === 0 ? (
+                    <div className="text-slate-500 text-sm py-4">No active alerts at this time.</div>
+                  ) : recentAlerts.slice(0, 4).map((alert) => (
                     <div key={alert.alertId} className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-800/30 transition-colors border border-transparent hover:border-slate-800/50">
                       <div className="flex items-center gap-4">
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${alert.severity === IncidentSeverity.CRITICAL ? 'bg-red-500/10' : 'bg-blue-500/10'}`}>
-                          <AlertTriangle size={16} className={alert.severity === IncidentSeverity.CRITICAL ? 'text-red-400' : 'text-blue-400'} />
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${alert.severity === 'CRITICAL' ? 'bg-red-500/10' : 'bg-blue-500/10'}`}>
+                          <AlertTriangle size={16} className={alert.severity === 'CRITICAL' ? 'text-red-400' : 'text-blue-400'} />
                         </div>
                         <div>
                           <h4 className="text-sm font-bold text-slate-200 mb-1">{alert.title}</h4>
@@ -276,7 +381,7 @@ export default function DashboardPage() {
                         </div>
                       </div>
                       <span className={`px-2.5 py-1 rounded text-[9px] font-bold tracking-widest border ${
-                        alert.severity === IncidentSeverity.CRITICAL ? 'bg-red-500/20 text-red-400 border-red-500/30' : 'bg-slate-800 text-slate-300 border-slate-700'
+                        alert.severity === 'CRITICAL' ? 'bg-red-500/20 text-red-400 border-red-500/30' : 'bg-slate-800 text-slate-300 border-slate-700'
                       }`}>{alert.severity}</span>
                     </div>
                   ))}
@@ -297,18 +402,28 @@ function FilterBtn({ label }: { label: string }) {
     </button>
   );
 }
+
 function Stat({ label, value }: { label: string; value: number }) {
-  return (<div><p className="text-[10px] font-bold text-slate-500 tracking-widest mb-1 uppercase">{label}</p><p className="text-xl font-bold">{value}</p></div>);
+  return (
+    <div>
+      <p className="text-[10px] font-bold text-slate-500 tracking-widest mb-1 uppercase">{label}</p>
+      <p className="text-xl font-bold">{value}</p>
+    </div>
+  );
 }
+
 function ResBar({ title, current, total, icon, color }: { title: string; current: number; total: number; icon: React.ReactNode; color: string }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2"><div className="text-slate-400">{icon}</div><span className="text-xs font-semibold text-slate-300">{title}</span></div>
+        <div className="flex items-center gap-2">
+          <div className="text-slate-400">{icon}</div>
+          <span className="text-xs font-semibold text-slate-300">{title}</span>
+        </div>
         <div className="text-xs font-bold text-white">{current} <span className="text-slate-500 font-medium">/ {total}</span></div>
       </div>
       <div className="w-full bg-slate-800/80 h-[4px] rounded-full overflow-hidden">
-        <div className={`${color} h-full rounded-full`} style={{ width: `${(current / total) * 100}%` }} />
+        <div className={`${color} h-full rounded-full`} style={{ width: `${(current / Math.max(total, 1)) * 100}%` }} />
       </div>
     </div>
   );

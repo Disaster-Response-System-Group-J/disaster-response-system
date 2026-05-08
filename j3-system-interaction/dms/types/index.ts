@@ -264,11 +264,11 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
   ],
   [UserRole.INCIDENT_COMMANDER_NATIONAL]: [
     'view:dashboard', 'view:incident-map', 'view:alerts', 'view:analytics', 'view:predictions',
-    'approve:incidents', 'reject:incidents', 'issue:alerts', 'force-reallocate:resources'
+    'view:sensors', 'approve:incidents', 'reject:incidents', 'issue:alerts', 'force-reallocate:resources'
   ],
   [UserRole.INCIDENT_COMMANDER_ZONAL]: [
     'view:dashboard', 'view:incident-map', 'view:alerts', 'view:analytics', 'view:predictions',
-    'approve:incidents', 'reject:incidents', 'issue:alerts', 'force-reallocate:resources'
+    'view:sensors', 'approve:incidents', 'reject:incidents', 'issue:alerts', 'force-reallocate:resources'
   ],
   [UserRole.OPERATIONS_OFFICER_NATIONAL]: [
     'view:dashboard', 'view:incoming-reports', 'view:incident-map', 'view:sensors',

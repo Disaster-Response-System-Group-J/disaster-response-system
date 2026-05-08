@@ -1,0 +1,7 @@
+# GitHub Linguist overrides
+.next/** linguist-generated=true
+dist/** linguist-generated=true
+build/** linguist-generated=true
+node_modules/** linguist-vendored=true
+*.lock linguist-generated=true
+local_alerts.db binary

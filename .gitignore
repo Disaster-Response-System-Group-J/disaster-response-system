@@ -30,6 +30,9 @@ build/
 # Node
 node_modules/
 npm-debug.log*
+.next/
+.next
+out/
 
 # Java / Maven / Gradle
 target/
@@ -45,3 +48,10 @@ target/
 *.key
 *.p12
 secrets/
+
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+
+**/secrets.yaml

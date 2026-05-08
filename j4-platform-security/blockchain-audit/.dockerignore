@@ -1,0 +1,11 @@
+node_modules
+dist
+.git
+.gitignore
+.env
+.env.*
+coverage
+typechain-types
+README.md
+AGENT_CONTEXT.md
+npm-debug.log

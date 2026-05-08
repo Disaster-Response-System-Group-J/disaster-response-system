@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, useMemo, useState } from 'react';
+import { ReactNode, useMemo, useState, useEffect } from 'react';
 import { AlertTriangle, BrainCircuit, Clock3, RefreshCcw, ShieldAlert, Waves } from 'lucide-react';
 
 type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
@@ -16,59 +16,6 @@ interface PredictionZone {
   recommendedAction: string;
 }
 
-const PREDICTION_ZONES: PredictionZone[] = [
-  {
-    zone: 'Kelani Lower Basin',
-    district: 'Colombo',
-    riskScore: 89,
-    riskLevel: 'CRITICAL',
-    confidence: 91,
-    leadTimeHours: 8,
-    likelyImpact: 'Rapid inundation in low-lying urban pockets and drainage backflow.',
-    recommendedAction: 'Prepare staged evacuation and pre-position rescue boats in Kaduwela and Wellampitiya.',
-  },
-  {
-    zone: 'Kalu Ganga - Ratnapura Reach',
-    district: 'Ratnapura',
-    riskScore: 82,
-    riskLevel: 'HIGH',
-    confidence: 87,
-    leadTimeHours: 10,
-    likelyImpact: 'Sustained floodplain overflow along downstream settlements.',
-    recommendedAction: 'Issue targeted household alerts and activate night-shift field monitoring.',
-  },
-  {
-    zone: 'Attanagalu Oya Corridor',
-    district: 'Gampaha',
-    riskScore: 76,
-    riskLevel: 'HIGH',
-    confidence: 84,
-    leadTimeHours: 6,
-    likelyImpact: 'Road-side flash flooding and mobility disruption in feeder roads.',
-    recommendedAction: 'Deploy traffic control units and open temporary shelter capacity near Ja-Ela.',
-  },
-  {
-    zone: 'Gin Ganga Midstream',
-    district: 'Galle',
-    riskScore: 58,
-    riskLevel: 'MEDIUM',
-    confidence: 79,
-    leadTimeHours: 14,
-    likelyImpact: 'Localized flooding near river banks and paddy tracts.',
-    recommendedAction: 'Continue telemetry watch and keep evacuation transport on standby.',
-  },
-  {
-    zone: 'Nilwala Basin',
-    district: 'Matara',
-    riskScore: 35,
-    riskLevel: 'LOW',
-    confidence: 74,
-    leadTimeHours: 18,
-    likelyImpact: 'Minor water accumulation in drainage-constrained neighborhoods.',
-    recommendedAction: 'Maintain routine monitoring and public advisory updates.',
-  },
-];
-
 const LEVEL_STYLES: Record<RiskLevel, string> = {
   CRITICAL: 'bg-red-500/10 text-red-400 border-red-500/30',
   HIGH: 'bg-orange-500/10 text-orange-400 border-orange-500/30',
@@ -77,11 +24,52 @@ const LEVEL_STYLES: Record<RiskLevel, string> = {
 };
 
 export default function PredictionsPage() {
-  const [zones, setZones] = useState(PREDICTION_ZONES);
+  const [zones, setZones] = useState<PredictionZone[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [riskFilter, setRiskFilter] = useState<'ALL' | RiskLevel>('ALL');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefreshedAt, setLastRefreshedAt] = useState(new Date());
-  const [refreshNote, setRefreshNote] = useState('Predictions are currently using local mock data.');
+  const [refreshNote, setRefreshNote] = useState('Fetching live predictions from database...');
+
+  const fetchPredictions = async () => {
+    setIsRefreshing(true);
+    setRefreshNote('Syncing latest prediction models from backend...');
+    
+    try {
+      const response = await fetch('/api/predictions');
+      if (!response.ok) throw new Error('Failed to fetch predictions');
+      
+      const data = await response.json();
+      
+      // Map database rows to the UI format
+      const mappedZones: PredictionZone[] = data.map((row: any) => ({
+        zone: row.division_name || 'Unknown Zone',
+        district: 'Assigned Region', // Fallback, since district isn't directly in DisasterRisk table
+        // Convert score to a 0-100 scale if it's a probability (0-1), otherwise use directly
+        riskScore: row.score > 1 ? Math.round(row.score) : Math.round((row.score || 0) * 100),
+        riskLevel: (row.risk_level as RiskLevel) || 'LOW',
+        confidence: 85, // Placeholder: ML confidence score
+        leadTimeHours: 24, // Placeholder: Target horizon
+        likelyImpact: `Potential ${row.disaster_type || 'hazard'} impacts expected in ${row.division_name || 'the area'} based on current sensor data.`,
+        recommendedAction: `Initiate standard ${row.risk_level || 'LOW'} risk monitoring protocols and review resource availability.`
+      }));
+
+      setZones(mappedZones);
+      setRefreshNote('Predictions synced successfully with live database.');
+    } catch (error) {
+      console.error('Error fetching predictions:', error);
+      setRefreshNote('Error syncing predictions. Showing last known state.');
+    } finally {
+      setIsRefreshing(false);
+      setIsLoading(false);
+      setLastRefreshedAt(new Date());
+    }
+  };
+
+  // Fetch initial data on mount
+  useEffect(() => {
+    fetchPredictions();
+  }, []);
 
   const filteredZones = useMemo(
     () => zones.filter((zone) => (riskFilter === 'ALL' ? true : zone.riskLevel === riskFilter)),
@@ -89,6 +77,7 @@ export default function PredictionsPage() {
   );
 
   const summary = useMemo(() => {
+    if (zones.length === 0) return { critical: 0, high: 0, avgConfidence: 0 };
     const critical = zones.filter((zone) => zone.riskLevel === 'CRITICAL').length;
     const high = zones.filter((zone) => zone.riskLevel === 'HIGH').length;
     const avgConfidence = Math.round(
@@ -97,25 +86,13 @@ export default function PredictionsPage() {
     return { critical, high, avgConfidence };
   }, [zones]);
 
-  const handleRefreshPredictions = () => {
-    if (isRefreshing) return;
-    setIsRefreshing(true);
-    setRefreshNote('Refreshing prediction snapshot from local model...');
-
-    window.setTimeout(() => {
-      setZones((previousZones) =>
-        previousZones.map((zone, index) => {
-          const shift = index % 2 === 0 ? 1 : -1;
-          const nextRiskScore = Math.max(20, Math.min(95, zone.riskScore + shift));
-          const nextConfidence = Math.max(60, Math.min(98, zone.confidence + (shift > 0 ? 1 : 0)));
-          return { ...zone, riskScore: nextRiskScore, confidence: nextConfidence };
-        }),
-      );
-      setLastRefreshedAt(new Date());
-      setRefreshNote('Predictions refreshed. Backend is not connected, so this is a simulated update.');
-      setIsRefreshing(false);
-    }, 900);
-  };
+  if (isLoading) {
+    return (
+      <div className="flex-1 overflow-y-auto bg-[#0a0f16] text-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#0a0f16] text-white">
@@ -128,7 +105,7 @@ export default function PredictionsPage() {
             </p>
           </div>
           <button
-            onClick={handleRefreshPredictions}
+            onClick={fetchPredictions}
             disabled={isRefreshing}
             className="px-4 py-2.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 disabled:opacity-60 disabled:cursor-not-allowed border border-blue-500/40 text-sm font-semibold text-blue-300 flex items-center gap-2 transition-colors"
           >
@@ -148,7 +125,7 @@ export default function PredictionsPage() {
           <StatCard title="Critical Zones" value={summary.critical.toString()} icon={<ShieldAlert size={14} />} tone="red" />
           <StatCard title="High-Risk Zones" value={summary.high.toString()} icon={<AlertTriangle size={14} />} tone="orange" />
           <StatCard title="Avg Confidence" value={`${summary.avgConfidence}%`} icon={<BrainCircuit size={14} />} tone="blue" />
-          <StatCard title="Prediction Window" value="6-18h" icon={<Clock3 size={14} />} tone="green" />
+          <StatCard title="Prediction Window" value="6-24h" icon={<Clock3 size={14} />} tone="green" />
         </div>
 
         <div className="bg-[#131924] border border-slate-800/80 rounded-xl p-4 mb-6 flex items-center justify-between">
@@ -170,12 +147,12 @@ export default function PredictionsPage() {
         </div>
 
         <div className="space-y-4">
-          {filteredZones.map((zone) => (
-            <article key={zone.zone} className="bg-[#131924] border border-slate-800/80 rounded-xl p-6">
+          {filteredZones.map((zone, index) => (
+            <article key={`${zone.zone}-${index}`} className="bg-[#131924] border border-slate-800/80 rounded-xl p-6">
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <h3 className="text-lg font-bold text-slate-100 mb-1">{zone.zone}</h3>
-                  <p className="text-[11px] text-slate-500 font-semibold tracking-wide uppercase">{zone.district} District</p>
+                  <p className="text-[11px] text-slate-500 font-semibold tracking-wide uppercase">{zone.district}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="px-2.5 py-1 rounded text-[9px] font-bold tracking-widest border bg-blue-500/10 text-blue-400 border-blue-500/30">
