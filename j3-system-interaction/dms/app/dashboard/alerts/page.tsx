@@ -1,13 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { AlertTriangle, MapPin, Clock, Search, Filter ,Plus, XCircle} from 'lucide-react';
-import { MOCK_ALERTS } from '@/data/mock-data';
-import { IncidentSeverity, AlertType } from '@/types';
+import { AlertTriangle, MapPin, Clock, Search, Filter, Plus, XCircle } from 'lucide-react';
+import { IncidentSeverity, AlertType, UserRole } from '@/types';
 import { DISTRICT_NAMES } from '@/data/districts';
 import { useSocket } from '@/context/SocketContext';
 import { useAuth } from '@/context/AuthContext';
-import { UserRole } from '@/types';
 
 const SEVERITY_STYLES: Record<string, string> = {
   CRITICAL: 'bg-red-500/10 text-red-400 border-red-500/30',
@@ -24,8 +22,19 @@ const ALERT_TYPE_STYLES: Record<string, string> = {
   INCIDENT_STATUS: 'bg-slate-800 text-slate-300 border-slate-700',
 };
 
-// Extracted type from MOCK_ALERTS for type safety
-type Alert = typeof MOCK_ALERTS[0];
+// Alert interface matching the API response shape
+type Alert = {
+  alertId: string;
+  title: string;
+  description: string;
+  type: AlertType;
+  severity: IncidentSeverity;
+  district: string;
+  isPublic: boolean;
+  isActive: boolean;
+  createdAt: string;
+  source?: string;
+};
 
 export default function AlertsPage() {
   const socket = useSocket();

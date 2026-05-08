@@ -13,7 +13,16 @@ export enum UserRole {
   RESOURCE_MANAGER_NATIONAL = 'RESOURCE_MANAGER_NATIONAL',
   RESOURCE_MANAGER_ZONAL = 'RESOURCE_MANAGER_ZONAL',
   SYSTEM_ADMIN = 'SYSTEM_ADMIN',
+  // Mobile App Roles
+  FIELD_OFFICER = 'FIELD_OFFICER',
+  LOGISTICS_STAFF = 'LOGISTICS_STAFF',
+  RESPONSE_TEAM_MEMBER = 'RESPONSE_TEAM_MEMBER',
 }
+
+// Alias for backwards compat
+export const UserRoleAliases = {
+  NATIONAL_COMMANDER: UserRole.INCIDENT_COMMANDER_NATIONAL,
+};
 
 // ── Enums ────────────────────────────────────────────────────
 
@@ -88,6 +97,8 @@ export interface User {
   email: string;
   name: string;
   role: UserRole;
+  assignedIncidentId?: string; // For Field Officers and Response Teams
+  assignedZone?: string;        // For Field Officers (zonal assignment)
 }
 
 export interface IncomingReport {
@@ -264,11 +275,13 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
   ],
   [UserRole.INCIDENT_COMMANDER_NATIONAL]: [
     'view:dashboard', 'view:incident-map', 'view:alerts', 'view:analytics', 'view:predictions',
-    'view:sensors', 'approve:incidents', 'reject:incidents', 'issue:alerts', 'force-reallocate:resources'
+    'view:sensors', 'approve:incidents', 'reject:incidents', 'issue:alerts', 'force-reallocate:resources',
+    'dispatch:field-officers', 'dispatch:response-teams',
   ],
   [UserRole.INCIDENT_COMMANDER_ZONAL]: [
     'view:dashboard', 'view:incident-map', 'view:alerts', 'view:analytics', 'view:predictions',
-    'view:sensors', 'approve:incidents', 'reject:incidents', 'issue:alerts', 'force-reallocate:resources'
+    'view:sensors', 'approve:incidents', 'reject:incidents', 'issue:alerts', 'force-reallocate:resources',
+    'dispatch:field-officers', 'dispatch:response-teams',
   ],
   [UserRole.OPERATIONS_OFFICER_NATIONAL]: [
     'view:dashboard', 'view:incoming-reports', 'view:incident-map', 'view:sensors',
@@ -280,13 +293,24 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
   ],
   [UserRole.RESOURCE_MANAGER_NATIONAL]: [
     'view:dashboard', 'view:incident-map', 'view:resources', 'view:predictions',
-    'dispatch:resources', 'update:resource-status', 'manage:shelters'
+    'dispatch:resources', 'update:resource-status', 'manage:shelters', 'dispatch:logistics',
   ],
   [UserRole.RESOURCE_MANAGER_ZONAL]: [
     'view:dashboard', 'view:incident-map', 'view:resources', 'view:predictions',
-    'dispatch:resources', 'update:resource-status', 'manage:shelters'
+    'dispatch:resources', 'update:resource-status', 'manage:shelters', 'dispatch:logistics',
   ],
   [UserRole.SYSTEM_ADMIN]: [
     'view:dashboard', 'manage:users', 'manage:settings', 'view:audit-logs'
+  ],
+  // ── Mobile App Roles ────────────────────────────────────────
+  [UserRole.FIELD_OFFICER]: [
+    'view:dashboard', 'view:incident-map',
+    'update:incident-status', 'request:resources',
+  ],
+  [UserRole.LOGISTICS_STAFF]: [
+    'view:dashboard', 'view:incident-map',
+  ],
+  [UserRole.RESPONSE_TEAM_MEMBER]: [
+    'view:dashboard', 'view:incident-map', 'view:alerts',
   ],
 };

@@ -23,6 +23,10 @@ const ROLE_STYLES: Record<string, string> = {
   [UserRole.RESOURCE_MANAGER_NATIONAL]: 'bg-teal-500/10 text-teal-400 border-teal-500/20',
   [UserRole.RESOURCE_MANAGER_ZONAL]: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
   [UserRole.PUBLIC_USER]: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
+  // Mobile App Roles
+  [UserRole.FIELD_OFFICER]: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  [UserRole.LOGISTICS_STAFF]: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
+  [UserRole.RESPONSE_TEAM_MEMBER]: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
 };
 
 // Mock Audit Logs
@@ -233,13 +237,20 @@ export default function AdminPanelPage() {
                       <div>
                         <label className="block text-[10px] font-bold text-slate-400 mb-1.5 tracking-widest uppercase">System Role</label>
                         <select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value as UserRole})} className="w-full bg-[#0a0f16] border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
-                          <option value={UserRole.SYSTEM_ADMIN}>System Administrator</option>
-                          <option value={UserRole.INCIDENT_COMMANDER_NATIONAL}>National Incident Commander</option>
-                          <option value={UserRole.INCIDENT_COMMANDER_ZONAL}>Zonal Incident Commander</option>
-                          <option value={UserRole.OPERATIONS_OFFICER_NATIONAL}>National Operations Officer</option>
-                          <option value={UserRole.OPERATIONS_OFFICER_ZONAL}>Zonal Operations Officer</option>
-                          <option value={UserRole.RESOURCE_MANAGER_NATIONAL}>National Resource Manager</option>
-                          <option value={UserRole.RESOURCE_MANAGER_ZONAL}>Zonal Resource Manager</option>
+                          <optgroup label="Command Roles">
+                            <option value={UserRole.SYSTEM_ADMIN}>System Administrator</option>
+                            <option value={UserRole.INCIDENT_COMMANDER_NATIONAL}>National Incident Commander</option>
+                            <option value={UserRole.INCIDENT_COMMANDER_ZONAL}>Zonal Incident Commander</option>
+                            <option value={UserRole.OPERATIONS_OFFICER_NATIONAL}>National Operations Officer</option>
+                            <option value={UserRole.OPERATIONS_OFFICER_ZONAL}>Zonal Operations Officer</option>
+                            <option value={UserRole.RESOURCE_MANAGER_NATIONAL}>National Resource Manager</option>
+                            <option value={UserRole.RESOURCE_MANAGER_ZONAL}>Zonal Resource Manager</option>
+                          </optgroup>
+                          <optgroup label="Mobile App Roles">
+                            <option value={UserRole.FIELD_OFFICER}>Field Officer</option>
+                            <option value={UserRole.LOGISTICS_STAFF}>Logistics Staff</option>
+                            <option value={UserRole.RESPONSE_TEAM_MEMBER}>Response Team Member</option>
+                          </optgroup>
                         </select>
                       </div>
                       <div className="pt-4 mt-4 border-t border-slate-800">

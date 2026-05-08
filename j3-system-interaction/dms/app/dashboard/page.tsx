@@ -8,8 +8,9 @@ import {
 import Map, { Marker, ViewStateChangeEvent } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import Link from 'next/link';
-import { VerificationStatus, IncidentSeverity } from '@/types';
+import { VerificationStatus, IncidentSeverity, UserRole } from '@/types';
 import { useSocket } from '@/context/SocketContext';
+import { useAuth } from '@/context/AuthContext';
 
 // Color mapping for the map pins
 const SEVERITY_COLORS: Record<string, string> = {
@@ -22,6 +23,9 @@ const SEVERITY_COLORS: Record<string, string> = {
 
 export default function DashboardPage() {
   const socket = useSocket();
+  const { user } = useAuth();
+  const isNationalLevel = !user || user.role === UserRole.SYSTEM_ADMIN || user.role.includes('NATIONAL') || user.role === UserRole.NATIONAL_COMMANDER;
+  const scopedDistrict = isNationalLevel ? null : (user as any)?.assignedDistrict || null;
   const [isLoading, setIsLoading] = useState(true);
 
   // Aggregated live data state
@@ -91,7 +95,7 @@ export default function DashboardPage() {
         const availableMachinery = machinery.filter((r: any) => r.status === 'AVAILABLE').length;
         // Process Alerts & Reports
         const pendingReports = reportsRes.filter((r: any) => r.status === 'PENDING_REVIEW').length;
-        const criticalAlertsCount = Array.isArray(alertsRes) ? alertsRes.filter((a: any) => a.severity_level === 'CRITICAL').length : 0;
+        const criticalAlertsCount = Array.isArray(alertsRes) ? alertsRes.filter((a: any) => a.severity === 'CRITICAL').length : 0;
 
         setData({
           activeIncidents: activeIncidents.length,
@@ -196,12 +200,20 @@ export default function DashboardPage() {
           <div className="flex items-end justify-between mb-8">
             <div>
               <p className="text-sm font-medium text-slate-400 mb-1">Operational Overview</p>
-              <h1 className="text-4xl font-extrabold tracking-tight">National Status</h1>
+              <h1 className="text-4xl font-extrabold tracking-tight">{isNationalLevel ? 'National Status' : `${scopedDistrict || 'District'} Overview`}</h1>
             </div>
             <div className="flex items-center gap-3">
-              <FilterBtn label="District: All" />
-              <FilterBtn label="Disaster Type" />
-              <FilterBtn label="Severity" />
+              {user && (
+                <div className="text-right">
+                  <p className="text-xs font-bold text-slate-300">{user.name}</p>
+                  <p className="text-[10px] text-slate-500 font-semibold tracking-wider">{user.role.replace(/_/g, ' ')}</p>
+                </div>
+              )}
+              {!isNationalLevel && scopedDistrict && (
+                <span className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/10 border border-blue-500/30 rounded-lg text-xs font-bold text-blue-400">
+                  <MapPin size={12} /> {scopedDistrict} Zone
+                </span>
+              )}
             </div>
           </div>
 
@@ -303,6 +315,7 @@ export default function DashboardPage() {
                       longitude={inc.longitude}
                       latitude={inc.latitude}
                       anchor="center"
+                      style={{ background: 'transparent', border: 'none', padding: 0 }}
                     >
                       <div className="relative">
                         <div

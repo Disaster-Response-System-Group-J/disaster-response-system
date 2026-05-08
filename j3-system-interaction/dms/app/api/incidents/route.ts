@@ -19,18 +19,16 @@ export async function POST(req: Request) {
     const data = await req.json();
     const query = `
       INSERT INTO public."ActiveIncident" 
-      (title, severity, affected_people, current_latitude, current_longitude, district, type, status) 
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+      (title, severity, affected_population, latitude, longitude, status) 
+      VALUES ($1, $2, $3, $4, $5, $6) 
       RETURNING *
     `;
     const { rows } = await pool.query(query, [
       data.title, 
       data.severity, 
-      data.affectedPeople, 
-      data.latitude, 
-      data.longitude, 
-      data.district, 
-      data.disasterType,
+      data.affectedPeople || 0, 
+      data.latitude || null, 
+      data.longitude || null, 
       'ACTIVE'
     ]);
     return NextResponse.json(rows[0]);

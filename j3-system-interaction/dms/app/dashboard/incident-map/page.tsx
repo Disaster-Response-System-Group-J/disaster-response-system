@@ -6,6 +6,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import { Shield, Filter, MapPin, AlertTriangle, X, ChevronDown, CheckCircle2, Clock } from 'lucide-react';
 import { IncidentSeverity, IncidentStatus, DISASTER_TYPES, ConfirmedIncident, UserRole } from '@/types';
 import { SRI_LANKA_CENTER, DISTRICT_NAMES } from '@/data/districts';
+import { MOCK_USERS } from '@/data/mock-data';
 import { useAuth } from '@/context/AuthContext';
 import { useSocket } from '@/context/SocketContext';
 
@@ -23,9 +24,11 @@ export default function IncidentMapPage() {
 
   const [viewState, setViewState] = useState(SRI_LANKA_CENTER);
   const [selectedIncident, setSelectedIncident] = useState<any | null>(null);
-  
-  // Start with an empty array instead of mock data
   const [mapPins, setMapPins] = useState<any[]>([]);
+
+  // Track dispatched personnel per incident: { [incidentId]: { fieldOfficers: User[], responseTeams: User[], logistics: User[] } }
+  const [dispatched, setDispatched] = useState<Record<string, { fieldOfficers: any[], responseTeams: any[], logistics: any[] }>>({});
+  const [dispatchTarget, setDispatchTarget] = useState<string>(''); // selected user id to dispatch
 
   // Filters
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
@@ -78,19 +81,41 @@ export default function IncidentMapPage() {
     } catch (err) {
       console.error('Failed to update DB', err);
     }
-    
-    // Optimistic UI update
-    setMapPins(prev => prev.map(inc => 
-      inc.incidentId === incidentId ? { ...inc, status: newStatus } : inc
-    ));
-    
-    if (selectedIncident?.incidentId === incidentId) {
-      setSelectedIncident({ ...selectedIncident, status: newStatus });
-    }
+    setMapPins(prev => prev.map(inc => inc.incidentId === incidentId ? { ...inc, status: newStatus } : inc));
+    if (selectedIncident?.incidentId === incidentId) setSelectedIncident({ ...selectedIncident, status: newStatus });
+    if (socket) socket.emit('client:update-incident-status', { incidentId, status: newStatus, timestamp: new Date().toISOString() });
+  };
 
-    // Emit to backend
+  const handleDispatch = (type: 'fieldOfficer' | 'responseTeam' | 'logistics') => {
+    if (!selectedIncident || !dispatchTarget) return;
+    const person = MOCK_USERS.find(u => u.id === dispatchTarget);
+    if (!person) return;
+
+    const incidentId = selectedIncident.incidentId;
+    setDispatched(prev => {
+      const current = prev[incidentId] || { fieldOfficers: [], responseTeams: [], logistics: [] };
+      const updated = {
+        ...current,
+        fieldOfficers: type === 'fieldOfficer' ? [...current.fieldOfficers.filter(u => u.id !== person.id), person] : current.fieldOfficers,
+        responseTeams: type === 'responseTeam' ? [...current.responseTeams.filter(u => u.id !== person.id), person] : current.responseTeams,
+        logistics: type === 'logistics' ? [...current.logistics.filter(u => u.id !== person.id), person] : current.logistics,
+      };
+      return { ...prev, [incidentId]: updated };
+    });
+    setDispatchTarget('');
+
     if (socket) {
-      socket.emit('client:update-incident-status', { incidentId, status: newStatus, timestamp: new Date().toISOString() });
+      socket.emit('client:dispatch-personnel', {
+        incidentId,
+        incidentTitle: selectedIncident.title,
+        personnelId: person.id,
+        personnelName: person.name,
+        role: person.role,
+        type,
+        latitude: selectedIncident.latitude,
+        longitude: selectedIncident.longitude,
+        timestamp: new Date().toISOString(),
+      });
     }
   };
 
@@ -150,6 +175,7 @@ export default function IncidentMapPage() {
               longitude={inc.longitude}
               latitude={inc.latitude}
               anchor="center"
+              style={{ background: 'transparent', border: 'none', padding: 0 }}
               onClick={(e) => {
                 e.originalEvent.stopPropagation();
                 setSelectedIncident(inc);
@@ -218,7 +244,87 @@ export default function IncidentMapPage() {
                     <span className="font-semibold">{selectedIncident.affectedPeople?.toLocaleString() || 'Unknown'}</span>
                   </div>
                 </div>
-                <button className="w-full py-2 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 rounded-lg text-xs font-semibold text-blue-400 transition-colors">
+
+                {/* Personnel Dispatch Panel — Commanders only */}
+                {(hasPermission('dispatch:field-officers') || hasPermission('dispatch:response-teams') || hasPermission('dispatch:logistics')) && (() => {
+                  const incDispatched = dispatched[selectedIncident.incidentId] || { fieldOfficers: [], responseTeams: [], logistics: [] };
+                  const availableFieldOfficers = MOCK_USERS.filter(u => u.role === UserRole.FIELD_OFFICER);
+                  const availableResponseTeams = MOCK_USERS.filter(u => u.role === UserRole.RESPONSE_TEAM_MEMBER);
+                  const availableLogistics = MOCK_USERS.filter(u => u.role === UserRole.LOGISTICS_STAFF);
+                  return (
+                    <div className="border-t border-slate-700/50 pt-3 mt-1 space-y-3">
+                      <p className="text-[9px] font-bold text-slate-400 tracking-widest uppercase">Personnel Dispatch</p>
+
+                      {/* Dispatched badges */}
+                      {(incDispatched.fieldOfficers.length > 0 || incDispatched.responseTeams.length > 0 || incDispatched.logistics.length > 0) && (
+                        <div className="space-y-1">
+                          {incDispatched.fieldOfficers.map(p => (
+                            <div key={p.id} className="flex items-center gap-1.5 px-2 py-1 bg-blue-500/10 border border-blue-500/20 rounded text-[9px] font-bold text-blue-400">
+                              <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />{p.name} · Field Officer
+                            </div>
+                          ))}
+                          {incDispatched.responseTeams.map(p => (
+                            <div key={p.id} className="flex items-center gap-1.5 px-2 py-1 bg-purple-500/10 border border-purple-500/20 rounded text-[9px] font-bold text-purple-400">
+                              <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />{p.name} · Response Team
+                            </div>
+                          ))}
+                          {incDispatched.logistics.map(p => (
+                            <div key={p.id} className="flex items-center gap-1.5 px-2 py-1 bg-teal-500/10 border border-teal-500/20 rounded text-[9px] font-bold text-teal-400">
+                              <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />{p.name} · Logistics
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Dispatch Field Officers */}
+                      {hasPermission('dispatch:field-officers') && (
+                        <div className="flex gap-1.5">
+                          <select value={dispatchTarget} onChange={e => setDispatchTarget(e.target.value)}
+                            className="flex-1 bg-[#0a0f16] border border-slate-700 rounded px-2 py-1 text-[9px] text-slate-300 outline-none">
+                            <option value="">Field Officer...</option>
+                            {availableFieldOfficers.map(u => <option key={u.id} value={u.id}>{u.name} ({(u as any).assignedDistrict})</option>)}
+                          </select>
+                          <button onClick={() => handleDispatch('fieldOfficer')}
+                            className="px-2 py-1 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded text-[9px] font-bold text-blue-400 transition-colors whitespace-nowrap">
+                            Dispatch
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Dispatch Response Teams */}
+                      {hasPermission('dispatch:response-teams') && (
+                        <div className="flex gap-1.5">
+                          <select value={dispatchTarget} onChange={e => setDispatchTarget(e.target.value)}
+                            className="flex-1 bg-[#0a0f16] border border-slate-700 rounded px-2 py-1 text-[9px] text-slate-300 outline-none">
+                            <option value="">Response Team...</option>
+                            {availableResponseTeams.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                          </select>
+                          <button onClick={() => handleDispatch('responseTeam')}
+                            className="px-2 py-1 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 rounded text-[9px] font-bold text-purple-400 transition-colors whitespace-nowrap">
+                            Dispatch
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Dispatch Logistics Staff */}
+                      {hasPermission('dispatch:logistics') && (
+                        <div className="flex gap-1.5">
+                          <select value={dispatchTarget} onChange={e => setDispatchTarget(e.target.value)}
+                            className="flex-1 bg-[#0a0f16] border border-slate-700 rounded px-2 py-1 text-[9px] text-slate-300 outline-none">
+                            <option value="">Logistics Staff...</option>
+                            {availableLogistics.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                          </select>
+                          <button onClick={() => handleDispatch('logistics')}
+                            className="px-2 py-1 bg-teal-500/20 hover:bg-teal-500/30 border border-teal-500/30 rounded text-[9px] font-bold text-teal-400 transition-colors whitespace-nowrap">
+                            Dispatch
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                <button className="w-full mt-3 py-2 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 rounded-lg text-xs font-semibold text-blue-400 transition-colors">
                   View Full Details
                 </button>
               </div>
