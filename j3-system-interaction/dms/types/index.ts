@@ -156,6 +156,18 @@ export interface Alert {
   createdAt: string;
   expiresAt?: string;
   source?: string;
+  // Prediction & AI Context
+  predictionProbability?: number;  // 0-1 confidence
+  considerationScore?: number;     // 0-1 AI confidence
+  predictionCategory?: string;     // FLOOD, LANDSLIDE, etc.
+  topProbabilityKey?: string;      // Most likely scenario (NORMAL, MODERATE, SEVERE, EXTREME)
+  probabilities?: Record<string, number>; // Full probability distribution
+  // Resource Context
+  resourcePressure?: number;       // 0-1 resource availability pressure
+  resourceSummary?: {
+    overall: { total: number; available: number };
+    by_type: Record<string, { total: number; available: number }>;
+  };
 }
 
 export interface ShelterInfo {

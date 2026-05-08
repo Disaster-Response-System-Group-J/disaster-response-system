@@ -18,6 +18,12 @@ export type NormalizedRiskAlert = {
   divisionName?: string;
   topProbabilityKey?: string;
   probabilities?: Record<string, number>;
+  // Resource Context
+  resourcePressure?: number;
+  resourceSummary?: {
+    overall: { total: number; available: number };
+    by_type: Record<string, { total: number; available: number }>;
+  };
 };
 
 const asNumber = (value: unknown): number | undefined => {
@@ -39,6 +45,8 @@ export function normalizeRiskAlert(alert: any): NormalizedRiskAlert {
   const predictionProbability = asNumber(payload.predictionProbability ?? alert?.predictionProbability)
     ?? (probabilityValues.length ? Math.max(...probabilityValues) : undefined);
   const considerationScore = asNumber(payload.considerationScore ?? alert?.considerationScore);
+  const resourcePressure = asNumber(payload.resourcePressure ?? alert?.resourcePressure);
+  const resourceSummary = payload.resourceSummary ?? alert?.resourceSummary;
 
   return {
     alertId: asString(payload.alertId ?? alert?.alertId ?? alert?.id ?? `risk-${Date.now()}`),
@@ -58,5 +66,7 @@ export function normalizeRiskAlert(alert: any): NormalizedRiskAlert {
     divisionName: asString(payload.divisionName ?? alert?.divisionName ?? ''),
     topProbabilityKey: asString(payload.topProbabilityKey ?? alert?.topProbabilityKey ?? ''),
     probabilities: Object.keys(probabilities).length ? probabilities : undefined,
+    resourcePressure,
+    resourceSummary,
   };
 }

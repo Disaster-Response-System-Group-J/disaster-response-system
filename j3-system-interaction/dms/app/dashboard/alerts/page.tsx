@@ -9,6 +9,7 @@ import { useSocket } from '@/context/SocketContext';
 import { useAuth } from '@/context/AuthContext';
 import { UserRole } from '@/types';
 import { normalizeRiskAlert } from '@/lib/risk-alert';
+import { normalizeRiskAlert } from '@/lib/risk-alert';
 
 const SEVERITY_STYLES: Record<string, string> = {
   CRITICAL: 'bg-red-500/10 text-red-400 border-red-500/30',
