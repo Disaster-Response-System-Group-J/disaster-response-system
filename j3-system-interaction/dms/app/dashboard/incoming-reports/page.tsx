@@ -73,7 +73,7 @@ export default function IncomingReportsPage() {
           longitude: Number(row.longitude) || 0,
           mediaUrls: row.media_url ? [row.media_url] : [],
           contact: row.contact_info || '',
-          createdAt: row.created_at,
+          createdAt: row.created_at ?? new Date().toISOString(),
           description: row.description || '',
           officerNotes: '',
         }));
