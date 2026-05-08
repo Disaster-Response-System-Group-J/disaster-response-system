@@ -1,5 +1,7 @@
 'use client';
 
+import { useState, useEffect } from 'react';
+import { useSocket } from '@/context/SocketContext';
 import Link from 'next/link';
 import { Shield, AlertTriangle, ArrowLeft, Waves, Mountain, Clock, MapPin } from 'lucide-react';
 import { MOCK_ALERTS } from '@/data/mock-data';
@@ -13,7 +15,24 @@ const SEVERITY_STYLES: Record<string, string> = {
 };
 
 export default function PublicAlertsPage() {
-  const publicAlerts = MOCK_ALERTS.filter(a => a.isPublic && a.isActive);
+  const socket = useSocket();
+  const [publicAlerts, setPublicAlerts] = useState(() => MOCK_ALERTS.filter(a => a.isPublic && a.isActive));
+
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleNewAlert = (newAlert: any) => {
+      if (newAlert.isPublic) {
+        setPublicAlerts(prev => [newAlert, ...prev]);
+      }
+    };
+
+    socket.on('dashboard:risk-alert', handleNewAlert);
+
+    return () => {
+      socket.off('dashboard:risk-alert', handleNewAlert);
+    };
+  }, [socket]);
 
   return (
     <div className="min-h-screen bg-[#0a0f16] text-white font-sans">

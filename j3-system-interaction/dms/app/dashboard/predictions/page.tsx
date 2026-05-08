@@ -2,6 +2,8 @@
 
 import { ReactNode, useMemo, useState, useEffect } from 'react';
 import { AlertTriangle, BrainCircuit, Clock3, RefreshCcw, ShieldAlert, Waves } from 'lucide-react';
+import { useSocket } from '@/context/SocketContext';
+import { toast } from 'sonner';
 
 type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
@@ -24,6 +26,7 @@ const LEVEL_STYLES: Record<RiskLevel, string> = {
 };
 
 export default function PredictionsPage() {
+  const socket = useSocket();
   const [zones, setZones] = useState<PredictionZone[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [riskFilter, setRiskFilter] = useState<'ALL' | RiskLevel>('ALL');
@@ -70,6 +73,29 @@ export default function PredictionsPage() {
   useEffect(() => {
     fetchPredictions();
   }, []);
+
+  const handleIssueAlert = (zone: PredictionZone) => {
+    if (!socket) {
+      toast.error('Socket connection not available');
+      return;
+    }
+    
+    const newAlert = {
+      alertId: `ALT-PRED-${Math.floor(Math.random() * 10000)}`,
+      title: `AI Prediction Alert: ${zone.riskLevel} Risk in ${zone.zone}`,
+      description: `Likely Impact: ${zone.likelyImpact} Recommended Action: ${zone.recommendedAction}`,
+      type: 'RISK_ALERT',
+      severity: zone.riskLevel === 'CRITICAL' ? 'CRITICAL' : zone.riskLevel === 'HIGH' ? 'HIGH' : zone.riskLevel === 'MEDIUM' ? 'MEDIUM' : 'LOW',
+      district: zone.district,
+      isPublic: true,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      source: 'AI Prediction System'
+    };
+    
+    socket.emit('client:create-alert', newAlert);
+    toast.success(`Public Alert issued for ${zone.zone}`);
+  };
 
   const filteredZones = useMemo(
     () => zones.filter((zone) => (riskFilter === 'ALL' ? true : zone.riskLevel === riskFilter)),
@@ -161,6 +187,12 @@ export default function PredictionsPage() {
                   <span className={`px-2.5 py-1 rounded text-[9px] font-bold tracking-widest border ${LEVEL_STYLES[zone.riskLevel]}`}>
                     {zone.riskLevel}
                   </span>
+                  <button 
+                    onClick={() => handleIssueAlert(zone)}
+                    className="px-2.5 py-1 ml-2 rounded text-[9px] font-bold tracking-widest border bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20 transition-colors"
+                  >
+                    ISSUE ALERT
+                  </button>
                 </div>
               </div>
 

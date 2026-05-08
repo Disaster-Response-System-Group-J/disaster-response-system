@@ -71,6 +71,11 @@ async function startBridge() {
       const payload = { resourceId: data.resourceId, status: data.status, lastUpdated: data.lastUpdated };
       await producer.send({ topic: 'j3.dashboard.resource-updates', messages: [{ value: JSON.stringify(payload) }] });
     });
+
+    socket.on('client:create-alert', async (data) => {
+      // Broadcast alert to all clients immediately
+      io.emit('dashboard:risk-alert', data);
+    });
   });
 }
 
