@@ -207,12 +207,14 @@ export default function DashboardPage() {
     const handleNewReport = (report: SocketReport) => {
       setPendingCount(prev => prev + 1);
       if (report.latitude && report.longitude) {
+        const lat = report.latitude;
+        const lng = report.longitude;
         setMapPins(prev => [...prev, {
           incidentId: report.reportId || `new-${Date.now()}`,
           severity: 'PENDING',
           status: 'UNVERIFIED',
-          latitude: report.latitude,
-          longitude: report.longitude,
+          latitude: lat,
+          longitude: lng,
         }]);
       }
     };
