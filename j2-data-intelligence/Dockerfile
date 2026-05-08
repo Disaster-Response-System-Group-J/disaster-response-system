@@ -10,7 +10,7 @@ RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 # Stage 2: runtime — only shared libraries, no compilers
 FROM python:3.11-slim AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    librdkafka1 libpq5 curl \
+    librdkafka1 libpq5 libgomp1 curl \
     && rm -rf /var/lib/apt/lists/*
 RUN useradd -m -u 1000 appuser
 WORKDIR /app

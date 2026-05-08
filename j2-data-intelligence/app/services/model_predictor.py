@@ -1,10 +1,12 @@
 import os
+import __main__
 import joblib
 import numpy as np
 import pandas as pd
 from sqlalchemy.orm import Session
 from sqlalchemy.dialects.postgresql import insert
 from app.db.models import Predictions, Division
+from app.services.kafka_producer import publish_predictions
 
 class SoftVotingEnsemble:
     def __init__(self, xgb_model, lgbm_model, n_classes=4):
@@ -28,6 +30,10 @@ class SoftVotingEnsemble:
 MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "models")
 _models = {}
 
+# Some trained artifacts reference SoftVotingEnsemble as __main__.SoftVotingEnsemble.
+# Register it here so joblib can unpickle those models when running under uvicorn.
+setattr(__main__, "SoftVotingEnsemble", SoftVotingEnsemble)
+
 def load_models():
     if not _models:
         for hazard in ["Flood", "Landslide", "Drought"]:
@@ -45,6 +51,8 @@ def generate_predictions(df_features: pd.DataFrame, db: Session):
     
     if df_features.empty:
         return []
+
+    df_features = df_features.reset_index(drop=True)
 
     FEATURES = [
         'rain_sum', 'temperature_2m_mean',
@@ -87,6 +95,14 @@ def generate_predictions(df_features: pd.DataFrame, db: Session):
         p_flood = float(crisis_probs["Flood"][i])
         p_landslide = float(crisis_probs["Landslide"][i])
         p_drought = float(crisis_probs["Drought"][i])
+
+        hazard_probs = {
+            "Flood": p_flood,
+            "Landslide": p_landslide,
+            "Drought": p_drought,
+        }
+        dominant_hazard = max(hazard_probs, key=hazard_probs.get)
+        dominant_hazard_probability = hazard_probs[dominant_hazard]
         
         # Multi-hazard composite
         p_composite = 0.40 * p_flood + 0.35 * p_landslide + 0.25 * p_drought
@@ -123,12 +139,19 @@ def generate_predictions(df_features: pd.DataFrame, db: Session):
         
         results.append({
             "division_id": div_id,
+            "division_name": row.get("division_name"),
             "date": date_val,
             "flood": p_flood,
             "landslide": p_landslide,
             "drought": p_drought,
+            "dominant_hazard": dominant_hazard,
+            "dominant_hazard_probability": dominant_hazard_probability,
             "consideration_score": s_consideration
         })
         
     db.commit()
+    try:
+        publish_predictions(results)
+    except Exception as exc:
+        print(f"Warning: failed to publish predictions to Kafka: {exc}")
     return results
