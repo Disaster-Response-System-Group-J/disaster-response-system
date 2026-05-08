@@ -103,6 +103,13 @@ def build_prediction_message(prediction):
     if hasattr(feature_date, "isoformat"):
         feature_date = feature_date.isoformat()
 
+    resource_summary = prediction.get("resource_summary") or {}
+    total_resources = _as_float(resource_summary.get("totalResources"))
+    available_resources = _as_float(resource_summary.get("availableResources"))
+    resource_pressure = 0.0
+    if total_resources > 0:
+        resource_pressure = max(0.0, min(1.0, 1.0 - (available_resources / total_resources)))
+
     return {
         "eventId": prediction.get("eventId") or f"pred-{prediction.get('division_id')}-{forecast_date}-{category_label}",
         "eventType": "risk-alert",
@@ -114,7 +121,8 @@ def build_prediction_message(prediction):
             "title": f"{category_label} risk forecast for {division_name}",
             "description": (
                 f"Highest predicted category: {category_label} at {category_probability:.3f}. "
-                f"Consideration score: {consideration_score:.3f}."
+                f"Consideration score: {consideration_score:.3f}. "
+                f"Available resources in {district}: {resource_summary.get('availableResources', 0)}."
             ),
             "district": district,
             "divisionId": prediction.get("division_id"),
@@ -126,9 +134,11 @@ def build_prediction_message(prediction):
             "topProbabilityKey": top_probability_key,
             "probabilities": category_probabilities,
             "considerationScore": consideration_score,
+            "resourcePressure": resource_pressure,
             "hazardType": prediction.get("dominant_hazard") if prediction_kind == "hazard" else None,
             "predictedSeverityLabel": prediction.get("predicted_severity_label") if prediction_kind == "severity" else None,
             "featureDate": feature_date,
+            "resourceSummary": resource_summary,
         },
     }
 
@@ -142,7 +152,11 @@ def publish_predictions(predictions):
         if not message:
             continue
 
-        if _as_float(message["payload"].get("considerationScore")) < ALERT_THRESHOLD and _as_float(message["payload"].get("predictionProbability")) < ALERT_THRESHOLD:
+        if (
+            _as_float(message["payload"].get("considerationScore")) < ALERT_THRESHOLD
+            and _as_float(message["payload"].get("predictionProbability")) < ALERT_THRESHOLD
+            and _as_float(message["payload"].get("resourcePressure")) < ALERT_THRESHOLD
+        ):
             continue
 
         producer.produce(

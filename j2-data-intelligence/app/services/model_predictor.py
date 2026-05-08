@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from sqlalchemy.orm import Session
 from sqlalchemy.dialects.postgresql import insert
-from app.db.models import Predictions, Division
+from app.db.models import Predictions, Division, Resource
 from app.services.kafka_producer import publish_predictions
 
 class SoftVotingEnsemble:
@@ -45,6 +45,42 @@ def load_models():
 
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
+
+
+def _summarize_resources(db: Session, district: str):
+    if not district:
+        return None
+
+    resources = db.query(Resource).filter(Resource.district == district).all()
+    if not resources:
+        return {
+            "district": district,
+            "totalResources": 0,
+            "availableResources": 0,
+            "resourceByType": {},
+            "resourceByStatus": {},
+        }
+
+    resource_by_type = {}
+    resource_by_status = {}
+    available_resources = 0
+
+    for resource in resources:
+        resource_type = resource.type or "UNKNOWN"
+        resource_status = resource.status or "UNKNOWN"
+
+        resource_by_type[resource_type] = resource_by_type.get(resource_type, 0) + 1
+        resource_by_status[resource_status] = resource_by_status.get(resource_status, 0) + 1
+        if str(resource_status).upper() == "AVAILABLE":
+            available_resources += 1
+
+    return {
+        "district": district,
+        "totalResources": len(resources),
+        "availableResources": available_resources,
+        "resourceByType": resource_by_type,
+        "resourceByStatus": resource_by_status,
+    }
 
 def generate_predictions(df_features: pd.DataFrame, db: Session):
     load_models()
@@ -90,6 +126,7 @@ def generate_predictions(df_features: pd.DataFrame, db: Session):
     
     for i, row in df_features.iterrows():
         div_id = int(row['division_id'])
+        district = row.get("district") or row.get("division_name")
         date_val = row['date']
         
         p_flood = float(crisis_probs["Flood"][i])
@@ -103,6 +140,8 @@ def generate_predictions(df_features: pd.DataFrame, db: Session):
         }
         dominant_hazard = max(hazard_probs, key=hazard_probs.get)
         dominant_hazard_probability = hazard_probs[dominant_hazard]
+
+        resource_summary = _summarize_resources(db, district)
         
         # Multi-hazard composite
         p_composite = 0.40 * p_flood + 0.35 * p_landslide + 0.25 * p_drought
@@ -140,13 +179,15 @@ def generate_predictions(df_features: pd.DataFrame, db: Session):
         results.append({
             "division_id": div_id,
             "division_name": row.get("division_name"),
+            "district": district,
             "date": date_val,
             "flood": p_flood,
             "landslide": p_landslide,
             "drought": p_drought,
             "dominant_hazard": dominant_hazard,
             "dominant_hazard_probability": dominant_hazard_probability,
-            "consideration_score": s_consideration
+            "consideration_score": s_consideration,
+            "resource_summary": resource_summary,
         })
         
     db.commit()

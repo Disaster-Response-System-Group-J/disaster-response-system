@@ -10,6 +10,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import Link from 'next/link';
 import { VerificationStatus, IncidentSeverity } from '@/types';
 import { useSocket } from '@/context/SocketContext';
+import { normalizeRiskAlert } from '@/lib/risk-alert';
 
 // Color mapping for the map pins
 const SEVERITY_COLORS: Record<string, string> = {
@@ -120,14 +121,7 @@ export default function DashboardPage() {
 
         // Alerts processing
         if (Array.isArray(alertsRes)) {
-          setRecentAlerts(alertsRes.map(a => ({
-            alertId: a.id,
-            title: a.title,
-            severity: a.severity_level || 'HIGH',
-            district: a.district || 'National',
-            createdAt: a.created_at,
-            isActive: true
-          })));
+          setRecentAlerts(alertsRes.map((a: any) => normalizeRiskAlert(a)));
         }
       } catch (error) {
         console.error('Failed to load dashboard data:', error);
@@ -158,7 +152,8 @@ export default function DashboardPage() {
       }
     };
 
-    const handleNewAlert = (alert: any) => {
+    const handleNewAlert = (incoming: any) => {
+      const alert = normalizeRiskAlert(incoming);
       setRecentAlerts(prev => [alert, ...prev].slice(0, 5));
       if (alert.severity === IncidentSeverity.CRITICAL || alert.severity === 'CRITICAL') {
         setData(prev => ({ ...prev, criticalAlerts: prev.criticalAlerts + 1 }));
@@ -378,6 +373,13 @@ export default function DashboardPage() {
                             <span className="flex items-center gap-1"><MapPin size={10} /> {alert.district}</span>
                             <span className="flex items-center gap-1"><Clock size={10} /> {new Date(alert.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
                           </div>
+                          {(alert.predictionCategory || alert.considerationScore !== undefined) && (
+                            <div className="mt-1 text-[10px] text-slate-400 flex flex-wrap gap-x-2 gap-y-1">
+                              {alert.predictionCategory && <span>Category: {alert.predictionCategory}</span>}
+                              {alert.predictionProbability !== undefined && <span>Prob: {alert.predictionProbability.toFixed(3)}</span>}
+                              {alert.considerationScore !== undefined && <span>Score: {alert.considerationScore.toFixed(3)}</span>}
+                            </div>
+                          )}
                         </div>
                       </div>
                       <span className={`px-2.5 py-1 rounded text-[9px] font-bold tracking-widest border ${
