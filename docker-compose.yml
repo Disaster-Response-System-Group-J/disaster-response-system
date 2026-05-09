@@ -265,6 +265,9 @@ services:
       KONG_PROXY_LISTEN: 0.0.0.0:8000
       KONG_ADMIN_LISTEN: 0.0.0.0:8001
       KONG_LOG_LEVEL: warn
+      # Allow `require "cjson.safe"` from inside post-function plugin
+      # sandbox (used by the J3 RBAC role-gating Lua in kong/setup.sh).
+      KONG_UNTRUSTED_LUA_SANDBOX_REQUIRES: cjson.safe
     ports:
       - "8000:8000"
       - "8001:8001"
