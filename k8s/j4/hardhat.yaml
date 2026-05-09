@@ -15,8 +15,8 @@ spec:
     spec:
       containers:
         - name: hardhat-node
-          image: hardhat-node:latest
-          imagePullPolicy: Never
+          image: j4-hardhat:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8545
           readinessProbe:

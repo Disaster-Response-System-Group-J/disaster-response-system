@@ -21,6 +21,59 @@ PubSubClient client(espClient);
 #define rst 14
 #define dio0 26
 
+static String normalizeLoRaJson(String payload) {
+    payload.trim();
+
+    // Keep only JSON body when noise exists before or after the packet.
+    int firstBrace = payload.indexOf('{');
+    int lastBrace = payload.lastIndexOf('}');
+    if (firstBrace >= 0 && lastBrace > firstBrace) {
+        payload = payload.substring(firstBrace, lastBrace + 1);
+    }
+
+    // If opening brace is missing but we can still see fields, recover packet.
+    if (!payload.startsWith("{") && payload.indexOf("\"type\"") >= 0) {
+        int typeIndex = payload.indexOf("\"type\"");
+        if (payload.indexOf("J1_TX_02") >= 0 || payload.indexOf("LANDSLIDE") >= 0) {
+            payload = "{\"id\":\"J1_TX_02\"," + payload.substring(typeIndex);
+        } else if (payload.indexOf("J1_TX_01") >= 0 || payload.indexOf("FLOOD") >= 0) {
+            payload = "{\"id\":\"J1_TX_01\"," + payload.substring(typeIndex);
+        } else {
+            payload = "{" + payload.substring(typeIndex);
+        }
+    }
+
+    if (!payload.endsWith("}")) {
+        int closeBrace = payload.lastIndexOf('}');
+        if (closeBrace >= 0) {
+            payload = payload.substring(0, closeBrace + 1);
+        } else {
+            payload += "}";
+        }
+    }
+
+    // Remove duplicated closing braces created by RF garbage.
+    while (payload.endsWith("}}")) {
+        payload.remove(payload.length() - 1);
+    }
+
+    return payload;
+}
+
+static String resolveMqttTopic(const JsonDocument& doc) {
+    String nodeId = doc["node_id"] | doc["id"] | "";
+    String type = doc["type"] | "";
+
+    if (nodeId == "J1_TX_01" || type == "SENSOR_DATA" || type == "SENSOR_DATA_FLOOD" || type == "FLOOD") {
+        return "j1/disaster/flood";
+    }
+    if (nodeId == "J1_TX_02" || type == "SENSOR_DATA_LANDSLIDE" || type == "LANDSLIDE") {
+        return "j1/disaster/landslide";
+    }
+
+    return "";
+}
+
 void setup_wifi() {
     Serial.print("\nConnecting to Wi-Fi: ");
     Serial.println(ssid);
@@ -134,61 +187,30 @@ void loop() {
             receivedData += (char)LoRa.read();
         }
         
-        Serial.print("\n📥 [LoRa] Received packet: ");
+        Serial.print("\n📥 [LoRa] Received ");
+        Serial.print(packetSize);
+        Serial.print(" bytes: ");
         Serial.println(receivedData);
         Serial.print("   RSSI: ");
-        Serial.println(LoRa.packetRssi());
+        Serial.print(LoRa.packetRssi());
+        Serial.print(" dBm | SNR: ");
+        Serial.println(LoRa.packetSnr());
 
-        // ROCK-SOLID JSON RECOVERY
-        // The ESP32 LoRa module might receive slightly corrupted first bytes due to RF saturation
-        // (RSSI is -17 to -37, which is extremely strong).
-        // If the string contains `"type"`, we can rebuild the beginning perfectly.
-        int typeIndex = receivedData.indexOf("\"type\"");
-        if (typeIndex > 0) {
-            if (receivedData.indexOf("J1_TX_02") > 0) {
-                receivedData = "{\"id\":\"J1_TX_02\"," + receivedData.substring(typeIndex);
-                Serial.print("   🔧 Repaired JSON: ");
-                Serial.println(receivedData);
-            } else if (receivedData.indexOf("J1_TX_01") > 0) {
-                receivedData = "{\"node_id\":\"J1_TX_01\"," + receivedData.substring(typeIndex);
-                Serial.print("   🔧 Repaired JSON: ");
-                Serial.println(receivedData);
-            }
-        }
-        
-        // Ensure trailing braces are correct
-        if (!receivedData.endsWith("}")) {
-            // Trim any garbage at the end
-            int lastBrace = receivedData.lastIndexOf('}');
-            if (lastBrace > 0) {
-                receivedData = receivedData.substring(0, lastBrace + 1);
-            } else {
-                receivedData += "}";
-            }
-        }
-        
-        // Force cleanup of random multiple trailing brackets
-        while(receivedData.endsWith("}}")) {
-             receivedData.remove(receivedData.length()-1);
+        String normalizedData = normalizeLoRaJson(receivedData);
+        if (normalizedData != receivedData) {
+            Serial.print("   Repaired JSON: ");
+            Serial.println(normalizedData);
         }
         
         // Parse JSON to route to correct topic
         JsonDocument doc;
-        DeserializationError error = deserializeJson(doc, receivedData);
+        DeserializationError error = deserializeJson(doc, normalizedData);
         
         if (!error) {
-            String nodeId = doc["node_id"] | doc["id"] | "";
-            String type = doc["type"] | "";
-
-            String topic = "";
-            if (nodeId == "J1_TX_01" || type == "SENSOR_DATA" || type == "SENSOR_DATA_FLOOD" || type == "FLOOD") {
-                topic = "j1/disaster/flood";
-            } else if (nodeId == "J1_TX_02" || type == "SENSOR_DATA_LANDSLIDE" || type == "LANDSLIDE") {
-                topic = "j1/disaster/landslide";
-            }
+            String topic = resolveMqttTopic(doc);
 
             if (topic != "") {
-                if (client.publish(topic.c_str(), receivedData.c_str())) {
+                if (client.publish(topic.c_str(), normalizedData.c_str())) {
                     Serial.print("   ✅ Published to MQTT topic: ");
                     Serial.println(topic);
                 } else {

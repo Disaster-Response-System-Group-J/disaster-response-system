@@ -25,6 +25,36 @@ services:
     networks:
       - disaster-net
 
+  # ─────────────────────────────────────────────────────────────
+  # J1 — Device & Edge Systems: MQTT-Kafka bridge
+  # Subscribes to HiveMQ (j1/disaster/#) and routes sensor data
+  # into two separate Kafka topics:
+  #   j1.sensor.telemetry.flood     ← flood sensor readings
+  #   j1.sensor.telemetry.landslide ← landslide sensor readings
+  # Both J1 and J2 teams consume from the same root Kafka cluster
+  # at kafka:29092.
+  # ─────────────────────────────────────────────────────────────
+  mqtt-kafka-bridge:
+    build:
+      context: ./j1-device-edge/mqtt-kafka-bridge
+    container_name: disaster-mqtt-kafka-bridge
+    restart: unless-stopped
+    environment:
+      MQTT_BROKER: 8e659da889be4ff7a3d839144a0f8aaa.s1.eu.hivemq.cloud
+      MQTT_PORT: 8883
+      MQTT_USERNAME: j1_gateway
+      MQTT_PASSWORD: 8797Sudil
+      MQTT_TOPICS: j1/disaster/#
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_TOPIC: disaster_data_stream
+      KAFKA_TOPIC_FLOOD: j1.sensor.telemetry.flood
+      KAFKA_TOPIC_LANDSLIDE: j1.sensor.telemetry.landslide
+    depends_on:
+      kafka:
+        condition: service_started
+    networks:
+      - disaster-net
+
   # Apache Kafka — KRaft mode, dual listener (EXTERNAL for host, INTERNAL for containers)
   kafka:
     image: apache/kafka:latest
@@ -87,7 +117,6 @@ services:
     networks:
       - disaster-net
 
-  # Keycloak exporter — exposes Keycloak metrics for Prometheus
 # keycloak-exporter:
   #   image: ghcr.io/ivanklee86/keycloak_exporter:latest
   #   container_name: disaster-keycloak-exporter
@@ -118,13 +147,10 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
-      KC_DB_USERNAME: keycloak
-      KC_DB_PASSWORD: keycloak123
+      KC_DB_USERNAME: ${KC_DB_USERNAME:-keycloak}
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD:-keycloak123}
       KC_METRICS_ENABLED: "true"
       KC_METRICS_PATH: "/metrics"
-      # Trust X-Forwarded-Proto so dev clients (host curl, keycloak-setup
-      # sidecar) can talk plain HTTP without sslRequired=external rejecting
-      # them on the master realm.
       KC_PROXY_HEADERS: xforwarded
     ports:
       - "8180:8080"
@@ -159,10 +185,7 @@ services:
     networks:
       - disaster-net
 
-  # Vault secret seeding — runs once after Vault is up. Currently writes
-  # the Keycloak admin password from .env into secret/keycloak/admin so
-  # the keycloak-setup sidecar can read it from Vault instead of env.
-  # Idempotent — KV v2 PUT is upsert.
+  # Vault secret seeding — runs once after Vault is up.
   vault-setup:
     image: alpine:3.19
     container_name: disaster-vault-setup
@@ -186,9 +209,6 @@ services:
       - disaster-net
 
   # Keycloak realm provisioning — runs once after Keycloak is up.
-  # Creates the 11 realm roles, 11 test users, and the disaster-app client.
-  # Pulls the admin password from Vault (secret/keycloak/admin), seeded by
-  # vault-setup. Idempotent — safe to re-run.
   keycloak-setup:
     image: alpine:3.19
     container_name: disaster-keycloak-setup
@@ -520,8 +540,8 @@ services:
       context: ./j3-system-interaction/dms
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: http://localhost:3000
-        NEXT_PUBLIC_SOCKET_URL: http://localhost:3001
+        NEXT_PUBLIC_API_URL: http://${SERVER_IP:-localhost}:3000
+        NEXT_PUBLIC_SOCKET_URL: http://${SERVER_IP:-localhost}:3001
     container_name: j3-dms
     restart: unless-stopped
     env_file:
@@ -544,30 +564,30 @@ services:
       - disaster-net
 
   # ─────────────────────────────────────────────────────────────
-  # J1 — Device & Edge Systems  (placeholder — add when ready)
+  # J1 — Device & Edge Systems
+  # j1-bridge-api handles mobile SOS help requests → j1.events topic
+  # mqtt-kafka-bridge handles sensor telemetry (defined above near kafka)
   # ─────────────────────────────────────────────────────────────
   # j1-device-edge:
-  #   build: ./J1-device-edge
-  #   container_name: j1-device-edge
+  #   build: ./j1-device-edge/backend
+  #   container_name: j1-bridge-api
   #   ports:
-  #     - "8081:8081"
+  #     - "8081:8000"
   #   environment:
-  #     DB_HOST: postgres
-  #     DB_USER: ${POSTGRES_USER}
-  #     DB_PASSWORD: ${POSTGRES_PASSWORD}
-  #     DB_NAME: ${POSTGRES_DB}
-  #     KAFKA_BROKER: kafka:29092
+  #     KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+  #     KAFKA_TOPIC_EVENTS: j1.events
   #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
   #     kafka:
   #       condition: service_started
   #   networks:
   #     - disaster-net
 
   # ─────────────────────────────────────────────────────────────
-  # ─────────────────────────────────────────────────────────────
   # J2 — Data & Intelligence
+  # Consumes from Kafka topics produced by J1:
+  #   j1.sensor.telemetry.flood
+  #   j1.sensor.telemetry.landslide
+  #   j1.events
   # ─────────────────────────────────────────────────────────────
   j2-data-intelligence:
     build: ./j2-data-intelligence

@@ -28,8 +28,8 @@ spec:
           command: ['sh', '-c', 'until nc -z hardhat-node 8545; do echo waiting for hardhat; sleep 3; done']
       containers:
         - name: deployer
-          image: hardhat-deployer:latest
-          imagePullPolicy: Never
+          image: j4-hardhat:latest
+          imagePullPolicy: Always
           volumeMounts:
             - name: deployment
               mountPath: /deployment
@@ -65,7 +65,7 @@ spec:
       containers:
         - name: j4-audit-api
           image: j4-audit-api:latest
-          imagePullPolicy: Never
+          imagePullPolicy: Always
           env:
             - name: PORT
               value: "8084"

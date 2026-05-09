@@ -8,6 +8,7 @@ const incidentCommander: User = { id: 'IC-001', email: 'commander@dmc.gov.lk', n
 const opsOfficer: User = { id: 'OFF-001', email: 'officer@dmc.gov.lk', name: 'Nimal Silva', role: UserRole.OPERATIONS_OFFICER_ZONAL };
 const resourceManager: User = { id: 'RM-001', email: 'resource@dmc.gov.lk', name: 'Sunil Fernando', role: UserRole.RESOURCE_MANAGER_NATIONAL };
 const systemAdmin: User = { id: 'ADM-001', email: 'admin@dmc.gov.lk', name: 'Kamal Perera', role: UserRole.SYSTEM_ADMIN };
+const auditor: User = { id: 'AUD-001', email: 'auditor@dmc.gov.lk', name: 'Priya Jayawardena', role: UserRole.AUDITOR };
 const publicUser: User = { id: 'PUB-001', email: 'public@example.com', name: 'Public User', role: UserRole.PUBLIC_USER };
 
 describe('hasPermission', () => {
@@ -75,6 +76,14 @@ describe('hasPermission', () => {
     expect(hasPermission(systemAdmin, 'manage:settings')).toBe(true);
   });
 
+  it('AUDITOR can view blockchain audit reports', () => {
+    expect(hasPermission(auditor, 'view:blockchain-audit')).toBe(true);
+  });
+
+  it('AUDITOR can view audit logs', () => {
+    expect(hasPermission(auditor, 'view:audit-logs')).toBe(true);
+  });
+
   it('SYSTEM_ADMIN cannot verify reports (not their role)', () => {
     expect(hasPermission(systemAdmin, 'verify:reports')).toBe(false);
   });
@@ -132,5 +141,9 @@ describe('hasRole', () => {
 
   it('SYSTEM_ADMIN matches its own role', () => {
     expect(hasRole(systemAdmin, UserRole.SYSTEM_ADMIN)).toBe(true);
+  });
+
+  it('AUDITOR matches its own role', () => {
+    expect(hasRole(auditor, UserRole.AUDITOR)).toBe(true);
   });
 });

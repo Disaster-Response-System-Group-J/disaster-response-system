@@ -50,8 +50,7 @@ metadata:
 spec:
   selector:
     app: j3-dms
-  type: NodePort
+  type: LoadBalancer
   ports:
-    - port: 3000
+    - port: 80
       targetPort: 3000
-      nodePort: 30000

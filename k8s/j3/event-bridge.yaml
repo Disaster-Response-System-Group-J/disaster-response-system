@@ -18,7 +18,7 @@ spec:
       containers:
         - name: j3-event-bridge
           image: j3-event-bridge:latest
-          imagePullPolicy: Never
+          imagePullPolicy: Always
           env:
             - name: KAFKA_BROKER
               value: kafka:29092

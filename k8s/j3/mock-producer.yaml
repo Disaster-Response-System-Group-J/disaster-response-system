@@ -17,8 +17,8 @@ spec:
     spec:
       containers:
         - name: j3-mock-producer
-          image: j3-mock-producer:latest
-          imagePullPolicy: Never
+          image: j3-event-bridge:latest
+          imagePullPolicy: Always
           command: ["node", "mock-producer.js"]
           env:
             - name: KAFKA_BROKER
