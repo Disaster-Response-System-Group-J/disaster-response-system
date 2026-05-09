@@ -13,6 +13,7 @@ export enum UserRole {
   RESOURCE_MANAGER_NATIONAL = 'RESOURCE_MANAGER_NATIONAL',
   RESOURCE_MANAGER_ZONAL = 'RESOURCE_MANAGER_ZONAL',
   SYSTEM_ADMIN = 'SYSTEM_ADMIN',
+  AUDITOR = 'AUDITOR',
 }
 
 // ── Enums ────────────────────────────────────────────────────
@@ -127,6 +128,44 @@ export interface ConfirmedIncident {
   affectedPeople?: number;
   createdAt: string;
   updatedAt: string;
+  // Assigned by J1/backend on incident creation; never generated in J3
+  blockchainCaseId?: number | null;
+}
+
+// ── J4 Blockchain Audit Types ─────────────────────────────────
+
+export interface LogAuditEventPayload {
+  caseId: number;
+  eventId: string;
+  eventType: string;
+  incidentId: string;
+  resourceId?: string;
+  alertId?: string;
+  performedBy: string;
+  performedRole: string;
+  previousStatus?: string;
+  newStatus?: string;
+  district?: string;
+  notes?: string;
+  correlationId?: string;
+}
+
+export interface AuditEvent {
+  id: number;
+  caseId: number;
+  eventId: string;
+  eventType: string;
+  incidentId: string;
+  resourceId?: string;
+  alertId?: string;
+  performedBy: string;
+  performedRole: string;
+  previousStatus?: string;
+  newStatus?: string;
+  district?: string;
+  notes?: string;
+  correlationId?: string;
+  timestamp: number;
 }
 
 export interface Resource {
@@ -287,6 +326,11 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     'dispatch:resources', 'update:resource-status', 'manage:shelters'
   ],
   [UserRole.SYSTEM_ADMIN]: [
-    'view:dashboard', 'manage:users', 'manage:settings', 'view:audit-logs'
+    'view:dashboard', 'manage:users', 'manage:settings', 'view:audit-logs',
+    'view:blockchain-audit',
+  ],
+  [UserRole.AUDITOR]: [
+    'view:dashboard', 'view:audit-logs', 'view:blockchain-audit',
+    'view:incident-map',
   ],
 };

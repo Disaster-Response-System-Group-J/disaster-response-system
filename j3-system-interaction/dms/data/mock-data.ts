@@ -10,6 +10,7 @@ export const MOCK_USERS: (User & { password: string, assignedDistrict?: string }
   { id: 'OFF-001', email: 'officer@dmc.gov.lk', name: 'Nimal Silva', role: UserRole.OPERATIONS_OFFICER_ZONAL, password: 'officer123', assignedDistrict: 'Colombo' },
   { id: 'RM-001', email: 'resource@dmc.gov.lk', name: 'Sunil Fernando', role: UserRole.RESOURCE_MANAGER_NATIONAL, password: 'resource123', assignedDistrict: 'ALL' },
   { id: 'IC-001', email: 'commander@dmc.gov.lk', name: 'Incident Commander', role: UserRole.INCIDENT_COMMANDER_NATIONAL, password: 'admin123', assignedDistrict: 'ALL' },
+  { id: 'AUD-001', email: 'auditor@dmc.gov.lk', name: 'Priya Jayawardena', role: UserRole.AUDITOR, password: 'auditor123', assignedDistrict: 'ALL' },
 ];
 // ── Mock Incoming Reports ────────────────────────────────────
 export const MOCK_INCOMING_REPORTS: IncomingReport[] = [
