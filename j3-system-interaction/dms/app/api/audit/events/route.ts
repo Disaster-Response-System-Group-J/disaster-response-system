@@ -1,13 +1,9 @@
-import { proxyAuditGet, proxyAuditRequest } from '@/lib/audit-gateway';
-
-export async function GET() {
-  return proxyAuditGet('/cases');
-}
+import { proxyAuditRequest } from '@/lib/audit-gateway';
 
 export async function POST(request: Request) {
   const requestBody = await request.text();
 
-  return proxyAuditRequest('POST', '/cases', {
+  return proxyAuditRequest('POST', '/events', {
     body: requestBody,
     headers: {
       Accept: 'application/json',

@@ -16,7 +16,7 @@ export function getAuditGatewayBaseUrl() {
   return trimTrailingSlash(configuredUrl);
 }
 
-export async function proxyAuditGet(pathname: string, searchParams?: URLSearchParams) {
+function buildAuditTargetUrl(pathname: string, searchParams?: URLSearchParams) {
   const gatewayBaseUrl = getAuditGatewayBaseUrl();
   const targetUrl = new URL(`/api/v1/audit${pathname}`, gatewayBaseUrl);
 
@@ -24,13 +24,30 @@ export async function proxyAuditGet(pathname: string, searchParams?: URLSearchPa
     targetUrl.search = searchParams.toString();
   }
 
+  return targetUrl;
+}
+
+type ProxyAuditRequestOptions = {
+  body?: BodyInit | null;
+  headers?: HeadersInit;
+  searchParams?: URLSearchParams;
+};
+
+export async function proxyAuditRequest(
+  method: string,
+  pathname: string,
+  options: ProxyAuditRequestOptions = {}
+) {
+  const targetUrl = buildAuditTargetUrl(pathname, options.searchParams);
+
   try {
     const response = await fetch(targetUrl.toString(), {
-      method: 'GET',
+      method,
       cache: 'no-store',
-      headers: {
+      headers: options.headers || {
         Accept: 'application/json',
       },
+      body: options.body,
     });
 
     const responseText = await response.text();
@@ -53,5 +70,33 @@ export async function proxyAuditGet(pathname: string, searchParams?: URLSearchPa
       },
       { status: 502 }
     );
+  }
+}
+
+export async function proxyAuditGet(pathname: string, searchParams?: URLSearchParams) {
+  return proxyAuditRequest('GET', pathname, { searchParams });
+}
+
+export async function proxyAuditHealth() {
+  const targetUrl = buildAuditTargetUrl('/cases');
+
+  try {
+    const response = await fetch(targetUrl.toString(), {
+      method: 'GET',
+      cache: 'no-store',
+      headers: {
+        Accept: 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      return NextResponse.json({ status: 'offline' }, { status: response.status });
+    }
+
+    return NextResponse.json({ status: 'ok' });
+  } catch (error) {
+    console.error('Audit health proxy error:', error);
+
+    return NextResponse.json({ status: 'offline' }, { status: 502 });
   }
 }
