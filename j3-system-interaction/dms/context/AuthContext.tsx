@@ -51,6 +51,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, passkey: password }),
     });
+    if (!res.headers.get('content-type')?.includes('application/json')) {
+      throw new Error('Server unreachable. Make sure you are on port 3000, not 8000.');
+    }
     const data = await res.json();
     if (!res.ok || !data.success) {
       throw new Error(data.message || 'Invalid credentials');
