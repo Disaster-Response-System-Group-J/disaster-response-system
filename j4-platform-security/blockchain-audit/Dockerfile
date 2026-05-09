@@ -1,8 +1,4 @@
-# This image builds the TypeScript backend and runs the compiled API.
-# To add it to the shared root docker-compose.yml, use the example
-# service block in the final notes for this task.
-
-FROM node:22-alpine AS builder
+FROM node:22.16.0-alpine3.21 AS builder
 
 WORKDIR /app
 
@@ -13,22 +9,26 @@ COPY tsconfig.json tsconfig.build.json ./
 COPY src ./src
 
 RUN npm run build
+RUN mkdir -p dist/blockchain \
+    && cp src/blockchain/IncidentAuditLog.json dist/blockchain/IncidentAuditLog.json
 
-# The backend reads the ABI JSON from the filesystem at runtime,
-# so copy it into the compiled dist folder as part of the image build.
-RUN mkdir -p dist/blockchain && cp src/blockchain/IncidentAuditLog.json dist/blockchain/IncidentAuditLog.json
 
-FROM node:22-alpine AS runtime
+FROM node:22.16.0-alpine3.21 AS runtime
 
 WORKDIR /app
 
 ENV NODE_ENV=production
 
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev && chown -R node:node /app/node_modules
 
-COPY --from=builder /app/dist ./dist
+COPY --from=builder --chown=node:node /app/dist ./dist
+
+USER node
 
 EXPOSE 8084
+
+HEALTHCHECK --interval=10s --timeout=5s --start-period=10s --retries=3 \
+    CMD wget -qO- http://127.0.0.1:8084/health || exit 1
 
 CMD ["npm", "start"]
