@@ -77,6 +77,28 @@ services:
     networks:
       - disaster-net
 
+  # Kafka Topic Initialiser — runs once after Kafka is up and creates all
+  # required topics so producers never hit "Unknown Topic" on first publish.
+  kafka-topic-init:
+    image: apache/kafka:latest
+    container_name: disaster-kafka-topic-init
+    restart: "no"
+    command: >
+      sh -c "
+        echo 'Waiting for Kafka to be ready...' &&
+        sleep 20 &&
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic j1.events               --partitions 3 --replication-factor 1 &&
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic j1.sensor.telemetry.flood      --partitions 3 --replication-factor 1 &&
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic j1.sensor.telemetry.landslide  --partitions 3 --replication-factor 1 &&
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic j2.engine.risk-alerts          --partitions 3 --replication-factor 1 &&
+        echo 'All Kafka topics created.'
+      "
+    depends_on:
+      kafka:
+        condition: service_started
+    networks:
+      - disaster-net
+
   # Kafka Exporter — exposes Kafka metrics for Prometheus
   kafka-exporter:
     image: danielqsj/kafka-exporter:latest
@@ -575,22 +597,36 @@ services:
 
   # ─────────────────────────────────────────────────────────────
   # J1 — Device & Edge Systems
-  # j1-bridge-api handles mobile SOS help requests → j1.events topic
-  # mqtt-kafka-bridge handles sensor telemetry (defined above near kafka)
+  # j1-bridge-api  → mobile SOS events   → Kafka topic j1.events
+  # mqtt-kafka-bridge → sensor telemetry → Kafka topics j1.sensor.telemetry.*
   # ─────────────────────────────────────────────────────────────
-  # j1-device-edge:
-  #   build: ./j1-device-edge/backend
-  #   container_name: j1-bridge-api
-  #   ports:
-  #     - "8081:8000"
-  #   environment:
-  #     KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-  #     KAFKA_TOPIC_EVENTS: j1.events
-  #   depends_on:
-  #     kafka:
-  #       condition: service_started
-  #   networks:
-  #     - disaster-net
+  j1-bridge-api:
+    build: ./j1-device-edge/backend
+    container_name: j1-bridge-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_TOPIC_EVENTS: j1.events
+      KAFKA_PRODUCER_TIMEOUT: "10"
+      API_HOST: 0.0.0.0
+      API_PORT: "8000"
+      CORS_ORIGINS: "*"
+      IDEMPOTENCY_MAX_KEYS: "50000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    depends_on:
+      kafka:
+        condition: service_started
+      kafka-topic-init:
+        condition: service_completed_successfully
+    networks:
+      - disaster-net
 
   # ─────────────────────────────────────────────────────────────
   # J2 — Data & Intelligence
