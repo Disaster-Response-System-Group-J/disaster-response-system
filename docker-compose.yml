@@ -269,21 +269,18 @@ services:
     image: alpine:3.19
     container_name: disaster-kong-setup
     restart: "no"
+    environment:
+      KONG_ADMIN: http://kong:8001
+    volumes:
+      - ./j4-platform-security/kong/setup.sh:/setup.sh:ro
     entrypoint:
       - sh
       - -c
       - |
-        apk add --no-cache curl -q
-        until curl -sf http://kong:8001 >/dev/null 2>&1; do
-          echo 'Waiting for Kong Admin API...'; sleep 3
-        done
-        curl -sf -X POST http://kong:8001/services --data 'name=j3-dms' --data 'url=http://j3-dms:3000' && echo 'Registered j3-dms'
-        curl -sf -X POST http://kong:8001/services/j3-dms/routes --data 'name=j3-route' --data 'paths[]=/api/v1/system' --data 'strip_path=false' && echo 'Created j3-route'
-        curl -sf -X POST http://kong:8001/routes/j3-route/plugins --data 'name=rate-limiting' --data 'config.minute=100' --data 'config.policy=local' && echo 'Rate limiting applied to j3'
-        curl -sf -X POST http://kong:8001/services --data 'name=j2-data-intelligence' --data 'url=http://j2-data-intelligence:8082' && echo 'Registered j2-data-intelligence'
-        curl -sf -X POST http://kong:8001/services/j2-data-intelligence/routes --data 'name=j2-route' --data 'paths[]=/api/v1/engine' --data 'strip_path=false' && echo 'Created j2-route'
-        curl -sf -X POST http://kong:8001/routes/j2-route/plugins --data 'name=rate-limiting' --data 'config.minute=60' --data 'config.policy=local' && echo 'Rate limiting applied to j2'
-        echo 'Kong setup complete'
+        apk add --no-cache bash curl -q
+        tr -d '\r' < /setup.sh > /tmp/kong-setup.sh
+        chmod +x /tmp/kong-setup.sh
+        bash /tmp/kong-setup.sh
     depends_on:
       kong:
         condition: service_healthy
