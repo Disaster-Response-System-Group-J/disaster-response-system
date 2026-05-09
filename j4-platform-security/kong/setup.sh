@@ -9,7 +9,7 @@ echo "==> Waiting for Kong to be ready..."
 until curl -sf "$KONG_ADMIN" > /dev/null; do sleep 2; done
 echo "    Kong is up."
 
-# ── Services ────────────────────────────────────────────────────────────────
+# â”€â”€ Services â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 echo ""
 echo "==> Registering services..."
@@ -26,7 +26,11 @@ curl -s -X POST "$KONG_ADMIN/services" \
   --data name=j3-system-interaction \
   --data url=http://j3-dms:3000 > /dev/null && echo "    j3-system-interaction OK"
 
-# ── Routes ──────────────────────────────────────────────────────────────────
+curl -s -X POST "$KONG_ADMIN/services" \
+  --data name=j4-audit-api \
+  --data url=http://j4-audit-api:8084 > /dev/null && echo "    j4-audit-api OK"
+
+# â”€â”€ Routes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 echo ""
 echo "==> Creating routes..."
@@ -46,12 +50,17 @@ curl -s -X POST "$KONG_ADMIN/services/j3-system-interaction/routes" \
   --data "paths[]=/api/v1/system" \
   --data strip_path=false > /dev/null && echo "    j3-route (/api/v1/system) OK"
 
-# ── Rate Limiting ────────────────────────────────────────────────────────────
+curl -s -X POST "$KONG_ADMIN/services/j4-audit-api/routes" \
+  --data name=j4-audit-route \
+  --data "paths[]=/api/v1/audit" \
+  --data strip_path=false > /dev/null && echo "    j4-audit-route (/api/v1/audit) OK"
+
+# â”€â”€ Rate Limiting â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 echo ""
 echo "==> Applying rate limiting (100 req/min) to all routes..."
 
-for route in j1-route j2-route j3-route; do
+for route in j1-route j2-route j3-route j4-audit-route; do
   curl -s -X POST "$KONG_ADMIN/routes/$route/plugins" \
     --data name=rate-limiting \
     --data config.minute=100 \
