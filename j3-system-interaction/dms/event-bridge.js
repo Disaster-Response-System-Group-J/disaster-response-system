@@ -1,15 +1,41 @@
 const { Server } = require('socket.io');
 const { Kafka } = require('kafkajs');
 
-// 1. Initialize Socket.IO Server
-const io = new Server(3001, {
-  cors: { origin: "*", methods: ["GET", "POST"] }
-});
+const brokerCandidates = (process.env.KAFKA_BROKER || 'localhost:29092,localhost:9092')
+  .split(',')
+  .map((item) => item.trim())
+  .filter(Boolean);
+
+// 1. Initialize Socket.IO Server (configurable port with fallback)
+const DEFAULT_PORT = parseInt(process.env.PORT || process.env.BRIDGE_PORT || '3001', 10);
+let io;
+
+async function bindSocketPort(startPort = DEFAULT_PORT, maxAttempts = 10) {
+  for (let p = startPort; p < startPort + maxAttempts; p++) {
+    try {
+      const candidate = new Server({ cors: { origin: "*", methods: ["GET", "POST"] } });
+      // Attach an error handler to avoid unhandled 'error' events during probe
+      candidate.on('error', (err) => {
+        // no-op here; the listen() call will throw synchronously for EADDRINUSE
+      });
+      candidate.listen(p);
+      io = candidate; // assign the working server to the module-scoped `io`
+      return p;
+    } catch (err) {
+      if (err && err.code === 'EADDRINUSE') {
+        console.warn(`Port ${p} in use — trying ${p + 1}`);
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error(`Unable to bind Socket.IO to a port in range ${startPort}-${startPort + maxAttempts - 1}`);
+}
 
 // 2. Initialize Kafka Client 
 const kafka = new Kafka({
   clientId: 'j3-event-bridge',
-  brokers: [process.env.KAFKA_BROKER || 'localhost:9092']
+  brokers: brokerCandidates
 });
 
 const consumer = kafka.consumer({ groupId: 'j3-dashboard-group' });
@@ -34,10 +60,11 @@ async function startBridge() {
   console.log("📂 Verified all required Kafka topics exist.");
   await admin.disconnect();
 
-  // 4. Connect Bridge
+  // 4. Bind socket port and connect bridge
+  const usedPort = await bindSocketPort();
   await producer.connect();
   await consumer.connect();
-  console.log("✅ Event Bridge Online. Connected to Kafka (9092) & Next.js (3001)");
+  console.log(`✅ Event Bridge Online. Connected to Kafka via ${brokerCandidates.join(', ')} & Next.js (${usedPort})`);
 
   // 5. Subscribe
   for (const t of topics) {
@@ -54,6 +81,8 @@ async function startBridge() {
       if (topic === 'j1.sensor.telemetry') io.emit('sensor:telemetry-update', data);
       if (topic === 'j2.engine.risk-alerts') io.emit('dashboard:risk-alert', data);
       if (topic === 'j2.engine.incidents') io.emit('dashboard:new-incident', data);
+      if (topic === 'j3.dashboard.report-updates') io.emit('dashboard:report-updated', data);
+      if (topic === 'j3.dashboard.resource-updates') io.emit('dashboard:resource-updated', data);
       
     },
   });

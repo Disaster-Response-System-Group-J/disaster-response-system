@@ -300,6 +300,7 @@ model ComputedFeatures {
   monthCos        Float?   @map("month_cos")
   spi             Float?
   divisionEncoded Int?     @map("division_encoded")
+  levelDifference Float?   @map("level_difference")
 
   division Division @relation(fields: [divisionId], references: [divisionId])
 

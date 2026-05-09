@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Float, String, Date, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, Float, String, Date, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.db.database import Base
 
@@ -9,6 +9,20 @@ class Division(Base):
     latitude = Column(Float)
     longitude = Column(Float)
     population = Column(Integer)
+
+
+class Resource(Base):
+    __tablename__ = "Resource"
+    id = Column(String, primary_key=True, index=True)
+    type = Column(String)
+    name = Column(String)
+    district = Column(String, index=True)
+    status = Column(String)
+    latitude = Column(Float)
+    longitude = Column(Float)
+    capacity = Column(Integer)
+    currentLoad = Column(Integer)
+    lastUpdated = Column(DateTime)
 
 class RainfallData(Base):
     __tablename__ = "RainfallData"

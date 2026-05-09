@@ -597,6 +597,7 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       KAFKA_BROKER: kafka:29092
+      KAFKA_ALERT_THRESHOLD: "0.0"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8082/api/v1/health"]
       interval: 30s
