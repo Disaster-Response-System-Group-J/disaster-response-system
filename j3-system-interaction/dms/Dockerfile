@@ -1,6 +1,6 @@
 FROM node:20.19.2-alpine3.21 AS deps
 
-RUN apk add --no-cache openssl
+RUN apk upgrade --no-cache && apk add --no-cache openssl
 
 WORKDIR /app
 
@@ -10,7 +10,7 @@ RUN npm ci --frozen-lockfile
 
 FROM node:20.19.2-alpine3.21 AS builder
 
-RUN apk add --no-cache openssl
+RUN apk upgrade --no-cache && apk add --no-cache openssl
 
 WORKDIR /app
 
@@ -28,7 +28,7 @@ RUN npm run build
 
 FROM node:20.19.2-alpine3.21 AS runner
 
-RUN apk add --no-cache openssl
+RUN apk upgrade --no-cache && apk add --no-cache openssl
 
 WORKDIR /app
 
@@ -48,7 +48,5 @@ EXPOSE 3000
 
 HEALTHCHECK --interval=20s --timeout=10s --start-period=40s --retries=3 \
     CMD wget -qO- http://127.0.0.1:3000/api/metrics > /dev/null || exit 1
-
-RUN apk upgrade --no-cache zlib
 
 CMD ["node", "server.js"]

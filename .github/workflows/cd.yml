@@ -1,0 +1,183 @@
+name: CD — Build & Push to Docker Hub + Update K8s Manifests
+
+on:
+  push:
+    branches: [main]
+
+env:
+  DOCKER_REGISTRY: docker.io
+  IMAGE_PREFIX: dehanns
+
+jobs:
+  # ─────────────────────────────────────────────
+  # Build & Push Docker Images (Matrix)
+  # Builds all 4 services in parallel
+  # ─────────────────────────────────────────────
+  build-and-push:
+    name: Build & Push — ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - service: j1-bridge-api
+            context: j1-device-edge/mqtt-kafka-bridge
+            dockerfile: j1-device-edge/mqtt-kafka-bridge/Dockerfile
+            image-name: disaster-j1-bridge-api
+
+          - service: j2-data-intelligence
+            context: j2-data-intelligence
+            dockerfile: j2-data-intelligence/Dockerfile
+            image-name: disaster-j2-data-intelligence
+
+          - service: j3-dms
+            context: j3-system-interaction/dms
+            dockerfile: j3-system-interaction/dms/Dockerfile
+            image-name: disaster-j3-dms
+
+          - service: j4-audit-api
+            context: j4-platform-security/blockchain-audit
+            dockerfile: j4-platform-security/blockchain-audit/Dockerfile
+            image-name: disaster-j4-audit-api
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Extract short commit SHA
+        id: vars
+        run: echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/${{ matrix.image-name }}:latest
+            ${{ env.IMAGE_PREFIX }}/${{ matrix.image-name }}:sha-${{ steps.vars.outputs.SHORT_SHA }}
+          cache-from: type=registry,ref=${{ env.IMAGE_PREFIX }}/${{ matrix.image-name }}:buildcache
+          cache-to: type=registry,ref=${{ env.IMAGE_PREFIX }}/${{ matrix.image-name }}:buildcache,mode=max
+
+  # ─────────────────────────────────────────────
+  # Update K8s Manifests with New SHA Tags
+  # Runs after all Docker builds succeed
+  # ─────────────────────────────────────────────
+  update-manifests:
+    name: Update K8s Manifests
+    runs-on: ubuntu-latest
+    needs: build-and-push
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract short commit SHA
+        id: vars
+        run: echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Update J1 Bridge API manifest
+        run: |
+          sed -i 's|image: dehanns/disaster-j1-bridge-api:.*|image: dehanns/disaster-j1-bridge-api:sha-${{ steps.vars.outputs.SHORT_SHA }}|g' k8s/apps/j1-bridge-api.yaml
+          cat k8s/apps/j1-bridge-api.yaml | grep "image:"
+
+      - name: Update J2 Data Intelligence manifest
+        run: |
+          sed -i 's|image: dehanns/disaster-j2-data-intelligence:.*|image: dehanns/disaster-j2-data-intelligence:sha-${{ steps.vars.outputs.SHORT_SHA }}|g' k8s/apps/j2-data-intelligence.yaml
+          cat k8s/apps/j2-data-intelligence.yaml | grep "image:"
+
+      - name: Update J3 DMS manifest
+        run: |
+          sed -i 's|image: dehanns/disaster-j3-dms:.*|image: dehanns/disaster-j3-dms:sha-${{ steps.vars.outputs.SHORT_SHA }}|g' k8s/apps/j3-dms.yaml
+          cat k8s/apps/j3-dms.yaml | grep "image:"
+
+      - name: Update J4 Audit API manifest
+        run: |
+          sed -i 's|image: dehanns/disaster-j4-audit-api:.*|image: dehanns/disaster-j4-audit-api:sha-${{ steps.vars.outputs.SHORT_SHA }}|g' k8s/apps/j4-audit-api.yaml
+          cat k8s/apps/j4-audit-api.yaml | grep "image:"
+
+      - name: Check for changes
+        id: check-changes
+        run: |
+          if git diff --quiet k8s/apps/; then
+            echo "HAS_CHANGES=false" >> $GITHUB_OUTPUT
+          else
+            echo "HAS_CHANGES=true" >> $GITHUB_OUTPUT
+            echo "Changed files:"
+            git diff --name-only k8s/apps/
+          fi
+
+      - name: Configure Git
+        if: steps.check-changes.outputs.HAS_CHANGES == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit and push manifest updates
+        if: steps.check-changes.outputs.HAS_CHANGES == 'true'
+        run: |
+          git add k8s/apps/*.yaml
+          git commit -m "chore: update K8s manifests with image tag sha-${{ steps.vars.outputs.SHORT_SHA }}"
+          git remote set-url origin https://x-access-token:${{ secrets.ARGOCD_REPO_TOKEN }}@github.com/Disaster-Response-System-Group-J/disaster-response-system.git
+          git push origin main
+
+      - name: No changes detected
+        if: steps.check-changes.outputs.HAS_CHANGES == 'false'
+        run: echo "No manifest updates needed"
+
+  # ─────────────────────────────────────────────
+  # Argo CD Sync Notification (Optional)
+  # Can add webhook to trigger Argo CD refresh
+  # ─────────────────────────────────────────────
+  notify-completion:
+    name: CD Pipeline Complete
+    runs-on: ubuntu-latest
+    needs: [build-and-push, update-manifests]
+    if: always()
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract short commit SHA
+        id: vars
+        run: echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Log completion
+        run: |
+          echo "✅ CD Pipeline Complete"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "Commit SHA: ${{ steps.vars.outputs.SHORT_SHA }}"
+          echo "Branch: main"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo ""
+          echo "🐳 Docker Images:"
+          echo "  • dehanns/disaster-j1-bridge-api:sha-${{ steps.vars.outputs.SHORT_SHA }}"
+          echo "  • dehanns/disaster-j2-data-intelligence:sha-${{ steps.vars.outputs.SHORT_SHA }}"
+          echo "  • dehanns/disaster-j3-dms:sha-${{ steps.vars.outputs.SHORT_SHA }}"
+          echo "  • dehanns/disaster-j4-audit-api:sha-${{ steps.vars.outputs.SHORT_SHA }}"
+          echo ""
+          echo "📋 K8s Manifests Updated:"
+          echo "  • k8s/apps/j1-bridge-api.yaml"
+          echo "  • k8s/apps/j2-data-intelligence.yaml"
+          echo "  • k8s/apps/j3-dms.yaml"
+          echo "  • k8s/apps/j4-audit-api.yaml"
+          echo ""
+          echo "🔄 Argo CD will detect the manifest changes and deploy automatically"
+
+      - name: Report job status
+        if: failure()
+        run: |
+          echo "❌ CD Pipeline failed"
+          exit 1
