@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: j3-system-interaction
+  namespace: platform-security
+  labels:
+    app: j3-system-interaction
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: j3-system-interaction
+  template:
+    metadata:
+      labels:
+        app: j3-system-interaction
+    spec:
+      containers:
+        - name: j3
+          image: ghcr.io/OWNER/GROUP-J/j3-system-interaction:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: KAFKA_BROKERS
+              value: "kafka:9092"
+            - name: POSTGRES_HOST
+              value: "postgres"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: j3-service
+  namespace: platform-security
+spec:
+  type: ClusterIP
+  selector:
+    app: j3-system-interaction
+  ports:
+    - port: 80
+      targetPort: 8080
+      protocol: TCP

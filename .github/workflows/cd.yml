@@ -1,0 +1,55 @@
+name: CD to DigitalOcean Kubernetes
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build & push images
+        run: |
+          set -euo pipefail
+          IMAGE_PREFIX=ghcr.io/${{ github.repository_owner }}/${{ github.repository }}
+          find . -name Dockerfile -not -path "./.github/*" -not -path "./k8s/*" -print0 | while IFS= read -r -d '' df; do
+            dir=$(dirname "$df")
+            image_name=$(echo "$dir" | sed 's|^\./||; s|/|_|g')
+            tag="${IMAGE_PREFIX}/${image_name}:${GITHUB_SHA::8}"
+            docker buildx build --platform linux/amd64,linux/arm64 -t "$tag" "$dir" --push
+            echo "pushed $tag"
+          done
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DO_TOKEN }}
+
+      - name: Save kubeconfig
+        run: doctl kubernetes cluster kubeconfig save "${{ secrets.DO_CLUSTER_NAME }}"
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+
+      - name: Deploy to cluster
+        run: |
+          kubectl apply -f j4-platform-security/k8s/
+          kubectl -n default rollout status deploy --all --timeout=120s || true
