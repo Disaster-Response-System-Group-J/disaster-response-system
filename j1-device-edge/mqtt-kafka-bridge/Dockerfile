@@ -2,6 +2,8 @@ FROM python:3.11-alpine AS builder
 
 WORKDIR /build
 
+RUN apk add --no-cache 'zlib>=1.3.2-r0'
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
@@ -10,6 +12,7 @@ FROM python:3.11-alpine
 
 WORKDIR /app
 
+RUN apk add --no-cache 'zlib>=1.3.2-r0'
 RUN adduser -D -u 1000 appuser
 
 COPY --from=builder /install /usr/local

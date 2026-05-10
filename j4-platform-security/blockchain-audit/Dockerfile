@@ -3,6 +3,7 @@ FROM node:22.16.0-alpine3.21 AS builder
 WORKDIR /app
 
 COPY package.json package-lock.json ./
+RUN apk add --no-cache zlib>=1.3.2-r0
 RUN npm ci
 
 COPY tsconfig.json tsconfig.build.json ./
@@ -20,6 +21,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 COPY package.json package-lock.json ./
+RUN apk add --no-cache zlib>=1.3.2-r0
 RUN npm ci --omit=dev && chown -R node:node /app/node_modules
 
 COPY --from=builder --chown=node:node /app/dist ./dist

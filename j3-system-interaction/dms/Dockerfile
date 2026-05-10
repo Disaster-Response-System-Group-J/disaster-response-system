@@ -1,6 +1,6 @@
 FROM node:20.19.2-alpine3.21 AS deps
 
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl zlib>=1.3.2-r0
 
 WORKDIR /app
 
@@ -10,7 +10,7 @@ RUN npm ci --frozen-lockfile
 
 FROM node:20.19.2-alpine3.21 AS builder
 
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl zlib>=1.3.2-r0
 
 WORKDIR /app
 
@@ -28,7 +28,7 @@ RUN npm run build
 
 FROM node:20.19.2-alpine3.21 AS runner
 
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl zlib>=1.3.2-r0
 
 WORKDIR /app
 
