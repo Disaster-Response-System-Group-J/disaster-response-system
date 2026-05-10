@@ -41,12 +41,12 @@ disaster-response-system/
 
 ## Subgroups
 
-| Subgroup | Focus | Key Technologies |
-|---|---|---|
-| **J1** | Device & Edge Systems | IoT, Edge computing, Device APIs |
-| **J2** | Data & Intelligence | AI/ML pipelines, Data processing |
-| **J3** | System Engineering & Interaction | Next.js dashboard, Socket.IO, Kafka |
-| **J4** | Platform, Security & Integration | Kong, Keycloak, Prometheus, Grafana, CI/CD |
+| Subgroup | Focus                            | Key Technologies                           |
+| -------- | -------------------------------- | ------------------------------------------ |
+| **J1**   | Device & Edge Systems            | IoT, Edge computing, Device APIs           |
+| **J2**   | Data & Intelligence              | AI/ML pipelines, Data processing           |
+| **J3**   | System Engineering & Interaction | Next.js dashboard, Socket.IO, Kafka        |
+| **J4**   | Platform, Security & Integration | Kong, Keycloak, Prometheus, Grafana, CI/CD |
 
 ---
 
@@ -108,17 +108,17 @@ docker compose down -v
 
 Once `docker compose up -d` completes, the following are available:
 
-| Service | URL | Credentials | Purpose |
-|---|---|---|---|
-| **J3 DMS Dashboard** | http://localhost:3000 | `admin@gmail.com` / `admin123` | Command centre for officers & resource managers |
-| **J3 Event Bridge** | http://localhost:3001 | — | Socket.IO server — real-time Kafka→browser relay |
-| **Kong API Gateway** | http://localhost:8000 | — | All API requests route through here |
-| **Kong Admin API** | http://localhost:8001 | — | Configure routes, plugins, rate limits |
-| **Keycloak** | http://localhost:8180 | `admin` / `admin123` | Authentication & identity management |
-| **Grafana** | http://localhost:3030 | `admin` / `admin123` | System monitoring dashboards |
-| **Prometheus** | http://localhost:9090 | — | Metrics collection & querying |
-| **PostgreSQL** | `localhost:5432` | `disaster` / `disaster123` | Shared application database |
-| **Kafka** | `localhost:9092` | — | Message broker (J1 sensors → J3 dashboard) |
+| Service              | URL                   | Credentials                    | Purpose                                          |
+| -------------------- | --------------------- | ------------------------------ | ------------------------------------------------ |
+| **J3 DMS Dashboard** | http://localhost:3000 | `admin@gmail.com` / `admin123` | Command centre for officers & resource managers  |
+| **J3 Event Bridge**  | http://localhost:3001 | —                              | Socket.IO server — real-time Kafka→browser relay |
+| **Kong API Gateway** | http://localhost:8000 | —                              | All API requests route through here              |
+| **Kong Admin API**   | http://localhost:8001 | —                              | Configure routes, plugins, rate limits           |
+| **Keycloak**         | http://localhost:8180 | `admin` / `admin123`           | Authentication & identity management             |
+| **Grafana**          | http://localhost:3030 | `admin` / `admin123`           | System monitoring dashboards                     |
+| **Prometheus**       | http://localhost:9090 | —                              | Metrics collection & querying                    |
+| **PostgreSQL**       | `localhost:5432`      | `disaster` / `disaster123`     | Shared application database                      |
+| **Kafka**            | `localhost:9092`      | —                              | Message broker (J1 sensors → J3 dashboard)       |
 
 Grafana loads a prebuilt dashboard automatically after startup:
 
@@ -164,25 +164,25 @@ Grafana loads a prebuilt dashboard automatically after startup:
 
 ### Kafka Topics
 
-| Topic | Producer | Consumer | Data |
-|---|---|---|---|
-| `j1.sos.raw-reports` | J1 | J3 Event Bridge | Mobile SOS alerts |
-| `j1.sensor.telemetry` | J1 | J3 Event Bridge | IoT sensor readings |
-| `j2.engine.risk-alerts` | J2 | J3 Event Bridge | Computed risk alerts |
-| `j2.engine.incidents` | J2 | J3 Event Bridge | Confirmed incidents |
-| `j3.dashboard.report-updates` | J3 | Downstream | Officer verification decisions |
-| `j3.dashboard.resource-updates` | J3 | Downstream | Resource assignment changes |
+| Topic                           | Producer | Consumer        | Data                           |
+| ------------------------------- | -------- | --------------- | ------------------------------ |
+| `j1.sos.raw-reports`            | J1       | J3 Event Bridge | Mobile SOS alerts              |
+| `j1.sensor.telemetry`           | J1       | J3 Event Bridge | IoT sensor readings            |
+| `j2.engine.risk-alerts`         | J2       | J3 Event Bridge | Computed risk alerts           |
+| `j2.engine.incidents`           | J2       | J3 Event Bridge | Confirmed incidents            |
+| `j3.dashboard.report-updates`   | J3       | Downstream      | Officer verification decisions |
+| `j3.dashboard.resource-updates` | J3       | Downstream      | Resource assignment changes    |
 
 ### Database Layout
 
 A single PostgreSQL instance hosts multiple databases:
 
-| Database | Owner | Used by |
-|---|---|---|
-| `disasterdb` | `disaster` | J1 / J2 shared application data |
-| `j3db` | `j3user` | J3 DMS (incidents, reports, resources) |
-| `kong` | `kong` | Kong Gateway config |
-| `keycloak` | `keycloak` | Keycloak user & realm data |
+| Database     | Owner      | Used by                                |
+| ------------ | ---------- | -------------------------------------- |
+| `disasterdb` | `disaster` | J1 / J2 shared application data        |
+| `j3db`       | `j3user`   | J3 DMS (incidents, reports, resources) |
+| `kong`       | `kong`     | Kong Gateway config                    |
+| `keycloak`   | `keycloak` | Keycloak user & realm data             |
 
 ---
 
@@ -193,24 +193,24 @@ A single PostgreSQL instance hosts multiple databases:
 Open the root `docker-compose.yml` and uncomment or add your service under the appropriate section comment. Use this template:
 
 ```yaml
-  j2-data-intelligence:
-    build: ./j2-data-intelligence
-    container_name: j2-data-intelligence
-    ports:
-      - "8082:8082"
-    environment:
-      DB_HOST: postgres
-      DB_USER: ${POSTGRES_USER}
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
-      DB_NAME: ${POSTGRES_DB}
-      KAFKA_BROKER: kafka:29092
-    depends_on:
-      postgres:
-        condition: service_healthy
-      kafka:
-        condition: service_started
-    networks:
-      - disaster-net
+j2-data-intelligence:
+  build: ./j2-data-intelligence
+  container_name: j2-data-intelligence
+  ports:
+    - "8082:8082"
+  environment:
+    DB_HOST: postgres
+    DB_USER: ${POSTGRES_USER}
+    DB_PASSWORD: ${POSTGRES_PASSWORD}
+    DB_NAME: ${POSTGRES_DB}
+    KAFKA_BROKER: kafka:29092
+  depends_on:
+    postgres:
+      condition: service_healthy
+    kafka:
+      condition: service_started
+  networks:
+    - disaster-net
 ```
 
 **Important:** Always use `kafka:29092` (the internal listener) when connecting to Kafka from inside Docker. `localhost:9092` only works from the host machine.
@@ -247,10 +247,10 @@ Kong uses this to confirm your service is available before routing traffic to it
 If your service exposes a `/metrics` endpoint, add a scrape job to `prometheus/prometheus.yml`:
 
 ```yaml
-  - job_name: j2-data-intelligence
-    static_configs:
-      - targets: ['j2-data-intelligence:8082']
-    metrics_path: /metrics
+- job_name: j2-data-intelligence
+  static_configs:
+    - targets: ["j2-data-intelligence:8082"]
+  metrics_path: /metrics
 ```
 
 ---
@@ -263,11 +263,11 @@ If your service exposes a `/metrics` endpoint, add a scrape job to `prometheus/p
 /api/v1/{subgroup}/{resource}
 ```
 
-| Subgroup | Base path | Example |
-|---|---|---|
-| J1 | `/api/v1/devices` | `/api/v1/devices/alerts` |
-| J2 | `/api/v1/intelligence` | `/api/v1/intelligence/predictions` |
-| J3 | `/api/v1/system` | `/api/v1/system/shelters` |
+| Subgroup | Base path              | Example                            |
+| -------- | ---------------------- | ---------------------------------- |
+| J1       | `/api/v1/devices`      | `/api/v1/devices/alerts`           |
+| J2       | `/api/v1/intelligence` | `/api/v1/intelligence/predictions` |
+| J3       | `/api/v1/system`       | `/api/v1/system/shelters`          |
 
 ### Authentication
 
@@ -309,14 +309,14 @@ On error:
 
 ### HTTP status codes
 
-| Status | When to use |
-|---|---|
-| `200 OK` | Successful read |
-| `201 Created` | Resource successfully created |
-| `400 Bad Request` | Invalid input from the client |
-| `401 Unauthorized` | Missing or invalid token |
-| `403 Forbidden` | Valid token, insufficient role |
-| `404 Not Found` | Resource does not exist |
+| Status                      | When to use                        |
+| --------------------------- | ---------------------------------- |
+| `200 OK`                    | Successful read                    |
+| `201 Created`               | Resource successfully created      |
+| `400 Bad Request`           | Invalid input from the client      |
+| `401 Unauthorized`          | Missing or invalid token           |
+| `403 Forbidden`             | Valid token, insufficient role     |
+| `404 Not Found`             | Resource does not exist            |
 | `500 Internal Server Error` | Something went wrong on the server |
 
 ---
