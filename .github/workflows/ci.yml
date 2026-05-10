@@ -108,13 +108,40 @@ jobs:
           NEXT_TELEMETRY_DISABLED: 1
 
   # ─────────────────────────────────────────────
-  # J3 — Docker build validation (no push)
-  # Push to Docker Hub happens in cd.yml
+  # Docker images — build validation + vulnerability scan
+  # Covers every Dockerfile currently in the repo
   # ─────────────────────────────────────────────
-  j3-docker-validate:
-    name: "J3 · Docker — Build Validation"
+  docker-build-and-scan:
+    name: "${{ matrix.service }} · Docker — Build & Scan"
     runs-on: ubuntu-latest
-    needs: j3-ci # Only validate if app CI passes first
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: J1 Bridge API
+            context: j1-device-edge/mqtt-kafka-bridge
+            dockerfile: j1-device-edge/mqtt-kafka-bridge/Dockerfile
+            image-name: disaster-j1-bridge-api
+
+          - service: J1 Backend
+            context: j1-device-edge/backend
+            dockerfile: j1-device-edge/backend/Dockerfile
+            image-name: disaster-j1-backend
+
+          - service: J2 Data Intelligence
+            context: j2-data-intelligence
+            dockerfile: j2-data-intelligence/Dockerfile
+            image-name: disaster-j2-data-intelligence
+
+          - service: J3 DMS
+            context: j3-system-interaction/dms
+            dockerfile: j3-system-interaction/dms/Dockerfile
+            image-name: disaster-j3-dms
+
+          - service: J4 Audit API
+            context: j4-platform-security/blockchain-audit
+            dockerfile: j4-platform-security/blockchain-audit/Dockerfile
+            image-name: disaster-j4-audit-api
 
     steps:
       - name: Checkout
@@ -126,43 +153,18 @@ jobs:
       - name: Build image (no push)
         uses: docker/build-push-action@v5
         with:
-          context: j3-system-interaction/dms
-          file: j3-system-interaction/dms/Dockerfile
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
           push: false
-          tags: ${{ env.IMAGE_PREFIX }}/disaster-j3-dms:ci-validate
+          load: true
+          tags: ${{ env.IMAGE_PREFIX }}/${{ matrix.image-name }}:ci-validate
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-  # ─────────────────────────────────────────────
-  # #16 — Trivy Security Scanning
-  # Scans J3 Docker image for vulnerabilities
-  # Other subgroups scanned once they add Dockerfiles
-  # ─────────────────────────────────────────────
-  trivy-scan-j3:
-    name: "J3 · Trivy — Security Scan"
-    runs-on: ubuntu-latest
-    needs: j3-docker-validate # Only scan if image builds successfully
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build image for scanning
-        uses: docker/build-push-action@v5
-        with:
-          context: j3-system-interaction/dms
-          file: j3-system-interaction/dms/Dockerfile
-          push: false
-          load: true # ← loads image into local Docker daemon so Trivy can scan it
-          tags: j3-dms:scan
 
       - name: Run Trivy vulnerability scan
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: j3-dms:scan
+          image-ref: ${{ env.IMAGE_PREFIX }}/${{ matrix.image-name }}:ci-validate
           format: table
           exit-code: 1
           ignore-unfixed: true
@@ -173,16 +175,16 @@ jobs:
       - name: Run Trivy and upload SARIF report
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: j3-dms:scan
+          image-ref: ${{ env.IMAGE_PREFIX }}/${{ matrix.image-name }}:ci-validate
           format: sarif
-          output: trivy-j3-results.sarif
+          output: trivy-${{ matrix.image-name }}.sarif
         continue-on-error: true # upload even if scan found issues
 
       - name: Upload Trivy results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: trivy-j3-results.sarif
-          category: trivy-j3
+          sarif_file: trivy-${{ matrix.image-name }}.sarif
+          category: trivy-${{ matrix.image-name }}
         continue-on-error: true # don't fail if Security tab not enabled
 
   # ─────────────────────────────────────────────
@@ -224,31 +226,6 @@ jobs:
           sarif_file: trivy-fs-results.sarif
           category: trivy-filesystem
         continue-on-error: true
-
-  # ─────────────────────────────────────────────
-  # Trivy placeholders — J1, J2, J4
-  # Wired in once they add Dockerfiles
-  # ─────────────────────────────────────────────
-  trivy-scan-j1-placeholder:
-    name: "J1 · Trivy — Pending Dockerfile"
-    runs-on: ubuntu-latest
-    steps:
-      - name: Placeholder
-        run: echo "J1 Trivy scan will run once edge service Dockerfile is added"
-
-  trivy-scan-j2-placeholder:
-    name: "J2 · Trivy — Pending Dockerfile"
-    runs-on: ubuntu-latest
-    steps:
-      - name: Placeholder
-        run: echo "J2 Trivy scan will run once data service Dockerfile is added"
-
-  trivy-scan-j4-placeholder:
-    name: "J4 · Trivy — Pending Dockerfile"
-    runs-on: ubuntu-latest
-    steps:
-      - name: Placeholder
-        run: echo "J4 Trivy scan will run once platform Dockerfile is added"
 
   # ─────────────────────────────────────────────
   # K8s Manifest Validation
