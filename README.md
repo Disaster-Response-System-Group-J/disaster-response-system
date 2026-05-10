@@ -357,3 +357,26 @@ bad:   WIP
 ## Questions or issues?
 
 Contact the J4 team lead or open a GitHub Issue in this repository.
+
+---
+
+## Required repository / organization secrets
+
+Add the following secrets in your GitHub repository settings (or as organization-level secrets) so the CI/CD workflows run correctly:
+
+- **DOCKERHUB_USERNAME**: Docker Hub account username. Used by `.github/workflows/cd.yml` for logging into Docker Hub.
+- **DOCKERHUB_TOKEN**: Docker Hub access token (recommended: a fine-grained or personal access token). Used by `.github/workflows/cd.yml`.
+- **ARGOCD_REPO_TOKEN**: Token used to push updated Kubernetes manifests back to the repo. Used by `.github/workflows/cd.yml`.
+- **ALERTMANAGER_EMAIL_PASSWORD**: SMTP/password value injected into Alertmanager config. Used by `.github/workflows/ci.yml` and `j4-platform-security/alertmanager/alertmanager.yml`.
+
+Optional (only if your workflows require cluster access):
+
+- **KUBECONFIG_DATA**: Base64-encoded kubeconfig contents for workflows that need to talk to a cluster.
+
+How to add a secret using the GitHub CLI (example):
+
+```bash
+gh secret set DOCKERHUB_TOKEN --body "$DOCKERHUB_TOKEN" --repo <owner>/<repo>
+```
+
+Prefer creating these as Organization secrets if multiple repos need the same values.
