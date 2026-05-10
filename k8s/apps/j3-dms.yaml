@@ -31,7 +31,12 @@ spec:
       initContainers:
         - name: wait-for-postgres
           image: busybox:1.37
-          command: ["sh", "-c", "until nc -w1 postgres 5432 >/dev/null 2>&1; do echo 'waiting for postgres...'; sleep 3; done"]
+          command:
+            [
+              "sh",
+              "-c",
+              "until nc -w1 postgres 5432 >/dev/null 2>&1; do echo 'waiting for postgres...'; sleep 3; done",
+            ]
           resources:
             requests:
               cpu: 50m
@@ -41,7 +46,12 @@ spec:
               memory: 64Mi
         - name: wait-for-kafka
           image: busybox:1.37
-          command: ["sh", "-c", "until nc -w1 kafka 29092 >/dev/null 2>&1; do echo 'waiting for kafka...'; sleep 3; done"]
+          command:
+            [
+              "sh",
+              "-c",
+              "until nc -w1 kafka 29092 >/dev/null 2>&1; do echo 'waiting for kafka...'; sleep 3; done",
+            ]
           resources:
             requests:
               cpu: 50m
