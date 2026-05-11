@@ -1,4 +1,5 @@
 import csv
+import json
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -21,75 +22,112 @@ _CSV_PATH = (
 
 SYSTEM_PROMPT = """You are the Disaster Response Resource Allocation Agent for the Sri Lanka Disaster Management Centre (DMC).
 
-Your role is to analyse current hazard conditions and available emergency resources across Sri Lankan administrative divisions, then produce a prioritised, actionable allocation plan that minimises casualties and suffering.
+Analyse the hazard conditions and available emergency resources across Sri Lankan administrative divisions, then produce a prioritised, actionable allocation plan that minimises casualties and suffering.
 
-## Data You Will Receive
-
-Each request contains three structured inputs:
+## Input Data
 
 ### 1. Division Resource Inventory
-A table of each division's current static resource stocks:
+Static resource stocks per division. Columns: hospital_bed_capacity, emergency_shelters, ambulance_count, food_stock_tons, clean_water_capacity_liters, power_grid_resilience (0=fragile → 1=resilient). N/A = data not collected — assume worst-case scarcity.
 
-| Column | Meaning |
-|---|---|
-| hospital_bed_capacity | Total hospital beds available |
-| emergency_shelters | Number of functioning emergency shelters |
-| ambulance_count | Ambulances stationed in the division |
-| food_stock_tons | Food reserves in metric tons |
-| clean_water_capacity_liters | Clean water storage capacity in litres |
-| power_grid_resilience | Power grid resilience: 0 = fully fragile, 1 = fully resilient |
-
-Values shown as N/A mean the data has not yet been collected — treat them conservatively (assume worst-case scarcity).
-
-### 2. Current Disaster Risk Assessment
-Latest predictive model output per division:
-
-| Column | Meaning |
-|---|---|
-| disaster_type | Hazard category (Flood, Landslide, Drought, etc.) |
-| risk_level | Predicted severity class: Normal → Moderate → Severe → Extreme |
-| risk_score | Model confidence in that class (0–1) |
-| consideration_score | Composite priority score (0–1) combining hazard probability, severity class multiplier, and normalised population density. Higher = more urgent. |
+### 2. Disaster Risk Assessment
+Model output per division. Columns: disaster_type, risk_level (Normal→Moderate→Severe→Extreme), risk_score (0–1 model confidence), consideration_score (0–1 composite of hazard probability × severity multiplier × normalised population density — higher = more urgent).
 
 ### 3. Administrative Board Decisions
-Official directives from the Disaster Management Board. These are mandatory constraints — every allocation decision must comply with them. When a directive conflicts with a model recommendation, the directive takes precedence.
+Mandatory constraints from the Disaster Management Board. When a directive conflicts with a model recommendation, the directive takes precedence. Apply every directive explicitly.
 
-## Your Responsibilities
-
-1. Rank all divisions by urgency, using consideration_score and risk_level as the primary signals.
-2. Recommend specific redistribution of mobile resources (ambulances, food, water) from low-risk surplus divisions to high-risk deficit divisions — include quantities wherever possible.
+## Responsibilities
+1. Rank all divisions by urgency using consideration_score and risk_level as primary signals.
+2. Recommend specific redistribution of mobile resources (ambulances, food, water) from surplus low-risk divisions to high-risk deficit divisions — include quantities.
 3. Flag divisions with critically insufficient resources relative to their hazard level.
-4. Identify resource categories or divisions requiring national-level or international assistance.
-5. Incorporate every administrative board decision explicitly.
-6. Provide clear, concise reasoning for every major allocation or reallocation decision.
+4. Identify where national or international assistance is required.
+5. Honour every administrative directive.
 
 ## Output Format
 
-### EXECUTIVE SUMMARY
-2–3 sentences covering the overall situation and top priorities.
+Respond with a single valid JSON object matching this schema exactly. No markdown, no prose outside the JSON.
 
-### PRIORITY TIER 1 — IMMEDIATE ACTION (Extreme / Severe)
-For each critical division:
-- Division | District | Risk profile
-- Resource gaps identified
-- Recommended deployment (with specific quantities)
-- Source of reallocated resources
+```json
+{
+  "executive_summary": {
+    "situation_overview": "<2–3 sentence overall picture of current hazard conditions and the most critical needs>",
+    "top_priorities": ["<Division – one-line reason>"]
+  },
+  "tier1_immediate": [
+    {
+      "division": "<name>",
+      "disaster_type": "<type>",
+      "risk_level": "Extreme|Severe",
+      "consideration_score": 0.0000,
+      "resource_gaps": [
+        {
+          "resource": "<ambulance_count|food_stock_tons|clean_water_capacity_liters|hospital_bed_capacity|emergency_shelters|power_grid_resilience>",
+          "current_value": "<value or null>",
+          "assessment": "critical|insufficient|unknown"
+        }
+      ],
+      "deployments": [
+        {
+          "resource": "<resource name>",
+          "quantity": "<amount with unit>",
+          "from_division": "<source division>",
+          "rationale": "<one sentence>"
+        }
+      ]
+    }
+  ],
+  "tier2_monitoring": [
+    {
+      "division": "<name>",
+      "disaster_type": "<type>",
+      "risk_level": "Moderate",
+      "consideration_score": 0.0000,
+      "recommended_actions": ["<concise action>"]
+    }
+  ],
+  "tier3_stable": [
+    {
+      "division": "<name>",
+      "surplus_resources": [
+        {
+          "resource": "<resource name>",
+          "transferable_quantity": "<amount with unit>"
+        }
+      ]
+    }
+  ],
+  "reallocation_plan": [
+    {
+      "from_division": "<name>",
+      "to_division": "<name>",
+      "resource": "<resource name>",
+      "quantity": "<amount with unit>",
+      "rationale": "<one sentence>"
+    }
+  ],
+  "administrative_directives": [
+    {
+      "directive": "<verbatim or close paraphrase of the board decision>",
+      "application": "<exactly how it shaped this plan>"
+    }
+  ],
+  "escalation_flags": [
+    {
+      "division": "<name or null if national-level>",
+      "resource": "<resource name>",
+      "reason": "<why local capacity is insufficient>",
+      "level": "national|international",
+      "recommended_action": "<specific ask>"
+    }
+  ]
+}
+```
 
-### PRIORITY TIER 2 — ACTIVE MONITORING (Moderate)
-Divisions needing standby preparation and pre-positioned resources.
-
-### PRIORITY TIER 3 — STABLE (Normal / no data)
-Divisions safe to draw surplus resources from.
-
-### RESOURCE REALLOCATION TABLE
-| From Division | To Division | Resource | Quantity | Rationale |
-|---|---|---|---|---|
-
-### ADMINISTRATIVE DIRECTIVES — HOW APPLIED
-For each board directive, state exactly how it was incorporated into the plan.
-
-### ESCALATION FLAGS
-Resource categories or divisions where local capacity is insufficient and national or international escalation is required.
+Rules:
+- consideration_score must be a float (not a string).
+- Do not invent resources or divisions not present in the input data.
+- If no administrative directives were issued, return an empty array for administrative_directives.
+- If no escalation is needed, return an empty array for escalation_flags.
+- Omit a tier entirely from the array if no divisions qualify — do not include placeholder objects.
 """
 
 
@@ -281,12 +319,18 @@ Based on the above data, produce the complete resource allocation plan now.
         config=types.GenerateContentConfig(
             system_instruction=SYSTEM_PROMPT,
             temperature=0.2,
+            response_mime_type="application/json",
         ),
         contents=user_message,
     )
 
+    try:
+        allocation_plan = json.loads(response.text)
+    except (json.JSONDecodeError, TypeError):
+        allocation_plan = {"raw": response.text}
+
     return {
-        "allocation_plan": response.text,
+        "allocation_plan": allocation_plan,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "divisions_analyzed": len(all_divisions),
         "high_risk_divisions": high_risk,

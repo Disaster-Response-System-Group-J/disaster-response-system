@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel
 
@@ -10,7 +10,7 @@ class AllocationRequest(BaseModel):
 
 
 class AllocationResponse(BaseModel):
-    allocation_plan: str
+    allocation_plan: dict[str, Any]
     generated_at: str
     divisions_analyzed: int
     high_risk_divisions: list[str]

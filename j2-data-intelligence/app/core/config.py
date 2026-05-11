@@ -15,4 +15,4 @@ DATABASE_URL = os.getenv(
     "postgresql+psycopg2://disaster:disaster123@postgres:5432/disasterdb",
 )
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
