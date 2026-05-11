@@ -4,10 +4,10 @@ import { useState, useEffect } from 'react';
 import Map, { Marker, NavigationControl, Popup, ViewStateChangeEvent } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Shield, Filter, MapPin, AlertTriangle, X, ChevronDown, CheckCircle2, Clock } from 'lucide-react';
-import { IncidentSeverity, IncidentStatus, DISASTER_TYPES, ConfirmedIncident, UserRole } from '@/types';
+import { IncidentSeverity, IncidentStatus, DISASTER_TYPES, ConfirmedIncident, UserRole, User } from '@/types';
 import { SRI_LANKA_CENTER, DISTRICT_NAMES } from '@/data/districts';
-import { MOCK_USERS } from '@/data/mock-data';
 import { useAuth } from '@/context/AuthContext';
+import { createClient } from '@supabase/supabase-js';
 import { useSocket } from '@/context/SocketContext';
 
 const SEVERITY_COLORS: Record<string, string> = {
@@ -25,6 +25,15 @@ export default function IncidentMapPage() {
   const [viewState, setViewState] = useState(SRI_LANKA_CENTER);
   const [selectedIncident, setSelectedIncident] = useState<any | null>(null);
   const [mapPins, setMapPins] = useState<any[]>([]);
+
+  // 1. Add this state to hold the real users
+  const [activeUsers, setActiveUsers] = useState<any[]>([]); 
+  
+  // 2. Initialize the Supabase client
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
   // Track dispatched personnel per incident: { [incidentId]: { fieldOfficers: User[], responseTeams: User[], logistics: User[] } }
   const [dispatched, setDispatched] = useState<Record<string, { fieldOfficers: any[], responseTeams: any[], logistics: any[] }>>({});
@@ -88,7 +97,7 @@ export default function IncidentMapPage() {
 
   const handleDispatch = (type: 'fieldOfficer' | 'responseTeam' | 'logistics') => {
     if (!selectedIncident || !dispatchTarget) return;
-    const person = MOCK_USERS.find(u => u.id === dispatchTarget);
+    const person = activeUsers.find(u => u.id === dispatchTarget);
     if (!person) return;
 
     const incidentId = selectedIncident.incidentId;
@@ -118,6 +127,21 @@ export default function IncidentMapPage() {
       });
     }
   };
+
+  useEffect(() => {
+    const fetchMapData = async () => {
+      // Fetch users from Supabase
+      const { data: userData, error: userError } = await supabase
+        .from('User')
+        .select('*');
+        
+      if (!userError && userData) {
+        setActiveUsers(userData);
+      }
+      // (If you also fetch incidents here, keep that logic intact)
+    };
+    fetchMapData();
+  }, [supabase]);
 
   // Listen for incoming reports to drop new pins
   useEffect(() => {
@@ -248,9 +272,9 @@ export default function IncidentMapPage() {
                 {/* Personnel Dispatch Panel — Commanders only */}
                 {(hasPermission('dispatch:field-officers') || hasPermission('dispatch:response-teams') || hasPermission('dispatch:logistics')) && (() => {
                   const incDispatched = dispatched[selectedIncident.incidentId] || { fieldOfficers: [], responseTeams: [], logistics: [] };
-                  const availableFieldOfficers = MOCK_USERS.filter(u => u.role === UserRole.FIELD_OFFICER);
-                  const availableResponseTeams = MOCK_USERS.filter(u => u.role === UserRole.RESPONSE_TEAM_MEMBER);
-                  const availableLogistics = MOCK_USERS.filter(u => u.role === UserRole.LOGISTICS_STAFF);
+                  const availableFieldOfficers = activeUsers.filter(u => u.role === UserRole.FIELD_OFFICER);
+                  const availableResponseTeams = activeUsers.filter(u => u.role === UserRole.RESPONSE_TEAM_MEMBER);
+                  const availableLogistics = activeUsers.filter(u => u.role === UserRole.LOGISTICS_STAFF);
                   return (
                     <div className="border-t border-slate-700/50 pt-3 mt-1 space-y-3">
                       <p className="text-[9px] font-bold text-slate-400 tracking-widest uppercase">Personnel Dispatch</p>
