@@ -288,6 +288,20 @@ model DisasterRisk {
 }
 
 // ------------------------------------------------------
+// AI Resource Allocation Plans
+// ------------------------------------------------------
+model ResourcePlan {
+  planId      Int      @id @default(autoincrement()) @map("plan_id")
+  incidentId  Int?     @map("incident_id")
+  triggeredBy String?  @map("triggered_by")
+  triggeredAt DateTime @default(now()) @map("triggered_at")
+  status      String   @default("PENDING")
+  planData    Json?    @map("plan_data")
+
+  @@map("resource_plans")
+}
+
+// ------------------------------------------------------
 // Computed ML Features (derived from raw weather data)
 // ------------------------------------------------------
 model ComputedFeatures {
