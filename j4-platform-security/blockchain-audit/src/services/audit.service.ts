@@ -85,7 +85,11 @@ export type ResourceEvent = {
 
 export type ResourceEventsByCaseIdResult = {
   caseId: string;
-  includedEventTypes: ["RESOURCE_ASSIGNED", "RESCUE_DISPATCHED"];
+  includedEventTypes: [
+    "RESOURCE_ASSIGNED",
+    "RESCUE_DISPATCHED",
+    "RESOURCE_DEALLOCATED",
+  ];
   count: number;
   events: ResourceEvent[];
 };
@@ -153,6 +157,7 @@ type AuditEventRecord = {
 const RESOURCE_EVENT_TYPES = [
   "RESOURCE_ASSIGNED",
   "RESCUE_DISPATCHED",
+  "RESOURCE_DEALLOCATED",
 ] as const;
 
 function mapAuditEventRecordToCaseEvent(auditEvent: AuditEventRecord): CaseEvent {
@@ -328,7 +333,11 @@ export async function getResourceEventsByCaseIdFromChain(
 
   return {
     caseId,
-    includedEventTypes: ["RESOURCE_ASSIGNED", "RESCUE_DISPATCHED"],
+    includedEventTypes: [
+      "RESOURCE_ASSIGNED",
+      "RESCUE_DISPATCHED",
+      "RESOURCE_DEALLOCATED",
+    ],
     count: events.length,
     events,
   };

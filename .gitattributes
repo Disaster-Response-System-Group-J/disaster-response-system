@@ -5,3 +5,4 @@ build/** linguist-generated=true
 node_modules/** linguist-vendored=true
 *.lock linguist-generated=true
 local_alerts.db binary
+*.sh text eol=lf
