@@ -31,9 +31,8 @@ spec:
                 secretKeyRef:
                   name: disaster-secrets
                   key: AUDIT_PRIVATE_KEY
-            # Placeholder — replace with real deployed contract address
-            - name: AUDIT_CONTRACT_ADDRESS
-              value: "0x0000000000000000000000000000000000000000"
+            # No AUDIT_CONTRACT_ADDRESS set; env.ts falls back to /deployment/audit-contract-address.txt
+            # written by the deploy-audit-contract Job once hardhat-node is ready.
           resources:
             requests:
               cpu: 100m
@@ -61,8 +60,10 @@ spec:
             - name: deployment
               mountPath: /deployment
       volumes:
+        # Startup order: PVC Bound → hardhat-node ready → deploy-audit-contract Job writes address → audit-api reads it here.
         - name: deployment
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: deployment-data
 ---
 apiVersion: v1
 kind: Service

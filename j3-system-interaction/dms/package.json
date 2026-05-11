@@ -15,6 +15,7 @@
     "@supabase/supabase-js": "^2.105.4",
     "bcryptjs": "^3.0.3",
     "csv-parser": "^3.2.0",
+    "http-proxy": "^1.18.1",
     "kafkajs": "^2.2.4",
     "lucide-react": "^0.408.0",
     "maplibre-gl": "^4.7.1",
