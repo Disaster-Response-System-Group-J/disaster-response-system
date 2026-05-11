@@ -51,49 +51,30 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: 'reportId and status are required' }, { status: 400 });
     }
 
-    // Try IncomingReport first (UUID primary key)
-    try {
-      let query: string;
-      let params: any[];
+    // UUID Regex to determine if we are using the modern IncomingReport table
+    const isUuid = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(reportId);
 
-      if (incidentId) {
-        // Mark as duplicate and link to an existing incident
-        query = `
-          UPDATE public."IncomingReport"
-          SET "verificationStatus" = $1, "incidentId" = $2, "reviewedAt" = now()
-          WHERE id = $3
-          RETURNING *
-        `;
-        params = [status, incidentId, reportId];
-      } else {
-        query = `
-          UPDATE public."IncomingReport"
-          SET "verificationStatus" = $1, "reviewedAt" = now()
-          WHERE id = $2
-          RETURNING *
-        `;
-        params = [status, reportId];
-      }
+    if (isUuid) {
+      const query = incidentId
+        ? 'UPDATE public."IncomingReport" SET "verificationStatus" = $1, "incidentId" = $2, "reviewedAt" = now() WHERE id = $3 RETURNING *'
+        : 'UPDATE public."IncomingReport" SET "verificationStatus" = $1, "reviewedAt" = now() WHERE id = $2 RETURNING *';
 
+      const params = incidentId ? [status, incidentId, reportId] : [status, reportId];
       const { rows } = await pool.query(query, params);
-      if (rows.length > 0) {
-        return NextResponse.json(rows[0]);
-      }
-    } catch {
-      // Fall through to legacy table
+      return NextResponse.json(rows[0]);
+    } else {
+      // Fallback for legacy Report table (integer primary key)
+      const legacyQuery = `
+        UPDATE public."Report"
+        SET status = $1, updated_at = now()
+        ${incidentId ? ', incident_id = $3' : ''}
+        WHERE report_id = $2
+        RETURNING *
+      `;
+      const params = incidentId ? [status, parseInt(reportId), incidentId] : [status, parseInt(reportId)];
+      const { rows } = await pool.query(legacyQuery, params);
+      return NextResponse.json(rows[0] || {});
     }
-
-    // Fallback: legacy Report table (integer primary key)
-    const legacyQuery = `
-      UPDATE public."Report"
-      SET status = $1, updated_at = now()
-      ${incidentId ? ', incident_id = $3' : ''}
-      WHERE report_id = $2
-      RETURNING *
-    `;
-    const params = incidentId ? [status, reportId, incidentId] : [status, reportId];
-    const { rows } = await pool.query(legacyQuery, params);
-    return NextResponse.json(rows[0] || {});
   } catch (error) {
     console.error('Failed to update report:', error);
     return NextResponse.json({ error: 'Failed to update report' }, { status: 500 });

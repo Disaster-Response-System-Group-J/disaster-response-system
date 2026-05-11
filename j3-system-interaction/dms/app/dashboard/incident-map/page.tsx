@@ -11,15 +11,15 @@ import { createClient } from '@supabase/supabase-js';
 import { useSocket } from '@/context/SocketContext';
 
 const SEVERITY_COLORS: Record<string, string> = {
-  CRITICAL: '#ef4444', 
-  HIGH: '#f97316', 
-  MEDIUM: '#eab308', 
-  LOW: '#3b82f6', 
+  CRITICAL: '#ef4444',
+  HIGH: '#f97316',
+  MEDIUM: '#eab308',
+  LOW: '#3b82f6',
   PENDING: '#a855f7', // Add a purple color for unverified incoming reports
 };
 
 export default function IncidentMapPage() {
-  const { user, hasPermission} = useAuth();
+  const { user, hasPermission } = useAuth();
   const socket = useSocket();
 
   const [viewState, setViewState] = useState(SRI_LANKA_CENTER);
@@ -27,8 +27,8 @@ export default function IncidentMapPage() {
   const [mapPins, setMapPins] = useState<any[]>([]);
 
   // 1. Add this state to hold the real users
-  const [activeUsers, setActiveUsers] = useState<any[]>([]); 
-  
+  const [activeUsers, setActiveUsers] = useState<any[]>([]);
+
   // 2. Initialize the Supabase client
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -53,15 +53,15 @@ export default function IncidentMapPage() {
       try {
         const response = await fetch('/api/incidents');
         if (!response.ok) throw new Error('Failed to fetch incidents');
-        
+
         const data = await response.json();
-        
+
         // Map database schema to the UI's expected format
         const mappedPins = data.map((inc: any) => ({
           incidentId: inc.incident_id.toString(),
           title: inc.title,
-          disasterType: inc.title?.toUpperCase().includes('FLOOD') ? 'FLOOD' : 
-                        inc.title?.toUpperCase().includes('LANDSLIDE') ? 'LANDSLIDE' : 'UNKNOWN',
+          disasterType: inc.title?.toUpperCase().includes('FLOOD') ? 'FLOOD' :
+            inc.title?.toUpperCase().includes('LANDSLIDE') ? 'LANDSLIDE' : 'UNKNOWN',
           severity: inc.severity || 'LOW',
           status: inc.status || 'ACTIVE',
           latitude: Number(inc.latitude) || 0,
@@ -95,36 +95,59 @@ export default function IncidentMapPage() {
     if (socket) socket.emit('client:update-incident-status', { incidentId, status: newStatus, timestamp: new Date().toISOString() });
   };
 
-  const handleDispatch = (type: 'fieldOfficer' | 'responseTeam' | 'logistics') => {
+  const handleDispatch = async (type: 'fieldOfficer' | 'responseTeam' | 'logistics') => {
     if (!selectedIncident || !dispatchTarget) return;
     const person = activeUsers.find(u => u.id === dispatchTarget);
     if (!person) return;
 
     const incidentId = selectedIncident.incidentId;
-    setDispatched(prev => {
-      const current = prev[incidentId] || { fieldOfficers: [], responseTeams: [], logistics: [] };
-      const updated = {
-        ...current,
-        fieldOfficers: type === 'fieldOfficer' ? [...current.fieldOfficers.filter(u => u.id !== person.id), person] : current.fieldOfficers,
-        responseTeams: type === 'responseTeam' ? [...current.responseTeams.filter(u => u.id !== person.id), person] : current.responseTeams,
-        logistics: type === 'logistics' ? [...current.logistics.filter(u => u.id !== person.id), person] : current.logistics,
-      };
-      return { ...prev, [incidentId]: updated };
-    });
-    setDispatchTarget('');
 
-    if (socket) {
-      socket.emit('client:dispatch-personnel', {
-        incidentId,
-        incidentTitle: selectedIncident.title,
-        personnelId: person.id,
-        personnelName: person.name,
-        role: person.role,
-        type,
-        latitude: selectedIncident.latitude,
-        longitude: selectedIncident.longitude,
-        timestamp: new Date().toISOString(),
+    try {
+      // 1. Save to Database via API
+      const response = await fetch('/api/incidents/dispatch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          incidentId,
+          personnelId: person.id,
+          role: person.role,
+          dispatchedBy: user?.id,
+        }),
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to persist dispatch');
+      }
+
+      // 2. Update Local UI State
+      setDispatched(prev => {
+        const current = prev[incidentId] || { fieldOfficers: [], responseTeams: [], logistics: [] };
+        return {
+          ...prev,
+          [incidentId]: {
+            ...current,
+            fieldOfficers: type === 'fieldOfficer' ? [...current.fieldOfficers.filter(u => u.id !== person.id), person] : current.fieldOfficers,
+            responseTeams: type === 'responseTeam' ? [...current.responseTeams.filter(u => u.id !== person.id), person] : current.responseTeams,
+            logistics: type === 'logistics' ? [...current.logistics.filter(u => u.id !== person.id), person] : current.logistics,
+          }
+        };
+      });
+      setDispatchTarget('');
+
+      // 3. Broadcast Real-time Event
+      if (socket) {
+        socket.emit('client:dispatch-personnel', {
+          incidentId,
+          personnelId: person.id,
+          role: person.role,
+          type,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert(`Dispatch Failed: ${err.message}`);
     }
   };
 
@@ -134,7 +157,7 @@ export default function IncidentMapPage() {
       const { data: userData, error: userError } = await supabase
         .from('User')
         .select('*');
-        
+
       if (!userError && userData) {
         setActiveUsers(userData);
       }
@@ -161,7 +184,7 @@ export default function IncidentMapPage() {
           district: report.district,
           description: report.description
         };
-        
+
         setMapPins(prev => [...prev, newPin]);
       }
     };
@@ -250,7 +273,7 @@ export default function IncidentMapPage() {
                   <div className="flex justify-between items-center text-slate-300">
                     <span className="text-slate-500">Status</span>
                     {hasPermission('update:incident-status') ? (
-                      <select 
+                      <select
                         value={selectedIncident.status}
                         onChange={(e) => handleStatusUpdate(selectedIncident.incidentId, e.target.value as IncidentStatus)}
                         className="bg-[#0a0f16] border border-slate-700 text-xs font-semibold text-slate-200 rounded px-2 py-1 outline-none focus:border-blue-500 cursor-pointer"
@@ -371,7 +394,7 @@ export default function IncidentMapPage() {
               <ChevronDown size={14} className={`transition-transform ${showFilters ? 'rotate-180' : ''}`} />
             </div>
           </div>
-          
+
           {/* Add the restriction badge right below the Map Controls header if restricted */}
           {enforcedDistrict !== 'ALL' && (
             <div className="bg-blue-500/10 border-b border-blue-500/20 px-4 py-2 flex items-center justify-center gap-2 text-[10px] font-bold text-blue-400 tracking-widest uppercase">
