@@ -5,6 +5,7 @@ from confluent_kafka import Producer
 
 KAFKA_BROKER = os.getenv("KAFKA_BROKER", "localhost:9092")
 KAFKA_TOPIC = os.getenv("KAFKA_TOPIC", "j2.engine.risk-alerts")
+KAFKA_TOPIC_RECOMMENDATIONS = os.getenv("KAFKA_TOPIC_RECOMMENDATIONS", "j2.engine.resource-recommendations")
 ALERT_THRESHOLD = float(os.getenv("KAFKA_ALERT_THRESHOLD", "0.3"))
 
 SEVERITY_LABELS = {
@@ -166,3 +167,39 @@ def publish_predictions(predictions):
         )
 
     producer.flush()
+
+
+def publish_prediction(division: dict, prediction: dict) -> bool:
+    """Single-prediction wrapper called by routes and the Kafka consumer."""
+    merged = {**prediction, **division}
+    try:
+        publish_predictions([merged])
+        return True
+    except Exception as e:
+        print(f"Failed to publish prediction: {e}")
+        return False
+
+
+def publish_recommendation(division: dict, recommendation: dict) -> bool:
+    """Publishes a resource recommendation to j2.engine.resource-recommendations."""
+    producer = get_producer()
+    if not producer:
+        return False
+    merged = {**recommendation, **division}
+    message = {
+        "eventId": f"rec-{recommendation.get('recommendation_id')}",
+        "eventType": "resource-recommendation",
+        "timestamp": datetime.utcnow().isoformat(),
+        "payload": merged,
+    }
+    try:
+        producer.produce(
+            KAFKA_TOPIC_RECOMMENDATIONS,
+            key=str(recommendation.get("division_id")),
+            value=json.dumps(message),
+        )
+        producer.flush()
+        return True
+    except Exception as e:
+        print(f"Failed to publish recommendation: {e}")
+        return False

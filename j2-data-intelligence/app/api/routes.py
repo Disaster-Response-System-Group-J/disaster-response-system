@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.db.models import DisasterPrediction
+from app.db.models import DisasterPrediction, IncomingReport
 from app.services.feature_engineering import build_computed_features
 from app.services.kafka_producer import publish_prediction, publish_recommendation
 from app.services.recommendation_service import build_recommendation
@@ -159,6 +159,33 @@ def ingest_and_predict(payload: J1ReadingIn, db: Session = Depends(get_db)) -> D
         "prediction": pred_data,
         "recommendation": recommendation_payload,
     }
+
+
+@router.get("/sos-requests")
+def get_sos_requests(limit: int = 100, db: Session = Depends(get_db)) -> List[Dict[str, Any]]:
+    rows = (
+        db.query(IncomingReport)
+        .order_by(IncomingReport.received_at.desc())
+        .limit(max(1, min(limit, 500)))
+        .all()
+    )
+    return [
+        {
+            "report_id": row.id,
+            "source_channel": row.source_channel,
+            "status": row.status,
+            "sos_type": row.sos_type,
+            "district": row.district,
+            "latitude": row.latitude,
+            "longitude": row.longitude,
+            "description": row.description or "",
+            "media_url": row.media_url,
+            "contact_info": row.contact_info,
+            "created_at": row.received_at.isoformat() if row.received_at else None,
+            "event_id": row.event_id,
+        }
+        for row in rows
+    ]
 
 
 @router.get("/predictions/latest")

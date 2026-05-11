@@ -59,10 +59,22 @@ services:
     networks:
       - disaster-net
 
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: disaster-kafka-ui
+    restart: unless-stopped
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - disaster-net
+
   # ── J1 — Device & Edge Systems ────────────────────────────────────────────
->>>>>>> main
-  # ── J1 — Device & Edge Systems ────────────────────────────────────────────
->>>>>>> main
 
   mqtt-kafka-bridge:
     build:
@@ -96,7 +108,7 @@ services:
       - "8081:8000"
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      KAFKA_TOPIC_EVENTS: j1.events
+      KAFKA_TOPIC_EVENTS: j1.sos.raw-reports
       KAFKA_PRODUCER_TIMEOUT: "10"
       API_HOST: 0.0.0.0
       API_PORT: "8000"
@@ -115,12 +127,17 @@ services:
     image: disaster/j2-data-intelligence:latest
     container_name: j2-data-intelligence
     restart: unless-stopped
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     ports:
       - "8082:8082"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       KAFKA_BROKER: kafka:29092
       KAFKA_ALERT_THRESHOLD: "0.0"
+      SUPABASE_URL: https://qfhmczryyyddgitnlndy.supabase.co
+      SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFmaG1jenJ5eXlkZGdpdG5sbmR5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNDA1NTAsImV4cCI6MjA5MjkxNjU1MH0.T7ncUD48wnQtb5PGasWpLEZjG6Y5PQz_QCfurE6DPs4
     depends_on:
       postgres:
         condition: service_healthy
@@ -165,6 +182,7 @@ services:
       SQLITE_DB_PATH: /app/data/local_alerts.db
       AUDIT_API_BASE_URL: http://j4-audit-api:8084
       KAFKA_BROKER: kafka:29092
+      J2_API_URL: http://j2-data-intelligence:8082
     labels:
       prometheus-scrape: "true"
       prometheus-port: "3000"
@@ -657,9 +675,6 @@ services:
       - disaster-net
 
 # ── Named Volumes ─────────────────────────────────────────────────────────────
->>>>>>> main
-# ── Named Volumes ─────────────────────────────────────────────────────────────
->>>>>>> main
 volumes:
   postgres_data:
   elasticsearch_data:

@@ -46,6 +46,8 @@ async function startBridge() {
   const topics = [
     'j1.sos.raw-reports',
     'j1.sensor.telemetry',
+    'j1.sensor.telemetry.flood',
+    'j1.sensor.telemetry.landslide',
     'j2.engine.risk-alerts',
     'j2.engine.incidents',
     'j3.dashboard.report-updates',
@@ -76,14 +78,27 @@ async function startBridge() {
     eachMessage: async ({ topic, message }) => {
       const data = JSON.parse(message.value.toString());
       console.log(`📡 [Kafka -> UI] Routing ${topic} to frontend!`);
-      
-      if (topic === 'j1.sos.raw-reports') io.emit('dashboard:new-report', data);
-      if (topic === 'j1.sensor.telemetry') io.emit('sensor:telemetry-update', data);
+
+      if (topic === 'j1.sos.raw-reports') {
+        // Flatten payload so dashboard can access latitude/longitude directly
+        const p = data.payload || {};
+        const report = {
+          ...data,
+          reportId: data.eventId,
+          latitude: p.latitude ?? data.latitude,
+          longitude: p.longitude ?? data.longitude,
+          sosType: p.sosType ?? data.sosType,
+          district: p.district ?? data.district,
+        };
+        io.emit('dashboard:new-report', report);
+      }
+      if (topic === 'j1.sensor.telemetry' || topic === 'j1.sensor.telemetry.flood' || topic === 'j1.sensor.telemetry.landslide') {
+        io.emit('sensor:telemetry-update', data);
+      }
       if (topic === 'j2.engine.risk-alerts') io.emit('dashboard:risk-alert', data);
       if (topic === 'j2.engine.incidents') io.emit('dashboard:new-incident', data);
       if (topic === 'j3.dashboard.report-updates') io.emit('dashboard:report-updated', data);
       if (topic === 'j3.dashboard.resource-updates') io.emit('dashboard:resource-updated', data);
-      
     },
   });
 

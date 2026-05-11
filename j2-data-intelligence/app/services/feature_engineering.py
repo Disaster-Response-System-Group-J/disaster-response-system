@@ -1,10 +1,77 @@
 import pandas as pd
 import numpy as np
 import scipy.stats
+from dataclasses import dataclass
 from sklearn.preprocessing import LabelEncoder
 from sqlalchemy.orm import Session
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
+from typing import TYPE_CHECKING
 from app.db.models import RainfallData, SoilMoisture, TemperatureData, Division
+
+if TYPE_CHECKING:
+    from app.db.models import RawTelemetry
+
+
+@dataclass
+class ComputedFeatures:
+    rain_lag_1: float = 0.0
+    rain_rolling_3d: float = 0.0
+    rain_rolling_7d: float = 0.0
+    month_sin: float = 0.0
+    month_cos: float = 0.0
+    spi: float = 0.0
+    division_encoded: int = 0
+    level_difference: float = 0.0
+
+
+def build_computed_features(db: Session, telemetry: "RawTelemetry", division: Division) -> ComputedFeatures:
+    today = telemetry.recorded_at.date() if telemetry.recorded_at else datetime.now(timezone.utc).date()
+    history_start = today - timedelta(days=30)
+
+    rows = (
+        db.query(RainfallData)
+        .filter(
+            RainfallData.division_id == division.division_id,
+            RainfallData.date >= history_start,
+            RainfallData.date <= today,
+        )
+        .order_by(RainfallData.date.asc())
+        .all()
+    )
+
+    rain_values = [float(r.rain_sum or 0.0) for r in rows]
+    rain_lag_1 = rain_values[-2] if len(rain_values) >= 2 else 0.0
+    rain_rolling_3d = sum(rain_values[-3:]) if rain_values else 0.0
+    rain_rolling_7d = sum(rain_values[-7:]) if rain_values else 0.0
+
+    month = today.month
+    month_sin = float(np.sin(2 * np.pi * month / 12))
+    month_cos = float(np.cos(2 * np.pi * month / 12))
+
+    spi = 0.0
+    if len(rain_values) >= 5:
+        try:
+            series = np.where(np.array(rain_values) == 0, 0.01, rain_values)
+            shape, loc, scale = scipy.stats.gamma.fit(series)
+            cdf = scipy.stats.gamma.cdf(max(rain_values[-1], 0.01), a=shape, loc=loc, scale=scale)
+            spi = float(scipy.stats.norm.ppf(cdf))
+            spi = max(-3.0, min(3.0, spi))
+        except Exception:
+            spi = 0.0
+
+    level_difference = float(telemetry.depth or 0.0)
+    division_encoded = division.division_id % 100
+
+    return ComputedFeatures(
+        rain_lag_1=rain_lag_1,
+        rain_rolling_3d=rain_rolling_3d,
+        rain_rolling_7d=rain_rolling_7d,
+        month_sin=month_sin,
+        month_cos=month_cos,
+        spi=spi,
+        division_encoded=division_encoded,
+        level_difference=level_difference,
+    )
 
 def compute_spi(rain_series, window=30):
     from scipy.stats import gamma
