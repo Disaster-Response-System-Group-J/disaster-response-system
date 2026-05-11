@@ -3,9 +3,9 @@
 import { useState, useEffect } from 'react';
 import { 
   Truck, Search, MapPin, Activity, CheckCircle2, 
-  XCircle, ChevronDown, Home, X 
+  XCircle, ChevronDown, Home, X, Inbox, Clock, AlertTriangle, Package
 } from 'lucide-react';
-import { ResourceType, ResourceStatus, IncidentStatus, UserRole } from '@/types';
+import { ResourceType, ResourceStatus, UserRole } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { DISTRICT_NAMES } from '@/data/districts';
 import { useSocket } from '@/context/SocketContext';
@@ -38,7 +38,12 @@ export default function ResourcesPage() {
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [districtFilter, setDistrictFilter] = useState<string>('ALL');
-  const [activeTab, setActiveTab] = useState<'ASSETS' | 'SHELTERS'>('ASSETS');
+  const [activeTab, setActiveTab] = useState<'ASSETS' | 'SHELTERS' | 'REQUESTS'>('ASSETS');
+
+  // Resource Requests inbox
+  const [resourceRequests, setResourceRequests] = useState<any[]>([]);
+  const [requestsLoading, setRequestsLoading] = useState(false);
+  const [requestFilter, setRequestFilter] = useState<string>('ALL');
   
   const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.includes('NATIONAL')) ? 'ALL' : (user as any)?.assignedDistrict || 'ALL';
 
@@ -49,58 +54,67 @@ export default function ResourcesPage() {
   const [shelterForm, setShelterForm] = useState({ capacity: 0, currentLoad: 0 });
 
   useEffect(() => {
-  const fetchAllData = async () => {
-    try {
-      const [assetsData, sheltersRes, incidentsRes] = await Promise.all([
-        fetch('/api/resources/list').then(res => res.json()),
-        fetch('/api/relief/shelter').then(res => res.json()),
-        fetch('/api/incidents').then(res => res.json())
-      ]);
+    const fetchAllData = async () => {
+      try {
+        const [assetsData, sheltersRes, incidentsRes] = await Promise.all([
+          fetch('/api/resources/list').then(res => res.json()),
+          fetch('/api/relief/shelter').then(res => res.json()),
+          fetch('/api/incidents').then(res => res.json())
+        ]);
 
-      // Access the .resources array from the API response
-      const assetsArray = assetsData.resources || []; 
+        const assetsArray = assetsData.resources || [];
+        const mappedAssets = assetsArray.map((a: any) => ({
+          resourceId: `ASSET-${a.asset_id}`,
+          dbId: a.asset_id,
+          name: a.name,
+          type: a.type as ResourceType,
+          status: a.status as ResourceStatus,
+          district: a.base_location || 'Unassigned',
+          latitude: a.current_latitude,
+          longitude: a.current_longitude,
+          lastUpdated: new Date().toISOString()
+        }));
 
-      // Map Assets
-      const mappedAssets = assetsArray.map((a: any) => ({
-        resourceId: `ASSET-${a.asset_id}`,
-        dbId: a.asset_id,
-        name: a.name,
-        type: a.type as ResourceType,
-        status: a.status as ResourceStatus,
-        district: a.base_location || 'Unassigned',
-        latitude: a.current_latitude,
-        longitude: a.current_longitude,
-        lastUpdated: new Date().toISOString()
-      }));
+        const mappedShelters = (Array.isArray(sheltersRes) ? sheltersRes : []).map((s: any) => ({
+          resourceId: `SHELTER-${s.shelter_id}`,
+          dbId: s.shelter_id,
+          name: s.name,
+          type: ResourceType.SHELTER,
+          status: s.status === 'OPEN' ? ResourceStatus.AVAILABLE : ResourceStatus.OUT_OF_SERVICE,
+          district: 'Unassigned',
+          capacity: s.max_capacity,
+          currentLoad: s.current_occupancy,
+          lastUpdated: s.updated_at
+        }));
 
-      // Map Shelters (Ensure sheltersRes is handled as an array)
-      const mappedShelters = (Array.isArray(sheltersRes) ? sheltersRes : []).map((s: any) => ({
-        resourceId: `SHELTER-${s.shelter_id}`,
-        dbId: s.shelter_id,
-        name: s.name,
-        type: ResourceType.SHELTER,
-        status: s.status === 'OPEN' ? ResourceStatus.AVAILABLE : ResourceStatus.OUT_OF_SERVICE,
-        district: 'Unassigned', 
-        capacity: s.max_capacity,
-        currentLoad: s.current_occupancy,
-        lastUpdated: s.updated_at
-      }));
+        setResources([...mappedAssets, ...mappedShelters]);
+        const incidentsArray = Array.isArray(incidentsRes) ? incidentsRes : [];
+        setActiveIncidents(incidentsArray.filter((i: any) => i.status === 'ACTIVE'));
+      } catch (err) {
+        console.error('Error loading resources:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchAllData();
+  }, []);
 
-      setResources([...mappedAssets, ...mappedShelters]);
-      
-      // Ensure incidentsRes is handled as an array before filtering[cite: 6]
-      const incidentsArray = Array.isArray(incidentsRes) ? incidentsRes : [];
-      setActiveIncidents(incidentsArray.filter((i: any) => i.status === 'ACTIVE'));
-      
-    } catch (err) {
-      console.error('Error loading resources:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  fetchAllData();
-}, []);
+  // Fetch resource requests when the REQUESTS tab is activated
+  useEffect(() => {
+    if (activeTab !== 'REQUESTS') return;
+    const fetchRequests = async () => {
+      setRequestsLoading(true);
+      try {
+        const res = await fetch('/api/resources/requests');
+        if (res.ok) setResourceRequests(await res.json());
+      } catch (err) {
+        console.error('Error loading resource requests:', err);
+      } finally {
+        setRequestsLoading(false);
+      }
+    };
+    fetchRequests();
+  }, [activeTab]);
 
   useEffect(() => {
     if (!socket) return;
@@ -237,16 +251,29 @@ export default function ResourcesPage() {
         </div>
 
         <div className="flex gap-6 border-b border-slate-800/80 mb-6">
-          <button 
-            onClick={() => setActiveTab('ASSETS')} 
+          <button
+            onClick={() => setActiveTab('ASSETS')}
             className={`pb-3 text-sm font-bold border-b-2 transition-colors ${activeTab === 'ASSETS' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-300'}`}>
             Deployable Assets
           </button>
-          <button 
-            onClick={() => setActiveTab('SHELTERS')} 
+          <button
+            onClick={() => setActiveTab('SHELTERS')}
             className={`pb-3 text-sm font-bold border-b-2 transition-colors ${activeTab === 'SHELTERS' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-300'}`}>
             Relief Shelters
           </button>
+          {hasPermission('dispatch:resources') && (
+            <button
+              onClick={() => setActiveTab('REQUESTS')}
+              className={`pb-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'REQUESTS' ? 'border-amber-500 text-amber-400' : 'border-transparent text-slate-400 hover:text-slate-300'}`}>
+              <Inbox size={14} />
+              Resource Requests
+              {resourceRequests.filter(r => r.status === 'PENDING').length > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                  {resourceRequests.filter(r => r.status === 'PENDING').length}
+                </span>
+              )}
+            </button>
+          )}
         </div>
 
         <div className="bg-[#131924] border border-slate-800/80 rounded-xl p-4 flex gap-4 mb-6">
@@ -335,6 +362,64 @@ export default function ResourcesPage() {
             </tbody>
           </table>
         </div>
+
+        {/* ── Resource Requests Tab ─────────────────────────────── */}
+        {activeTab === 'REQUESTS' && (
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-sm text-slate-400">Incoming resource requests from field response teams.</p>
+              <select
+                value={requestFilter}
+                onChange={e => setRequestFilter(e.target.value)}
+                className="bg-[#0a0f16] border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none">
+                <option value="ALL">All Statuses</option>
+                {['PENDING','APPROVED','DISPATCHED','FULFILLED','REJECTED'].map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+
+            {requestsLoading ? (
+              <div className="flex items-center justify-center py-16">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500" />
+              </div>
+            ) : resourceRequests.filter(r => requestFilter === 'ALL' || r.status === requestFilter).length === 0 ? (
+              <div className="text-center py-16 bg-[#131924] rounded-xl border border-slate-800/80">
+                <Inbox size={28} className="mx-auto mb-3 text-slate-600" />
+                <p className="text-sm text-slate-500">No resource requests found.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {resourceRequests
+                  .filter(r => requestFilter === 'ALL' || r.status === requestFilter)
+                  .map((req: any) => (
+                    <ResourceRequestCard
+                      key={req.request_id}
+                      req={req}
+                      user={user}
+                      onAction={async (requestId, status) => {
+                        try {
+                          const res = await fetch('/api/resources/requests', {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ requestId, status, reviewedBy: user?.id }),
+                          });
+                          if (res.ok) {
+                            setResourceRequests(prev =>
+                              prev.map(r => r.request_id === requestId ? { ...r, status } : r)
+                            );
+                          }
+                        } catch (err) {
+                          console.error('Failed to update request', err);
+                        }
+                      }}
+                    />
+                  ))
+                }
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Dispatch Modal */}
@@ -387,3 +472,131 @@ export default function ResourcesPage() {
     </div>
   );
 }
+
+// ── Resource Request Card ─────────────────────────────────────────────────────
+
+const REQUEST_STATUS_STYLES: Record<string, string> = {
+  PENDING:    'bg-amber-500/10 text-amber-400 border-amber-500/30',
+  APPROVED:   'bg-green-500/10 text-green-400 border-green-500/30',
+  DISPATCHED: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
+  FULFILLED:  'bg-teal-500/10 text-teal-400 border-teal-500/30',
+  REJECTED:   'bg-red-500/10 text-red-400 border-red-500/30',
+};
+
+const URGENCY_STYLES: Record<string, string> = {
+  CRITICAL: 'text-red-400 bg-red-500/10 border-red-500/20',
+  HIGH:     'text-orange-400 bg-orange-500/10 border-orange-500/20',
+  MEDIUM:   'text-yellow-400 bg-yellow-500/10 border-yellow-500/20',
+  LOW:      'text-blue-400 bg-blue-500/10 border-blue-500/20',
+};
+
+function ResourceRequestCard({
+  req,
+  user,
+  onAction,
+}: {
+  req: any;
+  user: any;
+  onAction: (requestId: string, status: string) => Promise<void>;
+}) {
+  const items: any[] = typeof req.items === 'string' ? JSON.parse(req.items) : (req.items ?? []);
+
+  return (
+    <div className={`bg-[#131924] border rounded-xl p-5 transition-all ${
+      req.status === 'PENDING' ? 'border-amber-500/20' : 'border-slate-800/80'
+    }`}>
+      {/* Header */}
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <Package size={14} className="text-amber-400" />
+            <span className="text-sm font-bold text-slate-100">
+              {req.incident_title ?? 'Unlinked Request'}
+            </span>
+            {req.incident_district && (
+              <span className="flex items-center gap-1 text-[10px] text-slate-500">
+                <MapPin size={9} /> {req.incident_district}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-3 text-[10px] text-slate-500">
+            <span>From: <span className="text-slate-300 font-semibold">{req.requester_name ?? 'Unknown'}</span></span>
+            <span className="flex items-center gap-1">
+              <Clock size={9} /> {new Date(req.created_at).toLocaleString()}
+            </span>
+          </div>
+        </div>
+        <span className={`px-2.5 py-1 rounded text-[9px] font-bold tracking-widest border ${REQUEST_STATUS_STYLES[req.status] ?? 'bg-slate-800 text-slate-400 border-slate-700'}`}>
+          {req.status}
+        </span>
+      </div>
+
+      {/* Items breakdown */}
+      {items.length > 0 && (
+        <div className="mb-4">
+          <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-2">Requested Items</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {items.map((item: any, i: number) => (
+              <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-slate-800/40 border border-slate-700/50">
+                <div>
+                  <p className="text-[10px] font-semibold text-slate-300">{item.resource_type?.replace(/_/g, ' ')}</p>
+                  <p className="text-xs font-bold text-white">{item.quantity} {item.unit}</p>
+                </div>
+                {item.urgency && (
+                  <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border ${URGENCY_STYLES[item.urgency] ?? ''}`}>
+                    {item.urgency}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {req.notes && (
+        <p className="text-xs text-slate-400 italic mb-4 border-l-2 border-slate-700 pl-3">{req.notes}</p>
+      )}
+
+      {/* Actions — only shown for PENDING requests to resource managers */}
+      {req.status === 'PENDING' && (
+        <div className="flex gap-2 pt-3 border-t border-slate-800/50">
+          <button
+            onClick={() => onAction(req.request_id, 'APPROVED')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-green-500/10 hover:bg-green-500/20 border border-green-500/20 text-green-400 transition-colors">
+            <CheckCircle2 size={12} /> Approve
+          </button>
+          <button
+            onClick={() => onAction(req.request_id, 'DISPATCHED')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 transition-colors">
+            <Truck size={12} /> Dispatch
+          </button>
+          <button
+            onClick={() => onAction(req.request_id, 'REJECTED')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-800/50 hover:bg-red-500/10 border border-slate-700/50 hover:border-red-500/20 text-slate-400 hover:text-red-400 transition-colors ml-auto">
+            <XCircle size={12} /> Reject
+          </button>
+        </div>
+      )}
+
+      {req.status === 'APPROVED' && (
+        <div className="flex gap-2 pt-3 border-t border-slate-800/50">
+          <button
+            onClick={() => onAction(req.request_id, 'DISPATCHED')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 transition-colors">
+            <Truck size={12} /> Mark Dispatched
+          </button>
+        </div>
+      )}
+
+      {req.status === 'DISPATCHED' && (
+        <div className="flex gap-2 pt-3 border-t border-slate-800/50">
+          <button
+            onClick={() => onAction(req.request_id, 'FULFILLED')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/20 text-teal-400 transition-colors">
+            <CheckCircle2 size={12} /> Mark Fulfilled
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
