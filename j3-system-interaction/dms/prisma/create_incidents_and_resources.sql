@@ -3,7 +3,7 @@
 -- Supports:
 --   1) Users & Roles management
 --   2) Incoming reports (from J1 SOS app, sensors, public portal)
---   3) Confirmed incidents (verified & escalated reports)
+--   3) Confirmed incidents (verified & escalated reports)``
 --   4) Resources (rescue teams, boats, shelters, etc.)
 --   5) Alerts (risk, public, resource-related)
 
