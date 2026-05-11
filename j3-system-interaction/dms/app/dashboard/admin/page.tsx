@@ -6,13 +6,22 @@ import {
   UserX, UserCheck, CheckCircle2, Search, X,
   AlertTriangle, Plus, Trash2, Settings, List, Save, Activity
 } from 'lucide-react';
+import { AdminAuditDashboard } from '@/components/admin/admin-audit-dashboard';
 import { MOCK_USERS } from '@/data/mock-data';
 import { UserRole, DISASTER_TYPES } from '@/types';
 
 // Extended local type to include status for the demo
 type AdminUser = typeof MOCK_USERS[0] & { status: 'ACTIVE' | 'SUSPENDED' };
+type AdminTab = 'users' | 'disasters' | 'config' | 'audit';
 
 const INITIAL_USERS: AdminUser[] = MOCK_USERS.map(u => ({ ...u, status: 'ACTIVE' }));
+const CORE_DISASTER_TYPES = new Set<string>(Object.values(DISASTER_TYPES));
+const ADMIN_TABS: Array<{ id: AdminTab; label: string; icon: typeof Users }> = [
+  { id: 'users', label: 'User Management', icon: Users },
+  { id: 'disasters', label: 'Disaster Types', icon: AlertTriangle },
+  { id: 'config', label: 'System Config', icon: Settings },
+  { id: 'audit', label: 'Audit Logs', icon: List }
+];
 
 const ROLE_STYLES: Record<string, string> = {
   [UserRole.SYSTEM_ADMIN]: 'bg-red-500/10 text-red-400 border-red-500/20',
@@ -29,15 +38,6 @@ const ROLE_STYLES: Record<string, string> = {
   [UserRole.RESPONSE_TEAM_MEMBER]: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
 };
 
-// Mock Audit Logs
-const MOCK_AUDIT_LOGS = [
-  { id: 'LOG-001', timestamp: '2026-05-03T10:15:00Z', user: 'Kamal Perera (ADM-001)', action: 'UPDATE_ROLE', details: 'Changed role of USR-421 to OPERATIONS_OFFICER_ZONAL' },
-  { id: 'LOG-002', timestamp: '2026-05-03T09:42:00Z', user: 'System', action: 'AUTO_ALERT_TRIGGERED', details: 'Risk Engine triggered ALT-001 for Kelani Basin' },
-  { id: 'LOG-003', timestamp: '2026-05-03T08:11:00Z', user: 'Sunil Fernando (RM-001)', action: 'DISPATCH_RESOURCE', details: 'Dispatched RSC-002 to INC-001' },
-  { id: 'LOG-004', timestamp: '2026-05-02T22:30:00Z', user: 'Incident Commander (IC-001)', action: 'ELEVATE_INCIDENT', details: 'Elevated RPT-003 to INC-001 (CRITICAL)' },
-  { id: 'LOG-005', timestamp: '2026-05-02T18:05:00Z', user: 'Kamal Perera (ADM-001)', action: 'SYS_CONFIG_UPDATE', details: 'Updated Sensor Warning Threshold from 4.5m to 5.0m' },
-];
-
 export default function AdminPanelPage() {
   const [users, setUsers] = useState<AdminUser[]>(INITIAL_USERS);
   const [search, setSearch] = useState('');
@@ -50,7 +50,7 @@ export default function AdminPanelPage() {
   const [actionMessage, setActionMessage] = useState('');
 
   // Tab State
-  const [activeTab, setActiveTab] = useState<'users' | 'disasters' | 'config' | 'audit'>('users');
+  const [activeTab, setActiveTab] = useState<AdminTab>('users');
 
   // Disaster Management State
   const [disasterTypes, setDisasterTypes] = useState<string[]>([
@@ -65,18 +65,8 @@ export default function AdminPanelPage() {
     maintenanceMode: false,
     maxUploadSizeMB: 10
   });
-
-  // Audit Logs State
-  const [logSearch, setLogSearch] = useState('');
-
   const filteredUsers = users.filter(u => 
     u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const filteredLogs = MOCK_AUDIT_LOGS.filter(log => 
-    log.action.toLowerCase().includes(logSearch.toLowerCase()) || 
-    log.user.toLowerCase().includes(logSearch.toLowerCase()) ||
-    log.details.toLowerCase().includes(logSearch.toLowerCase())
   );
 
   const showMessage = (msg: string) => {
@@ -120,7 +110,7 @@ export default function AdminPanelPage() {
   };
 
   const removeDisasterType = (type: string) => {
-    if (Object.values(DISASTER_TYPES).includes(type as any)) return showMessage('Cannot remove core disaster types');
+    if (CORE_DISASTER_TYPES.has(type)) return showMessage('Cannot remove core disaster types');
     setDisasterTypes(disasterTypes.filter(t => t !== type));
     showMessage('Disaster type removed successfully');
   };
@@ -158,15 +148,10 @@ export default function AdminPanelPage() {
 
         {/* Tab Navigation */}
         <div className="flex gap-1 mb-6 bg-[#131924] border border-slate-800/80 rounded-lg p-1 overflow-x-auto">
-          {[
-            { id: 'users', label: 'User Management', icon: Users },
-            { id: 'disasters', label: 'Disaster Types', icon: AlertTriangle },
-            { id: 'config', label: 'System Config', icon: Settings },
-            { id: 'audit', label: 'Audit Logs', icon: List }
-          ].map(tab => (
+          {ADMIN_TABS.map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id)}
               className={`flex-1 min-w-[150px] py-2.5 px-4 rounded-md text-xs font-bold transition-colors flex items-center justify-center gap-2 ${
                 activeTab === tab.id 
                   ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' 
@@ -308,9 +293,9 @@ export default function AdminPanelPage() {
                       <div className="flex items-center gap-3">
                         <div className={`w-3 h-3 rounded-full ${type === DISASTER_TYPES.FLOOD ? 'bg-blue-400' : type === DISASTER_TYPES.LANDSLIDE ? 'bg-orange-400' : type === DISASTER_TYPES.DROUGHT ? 'bg-yellow-400' : 'bg-purple-400'}`} />
                         <span className="text-sm font-semibold text-slate-200">{type}</span>
-                        {Object.values(DISASTER_TYPES).includes(type as any) && <span className="px-1.5 py-0.5 text-[8px] bg-blue-500/20 text-blue-400 rounded border border-blue-500/20">CORE</span>}
+                        {CORE_DISASTER_TYPES.has(type) && <span className="px-1.5 py-0.5 text-[8px] bg-blue-500/20 text-blue-400 rounded border border-blue-500/20">CORE</span>}
                       </div>
-                      {!Object.values(DISASTER_TYPES).includes(type as any) && <button onClick={() => removeDisasterType(type)} className="text-slate-500 hover:text-red-400 transition-colors"><Trash2 size={14} /></button>}
+                      {!CORE_DISASTER_TYPES.has(type) && <button onClick={() => removeDisasterType(type)} className="text-slate-500 hover:text-red-400 transition-colors"><Trash2 size={14} /></button>}
                     </div>
                   ))}
                 </div>
@@ -408,42 +393,7 @@ export default function AdminPanelPage() {
 
         {/* TAB 4: AUDIT LOGS */}
         {activeTab === 'audit' && (
-          <div className="bg-[#131924] border border-slate-800/80 rounded-xl overflow-hidden">
-            <div className="p-4 border-b border-slate-800/80 flex gap-4 bg-slate-800/20">
-              <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
-                <input type="text" placeholder="Search by user, action, or details..." value={logSearch} onChange={e => setLogSearch(e.target.value)}
-                  className="w-full bg-[#0a0f16] border border-slate-800 rounded-lg pl-9 pr-4 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500/50" />
-              </div>
-            </div>
-            <table className="w-full text-left">
-              <thead>
-                <tr className="border-b border-slate-800/80 bg-[#0a0f16]/50 text-[9px] font-bold text-slate-500 tracking-widest uppercase">
-                  <th className="px-6 py-4">TIMESTAMP</th>
-                  <th className="px-6 py-4">USER / ACTOR</th>
-                  <th className="px-6 py-4">ACTION TYPE</th>
-                  <th className="px-6 py-4 w-1/2">DETAILS</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/50">
-                {filteredLogs.map(log => (
-                  <tr key={log.id} className="hover:bg-slate-800/20 transition-colors">
-                    <td className="px-6 py-3 text-xs text-slate-400 whitespace-nowrap">{new Date(log.timestamp).toLocaleString()}</td>
-                    <td className="px-6 py-3 text-xs font-semibold text-slate-200">{log.user}</td>
-                    <td className="px-6 py-3">
-                      <span className="px-2 py-0.5 rounded text-[9px] font-bold tracking-widest border bg-slate-800 text-slate-300 border-slate-700">
-                        {log.action.replace(/_/g, ' ')}
-                      </span>
-                    </td>
-                    <td className="px-6 py-3 text-xs text-slate-400">{log.details}</td>
-                  </tr>
-                ))}
-                {filteredLogs.length === 0 && (
-                  <tr><td colSpan={4} className="px-6 py-12 text-center text-slate-500 text-sm">No audit logs matching the criteria.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          <AdminAuditDashboard />
         )}
       </div>
     </div>

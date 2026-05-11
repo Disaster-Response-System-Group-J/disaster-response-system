@@ -20,7 +20,7 @@ pool.on('connect', () => {
 // 2. LOCAL SQLITE CONNECTION (For Alerts)
 // ==========================================
 // This creates a file named 'local_alerts.db' in your project root
-const dbPath = path.resolve(process.cwd(), 'local_alerts.db');
+const dbPath = process.env.SQLITE_DB_PATH || path.resolve(process.cwd(), 'local_alerts.db');
 
 export const localDb = new sqlite3.Database(dbPath, (err) => {
   if (err) {

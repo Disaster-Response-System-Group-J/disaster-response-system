@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
             district: district || null,
           },
         },
-        data: divisions.map((d) => ({
+        data: divisions.map((d : any) => ({
           id: d.divisionId,
           locationId: d.locationId,
           name: d.name,

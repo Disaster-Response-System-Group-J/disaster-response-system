@@ -1,7 +1,17 @@
-FROM node:20-alpine
+FROM node:20.19.2-alpine3.21
+
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci --frozen-lockfile --omit=dev
-COPY *.js ./
+
+COPY package.bridge.json ./package.json
+RUN npm install --omit=dev --no-audit
+
+COPY --chown=node:node event-bridge.js .
+
+USER node
+
 EXPOSE 3001
+
+HEALTHCHECK --interval=10s --timeout=5s --start-period=15s --retries=5 \
+    CMD wget -qO- "http://127.0.0.1:3001/socket.io/?EIO=4&transport=polling" > /dev/null || exit 1
+
 CMD ["node", "event-bridge.js"]

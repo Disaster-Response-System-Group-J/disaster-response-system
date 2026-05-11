@@ -55,3 +55,10 @@ secrets/
 .piolibdeps/
 
 **/secrets.yaml
+
+# Kubernetes sensitive files
+*kubeconfig*
+*.kubeconfig
+kube/config
+~/.kube/
+k8s/secrets.yaml

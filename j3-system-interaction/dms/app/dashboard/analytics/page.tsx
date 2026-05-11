@@ -27,10 +27,13 @@ export default function AnalyticsPage() {
           fetch('/api/relief/shelter').then(res => res.json())
         ]);
 
-        setIncidents(incidentsRes);
+        const incidentsList = Array.isArray(incidentsRes) ? incidentsRes : [];
+        const sheltersList = Array.isArray(sheltersRes) ? sheltersRes : [];
 
-        const totalCapacity = sheltersRes.reduce((sum: number, s: any) => sum + (s.max_capacity || 0), 0);
-        const totalOccupancy = sheltersRes.reduce((sum: number, s: any) => sum + (s.current_occupancy || 0), 0);
+        setIncidents(incidentsList);
+
+        const totalCapacity = sheltersList.reduce((sum: number, s: any) => sum + (s.max_capacity || 0), 0);
+        const totalOccupancy = sheltersList.reduce((sum: number, s: any) => sum + (s.current_occupancy || 0), 0);
         setShelterStats({ 
           utilization: totalCapacity > 0 ? Math.round((totalOccupancy / totalCapacity) * 100) : 0 
         });

@@ -17,6 +17,7 @@ export const MOCK_USERS: (User & { password: string, assignedDistrict?: string }
   { id: 'LS-002', email: 'logistics2@dmc.gov.lk', name: 'Pathum Senanayake', role: UserRole.LOGISTICS_STAFF, password: 'logistics123', assignedDistrict: 'ALL' },
   { id: 'RT-001', email: 'response@dmc.gov.lk', name: 'Priya Bandara', role: UserRole.RESPONSE_TEAM_MEMBER, password: 'response123', assignedDistrict: 'ALL' },
   { id: 'RT-002', email: 'response2@dmc.gov.lk', name: 'Dilshan Perera', role: UserRole.RESPONSE_TEAM_MEMBER, password: 'response123', assignedDistrict: 'ALL' },
+  { id: 'AUD-001', email: 'auditor@dmc.gov.lk', name: 'Priya Jayawardena', role: UserRole.AUDITOR, password: 'auditor123', assignedDistrict: 'ALL' },
 ];
 // ── Mock Incoming Reports ────────────────────────────────────
 export const MOCK_INCOMING_REPORTS: IncomingReport[] = [
@@ -217,14 +218,164 @@ export const MOCK_RESOURCES: Resource[] = [
 
 // ── Mock Alerts ──────────────────────────────────────────────
 export const MOCK_ALERTS: Alert[] = [
-  { alertId: 'ALT-001', type: AlertType.RISK_ALERT, severity: IncidentSeverity.CRITICAL, title: 'Level 3 Flood Warning — Kelani River Basin', description: 'Kelani River water levels exceeding danger mark. Colombo & Gampaha districts under evacuation orders.', district: 'Colombo', isPublic: true, isActive: true, createdAt: '2026-04-27T06:00:00Z', source: 'J2 Risk Engine' },
-  { alertId: 'ALT-002', type: AlertType.RISK_ALERT, severity: IncidentSeverity.HIGH, title: 'Landslide Warning — Central Highlands', description: 'Heavy rainfall triggering landslide risk in Nuwara Eliya, Kandy, and Kegalle districts.', district: 'Nuwara Eliya', isPublic: true, isActive: true, createdAt: '2026-04-27T07:00:00Z', source: 'J2 Risk Engine' },
-  { alertId: 'ALT-003', type: AlertType.SHELTER_CAPACITY, severity: IncidentSeverity.HIGH, title: 'Shelter Over Capacity — Ratnapura Central', description: 'Ratnapura Central School shelter at 96% capacity. Overflow arrangements needed.', district: 'Ratnapura', isPublic: false, isActive: true, createdAt: '2026-04-27T10:00:00Z' },
-  { alertId: 'ALT-004', type: AlertType.RESOURCE_SHORTAGE, severity: IncidentSeverity.MEDIUM, title: 'Medical Supply Shortage — Galle Zone', description: 'Medical supplies running low in Galle district shelters. Resupply within 12 hours.', district: 'Galle', isPublic: false, isActive: true, createdAt: '2026-04-27T09:00:00Z' },
-  { alertId: 'ALT-005', type: AlertType.PUBLIC_ALERT, severity: IncidentSeverity.CRITICAL, title: 'Evacuation Order — Kaduwela Division', description: 'All residents in Kaduwela low-lying areas must evacuate immediately. Report to nearest shelter.', district: 'Colombo', isPublic: true, isActive: true, createdAt: '2026-04-27T08:30:00Z' },
-  { alertId: 'ALT-006', type: AlertType.INCIDENT_STATUS, severity: IncidentSeverity.LOW, title: 'Road Reopened — Haputale', description: 'Haputale road cleared of debris. Normal traffic resumed.', district: 'Badulla', isPublic: true, isActive: false, createdAt: '2026-04-27T06:30:00Z' },
-  { alertId: 'ALT-007', type: AlertType.PUBLIC_ALERT, severity: IncidentSeverity.HIGH, title: 'Heavy Rainfall Expected — SW Monsoon', description: '150mm rainfall expected in next 24h across Western & Sabaragamuwa provinces.', district: 'Ratnapura', isPublic: true, isActive: true, createdAt: '2026-04-27T05:00:00Z', source: 'Meteorological Dept' },
-  { alertId: 'ALT-008', type: AlertType.RESOURCE_SHORTAGE, severity: IncidentSeverity.HIGH, title: 'Potable Water Critical — Ratnapura', description: 'Water purification supplies running critically low in Ratnapura shelters.', district: 'Ratnapura', isPublic: false, isActive: true, createdAt: '2026-04-27T11:00:00Z' },
+  {
+    alertId: 'ALT-001',
+    type: AlertType.RISK_ALERT,
+    severity: IncidentSeverity.CRITICAL,
+    title: 'Level 3 Flood Warning — Kelani River Basin',
+    description: 'Kelani River water levels exceeding danger mark. Colombo & Gampaha districts under evacuation orders.',
+    district: 'Colombo',
+    isPublic: true,
+    isActive: true,
+    createdAt: '2026-04-27T06:00:00Z',
+    source: 'J2 Risk Engine',
+    predictionProbability: 0.87,
+    considerationScore: 0.92,
+    resourcePressure: 0.78,
+    predictionCategory: 'FLOOD',
+    topProbabilityKey: 'SEVERE',
+    probabilities: { NORMAL: 0.02, MODERATE: 0.07, SEVERE: 0.78, EXTREME: 0.13 },
+    resourceSummary: {
+      overall: { total: 45, available: 10 },
+      by_type: { shelter: { total: 12, available: 2 }, water_supply: { total: 8, available: 1 }, medical: { total: 15, available: 4 }, transport: { total: 10, available: 3 } }
+    }
+  },
+  {
+    alertId: 'ALT-002',
+    type: AlertType.RISK_ALERT,
+    severity: IncidentSeverity.HIGH,
+    title: 'Landslide Warning — Central Highlands',
+    description: 'Heavy rainfall triggering landslide risk in Nuwara Eliya, Kandy, and Kegalle districts.',
+    district: 'Nuwara Eliya',
+    isPublic: true,
+    isActive: true,
+    createdAt: '2026-04-27T07:00:00Z',
+    source: 'J2 Risk Engine',
+    predictionProbability: 0.73,
+    considerationScore: 0.81,
+    resourcePressure: 0.42,
+    predictionCategory: 'LANDSLIDE',
+    topProbabilityKey: 'MODERATE',
+    probabilities: { NORMAL: 0.12, MODERATE: 0.64, SEVERE: 0.20, EXTREME: 0.04 },
+    resourceSummary: {
+      overall: { total: 38, available: 22 },
+      by_type: { shelter: { total: 10, available: 7 }, water_supply: { total: 6, available: 4 }, medical: { total: 12, available: 7 }, transport: { total: 10, available: 4 } }
+    }
+  },
+  {
+    alertId: 'ALT-003',
+    type: AlertType.SHELTER_CAPACITY,
+    severity: IncidentSeverity.HIGH,
+    title: 'Shelter Over Capacity — Ratnapura Central',
+    description: 'Ratnapura Central School shelter at 96% capacity. Overflow arrangements needed.',
+    district: 'Ratnapura',
+    isPublic: false,
+    isActive: true,
+    createdAt: '2026-04-27T10:00:00Z'
+  },
+  {
+    alertId: 'ALT-004',
+    type: AlertType.RESOURCE_SHORTAGE,
+    severity: IncidentSeverity.MEDIUM,
+    title: 'Medical Supply Shortage — Galle Zone',
+    description: 'Medical supplies running low in Galle district shelters. Resupply within 12 hours.',
+    district: 'Galle',
+    isPublic: false,
+    isActive: true,
+    createdAt: '2026-04-27T09:00:00Z'
+  },
+  {
+    alertId: 'ALT-005',
+    type: AlertType.PUBLIC_ALERT,
+    severity: IncidentSeverity.CRITICAL,
+    title: 'Evacuation Order — Kaduwela Division',
+    description: 'All residents in Kaduwela low-lying areas must evacuate immediately. Report to nearest shelter.',
+    district: 'Colombo',
+    isPublic: true,
+    isActive: true,
+    createdAt: '2026-04-27T08:30:00Z',
+    predictionProbability: 0.91,
+    considerationScore: 0.84,
+    resourcePressure: 0.65,
+    predictionCategory: 'FLOOD',
+    topProbabilityKey: 'SEVERE',
+    probabilities: { NORMAL: 0.02, MODERATE: 0.07, SEVERE: 0.78, EXTREME: 0.13 },
+    resourceSummary: {
+      overall: { total: 45, available: 18 },
+      by_type: { shelter: { total: 12, available: 4 }, water_supply: { total: 8, available: 3 }, medical: { total: 15, available: 6 }, transport: { total: 10, available: 5 } }
+    }
+  },
+  {
+    alertId: 'ALT-006',
+    type: AlertType.INCIDENT_STATUS,
+    severity: IncidentSeverity.LOW,
+    title: 'Road Reopened — Haputale',
+    description: 'Haputale road cleared of debris. Normal traffic resumed.',
+    district: 'Badulla',
+    isPublic: true,
+    isActive: false,
+    createdAt: '2026-04-27T06:30:00Z'
+  },
+  {
+    alertId: 'ALT-007',
+    type: AlertType.PUBLIC_ALERT,
+    severity: IncidentSeverity.HIGH,
+    title: 'Heavy Rainfall Expected — SW Monsoon',
+    description: '150mm rainfall expected in next 24h across Western & Sabaragamuwa provinces.',
+    district: 'Ratnapura',
+    isPublic: true,
+    isActive: true,
+    createdAt: '2026-04-27T05:00:00Z',
+    source: 'Meteorological Dept',
+    predictionProbability: 0.68,
+    considerationScore: 0.76,
+    resourcePressure: 0.71,
+    predictionCategory: 'FLOOD',
+    topProbabilityKey: 'SEVERE',
+    probabilities: { NORMAL: 0.05, MODERATE: 0.27, SEVERE: 0.56, EXTREME: 0.12 },
+    resourceSummary: {
+      overall: { total: 42, available: 12 },
+      by_type: { shelter: { total: 14, available: 3 }, water_supply: { total: 7, available: 2 }, medical: { total: 13, available: 4 }, transport: { total: 8, available: 3 } }
+    }
+  },
+  {
+    alertId: 'ALT-008',
+    type: AlertType.RESOURCE_SHORTAGE,
+    severity: IncidentSeverity.HIGH,
+    title: 'Potable Water Critical — Ratnapura',
+    description: 'Water purification supplies running critically low in Ratnapura shelters.',
+    district: 'Ratnapura',
+    isPublic: false,
+    isActive: true,
+    createdAt: '2026-04-27T11:00:00Z'
+  },
+  {
+    alertId: 'ALT-SYN-1715169688637',
+    type: AlertType.RISK_ALERT,
+    severity: IncidentSeverity.HIGH,
+    title: 'Synthetic Flood Watch for Colombo',
+    description: 'Risk alert',
+    district: 'Colombo',
+    isPublic: true,
+    isActive: true,
+    createdAt: '2026-05-08T15:01:28.637Z',
+    source: 'Synthetic Test Producer',
+    predictionProbability: 0.91,
+    considerationScore: 0.84,
+    resourcePressure: 0.65,
+    predictionCategory: 'FLOOD',
+    topProbabilityKey: 'SEVERE',
+    divisionId: 1,
+    divisionName: 'Colombo',
+    forecastDate: '2026-05-08',
+    hazardType: 'FLOOD',
+    featureDate: '2026-05-08',
+    probabilities: { NORMAL: 0.02, MODERATE: 0.07, SEVERE: 0.78, EXTREME: 0.13 },
+    resourceSummary: {
+      overall: { total: 52, available: 20 },
+      by_type: { shelter: { total: 14, available: 5 }, water_supply: { total: 9, available: 3 }, medical: { total: 17, available: 7 }, transport: { total: 12, available: 5 } }
+    }
+  },
 ];
 
 // ── Mock Shelters ────────────────────────────────────────────

@@ -17,6 +17,7 @@ export enum UserRole {
   FIELD_OFFICER = 'FIELD_OFFICER',
   LOGISTICS_STAFF = 'LOGISTICS_STAFF',
   RESPONSE_TEAM_MEMBER = 'RESPONSE_TEAM_MEMBER',
+  AUDITOR = 'AUDITOR',
 }
 
 // Alias for backwards compat
@@ -138,6 +139,44 @@ export interface ConfirmedIncident {
   affectedPeople?: number;
   createdAt: string;
   updatedAt: string;
+  // Assigned by J1/backend on incident creation; never generated in J3
+  blockchainCaseId?: number | null;
+}
+
+// ── J4 Blockchain Audit Types ─────────────────────────────────
+
+export interface LogAuditEventPayload {
+  caseId: number;
+  eventId: string;
+  eventType: string;
+  incidentId: string;
+  resourceId?: string;
+  alertId?: string;
+  performedBy: string;
+  performedRole: string;
+  previousStatus?: string;
+  newStatus?: string;
+  district?: string;
+  notes?: string;
+  correlationId?: string;
+}
+
+export interface AuditEvent {
+  id: number;
+  caseId: number;
+  eventId: string;
+  eventType: string;
+  incidentId: string;
+  resourceId?: string;
+  alertId?: string;
+  performedBy: string;
+  performedRole: string;
+  previousStatus?: string;
+  newStatus?: string;
+  district?: string;
+  notes?: string;
+  correlationId?: string;
+  timestamp: number;
 }
 
 export interface Resource {
@@ -167,6 +206,18 @@ export interface Alert {
   createdAt: string;
   expiresAt?: string;
   source?: string;
+  // Prediction & AI Context
+  predictionProbability?: number;  // 0-1 confidence
+  considerationScore?: number;     // 0-1 AI confidence
+  predictionCategory?: string;     // FLOOD, LANDSLIDE, etc.
+  topProbabilityKey?: string;      // Most likely scenario (NORMAL, MODERATE, SEVERE, EXTREME)
+  probabilities?: Record<string, number>; // Full probability distribution
+  // Resource Context
+  resourcePressure?: number;       // 0-1 resource availability pressure
+  resourceSummary?: {
+    overall: { total: number; available: number };
+    by_type: Record<string, { total: number; available: number }>;
+  };
 }
 
 export interface ShelterInfo {
@@ -300,7 +351,12 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     'dispatch:resources', 'update:resource-status', 'manage:shelters', 'dispatch:logistics',
   ],
   [UserRole.SYSTEM_ADMIN]: [
-    'view:dashboard', 'manage:users', 'manage:settings', 'view:audit-logs'
+    'view:dashboard', 'manage:users', 'manage:settings', 'view:audit-logs',
+    'view:blockchain-audit',
+  ],
+  [UserRole.AUDITOR]: [
+    'view:dashboard', 'view:audit-logs', 'view:blockchain-audit',
+    'view:incident-map',
   ],
   // ── Mobile App Roles ────────────────────────────────────────
   [UserRole.FIELD_OFFICER]: [
