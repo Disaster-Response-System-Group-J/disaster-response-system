@@ -16,3 +16,6 @@ DATABASE_URL = os.getenv(
 )
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+
+KAFKA_BROKER = os.getenv("KAFKA_BROKER", "localhost:9092")
+KAFKA_TOPIC_ALLOCATION = os.getenv("KAFKA_TOPIC_ALLOCATION", "j2.engine.allocation-plan")

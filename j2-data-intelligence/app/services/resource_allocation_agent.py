@@ -1,7 +1,5 @@
-import csv
 import json
 from datetime import date, datetime, timezone
-from pathlib import Path
 from typing import Any
 
 from google import genai
@@ -13,12 +11,8 @@ from app.core.config import GEMINI_API_KEY, GEMINI_MODEL
 from app.models.consideration_score import ConsiderationScore
 from app.models.disaster_risk import DisasterRisk
 from app.models.division import Division
-
-_CSV_PATH = (
-    Path(__file__).parents[2]
-    / "Model Training and Validation"
-    / "synthetic_resources_dataset(in).csv"
-)
+from app.models.division_resources import DivisionResources
+from app.services.kafka_producer import publish_allocation_plan
 
 SYSTEM_PROMPT = """You are the Disaster Response Resource Allocation Agent for the Sri Lanka Disaster Management Centre (DMC).
 
@@ -131,25 +125,27 @@ Rules:
 """
 
 
-def _load_csv() -> dict[str, dict[str, Any]]:
-    """Return resources keyed by division name, with None for missing values."""
-    resources: dict[str, dict[str, Any]] = {}
-    if not _CSV_PATH.exists():
-        return resources
-    with open(_CSV_PATH, newline="", encoding="utf-8") as f:
-        for row in csv.DictReader(f):
-            name = row.get("division", "").strip()
-            if not name:
-                continue
-            resources[name] = {
-                "hospital_bed_capacity": row.get("hospital_bed_capacity") or None,
-                "emergency_shelters": row.get("emergency_shelters") or None,
-                "ambulance_count": row.get("ambulance_count") or None,
-                "food_stock_tons": row.get("food_stock_tons") or None,
-                "clean_water_capacity_liters": row.get("clean_water_capacity_liters") or None,
-                "power_grid_resilience": row.get("power_grid_resilience") or None,
+def _query_resources(db: Session) -> dict[str, dict[str, Any]]:
+    """Return {division_name: {resource_fields}} from DivisionResources joined with Division."""
+    try:
+        rows = (
+            db.query(Division.name, DivisionResources)
+            .join(DivisionResources, Division.division_id == DivisionResources.division_id)
+            .all()
+        )
+        return {
+            name: {
+                "hospital_bed_capacity": res.hospital_bed_capacity,
+                "emergency_shelters": res.emergency_shelters,
+                "ambulance_count": res.ambulance_count,
+                "food_stock_tons": res.food_stock_tons,
+                "clean_water_capacity_liters": res.clean_water_capacity_liters,
+                "power_grid_resilience": res.power_grid_resilience,
             }
-    return resources
+            for name, res in rows
+        }
+    except Exception:
+        return {}
 
 
 def _fmt(val: Any) -> str:
@@ -282,7 +278,7 @@ def run_allocation_agent(
     if not GEMINI_API_KEY:
         raise ValueError("GEMINI_API_KEY is not configured.")
 
-    resources = _load_csv()
+    resources = _query_resources(db)
     risk_data = _query_risk(db, target_date)
     cs_lookup = _query_consideration_scores(db)
 
@@ -329,9 +325,18 @@ Based on the above data, produce the complete resource allocation plan now.
     except (json.JSONDecodeError, TypeError):
         allocation_plan = {"raw": response.text}
 
+    generated_at = datetime.now(timezone.utc).isoformat()
+    kafka_published = publish_allocation_plan(
+        plan=allocation_plan,
+        divisions_analyzed=len(all_divisions),
+        high_risk_divisions=high_risk,
+        generated_at=generated_at,
+    )
+
     return {
         "allocation_plan": allocation_plan,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": generated_at,
         "divisions_analyzed": len(all_divisions),
         "high_risk_divisions": high_risk,
+        "kafka_published": kafka_published,
     }

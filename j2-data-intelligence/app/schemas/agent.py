@@ -14,3 +14,4 @@ class AllocationResponse(BaseModel):
     generated_at: str
     divisions_analyzed: int
     high_risk_divisions: list[str]
+    kafka_published: bool
