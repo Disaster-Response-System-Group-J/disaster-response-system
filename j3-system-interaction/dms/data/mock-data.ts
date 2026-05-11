@@ -5,20 +5,20 @@ import {
 } from '@/types';
 
 // ── Mock Users ───────────────────────────────────────────────
-export const MOCK_USERS: (User & { password: string, assignedDistrict?: string })[] = [
-  { id: 'ADM-001', email: 'admin@dmc.gov.lk', name: 'Kamal Perera', role: UserRole.SYSTEM_ADMIN, password: 'admin123', assignedDistrict: 'ALL' },
-  { id: 'OFF-001', email: 'officer@dmc.gov.lk', name: 'Nimal Silva', role: UserRole.OPERATIONS_OFFICER_ZONAL, password: 'officer123', assignedDistrict: 'Colombo' },
-  { id: 'RM-001', email: 'resource@dmc.gov.lk', name: 'Sunil Fernando', role: UserRole.RESOURCE_MANAGER_NATIONAL, password: 'resource123', assignedDistrict: 'ALL' },
-  { id: 'IC-001', email: 'commander@dmc.gov.lk', name: 'Incident Commander', role: UserRole.INCIDENT_COMMANDER_NATIONAL, password: 'admin123', assignedDistrict: 'ALL' },
-  // Mobile App Role Users
-  { id: 'FO-001', email: 'fieldofficer@dmc.gov.lk', name: 'Asanka Rathnayake', role: UserRole.FIELD_OFFICER, password: 'field123', assignedDistrict: 'Colombo' },
-  { id: 'FO-002', email: 'fieldofficer2@dmc.gov.lk', name: 'Ruwan Jayasena', role: UserRole.FIELD_OFFICER, password: 'field123', assignedDistrict: 'Ratnapura' },
-  { id: 'LS-001', email: 'logistics@dmc.gov.lk', name: 'Chaminda Jayawardena', role: UserRole.LOGISTICS_STAFF, password: 'logistics123', assignedDistrict: 'ALL' },
-  { id: 'LS-002', email: 'logistics2@dmc.gov.lk', name: 'Pathum Senanayake', role: UserRole.LOGISTICS_STAFF, password: 'logistics123', assignedDistrict: 'ALL' },
-  { id: 'RT-001', email: 'response@dmc.gov.lk', name: 'Priya Bandara', role: UserRole.RESPONSE_TEAM_MEMBER, password: 'response123', assignedDistrict: 'ALL' },
-  { id: 'RT-002', email: 'response2@dmc.gov.lk', name: 'Dilshan Perera', role: UserRole.RESPONSE_TEAM_MEMBER, password: 'response123', assignedDistrict: 'ALL' },
-  { id: 'AUD-001', email: 'auditor@dmc.gov.lk', name: 'Priya Jayawardena', role: UserRole.AUDITOR, password: 'auditor123', assignedDistrict: 'ALL' },
-];
+// export const MOCK_USERS: (User & { password: string, assignedDistrict?: string })[] = [
+//   { id: 'ADM-001', email: 'admin@dmc.gov.lk', name: 'Kamal Perera', role: UserRole.SYSTEM_ADMIN, password: 'admin123', assignedDistrict: 'ALL' },
+//   { id: 'OFF-001', email: 'officer@dmc.gov.lk', name: 'Nimal Silva', role: UserRole.OPERATIONS_OFFICER_ZONAL, password: 'officer123', assignedDistrict: 'Colombo' },
+//   { id: 'RM-001', email: 'resource@dmc.gov.lk', name: 'Sunil Fernando', role: UserRole.RESOURCE_MANAGER_NATIONAL, password: 'resource123', assignedDistrict: 'ALL' },
+//   { id: 'IC-001', email: 'commander@dmc.gov.lk', name: 'Incident Commander', role: UserRole.INCIDENT_COMMANDER_NATIONAL, password: 'admin123', assignedDistrict: 'ALL' },
+//   // Mobile App Role Users
+//   { id: 'FO-001', email: 'fieldofficer@dmc.gov.lk', name: 'Asanka Rathnayake', role: UserRole.FIELD_OFFICER, password: 'field123', assignedDistrict: 'Colombo' },
+//   { id: 'FO-002', email: 'fieldofficer2@dmc.gov.lk', name: 'Ruwan Jayasena', role: UserRole.FIELD_OFFICER, password: 'field123', assignedDistrict: 'Ratnapura' },
+//   { id: 'LS-001', email: 'logistics@dmc.gov.lk', name: 'Chaminda Jayawardena', role: UserRole.LOGISTICS_STAFF, password: 'logistics123', assignedDistrict: 'ALL' },
+//   { id: 'LS-002', email: 'logistics2@dmc.gov.lk', name: 'Pathum Senanayake', role: UserRole.LOGISTICS_STAFF, password: 'logistics123', assignedDistrict: 'ALL' },
+//   { id: 'RT-001', email: 'response@dmc.gov.lk', name: 'Priya Bandara', role: UserRole.RESPONSE_TEAM_MEMBER, password: 'response123', assignedDistrict: 'ALL' },
+//   { id: 'RT-002', email: 'response2@dmc.gov.lk', name: 'Dilshan Perera', role: UserRole.RESPONSE_TEAM_MEMBER, password: 'response123', assignedDistrict: 'ALL' },
+//   { id: 'AUD-001', email: 'auditor@dmc.gov.lk', name: 'Priya Jayawardena', role: UserRole.AUDITOR, password: 'auditor123', assignedDistrict: 'ALL' },
+// ];
 // ── Mock Incoming Reports ────────────────────────────────────
 export const MOCK_INCOMING_REPORTS: IncomingReport[] = [
   {

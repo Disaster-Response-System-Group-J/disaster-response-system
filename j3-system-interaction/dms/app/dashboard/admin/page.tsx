@@ -1,20 +1,19 @@
 'use client';
 
-import { useState } from 'react';
-import { 
-  Users, UserPlus, Shield, Mail, Key, Edit2, 
+import { useState, useEffect } from 'react';
+import {
+  Users, UserPlus, Shield, Mail, Key, Edit2,
   UserX, UserCheck, CheckCircle2, Search, X,
   AlertTriangle, Plus, Trash2, Settings, List, Save, Activity
 } from 'lucide-react';
 import { AdminAuditDashboard } from '@/components/admin/admin-audit-dashboard';
-import { MOCK_USERS } from '@/data/mock-data';
-import { UserRole, DISASTER_TYPES } from '@/types';
+import { UserRole, DISASTER_TYPES, User } from '@/types';
+import { createClient } from '@supabase/supabase-js';
 
-// Extended local type to include status for the demo
-type AdminUser = typeof MOCK_USERS[0] & { status: 'ACTIVE' | 'SUSPENDED' };
+type AdminUser = User & { status: 'ACTIVE' | 'SUSPENDED' };
 type AdminTab = 'users' | 'disasters' | 'config' | 'audit';
 
-const INITIAL_USERS: AdminUser[] = MOCK_USERS.map(u => ({ ...u, status: 'ACTIVE' }));
+const INITIAL_USERS: AdminUser[] = [];
 const CORE_DISASTER_TYPES = new Set<string>(Object.values(DISASTER_TYPES));
 const ADMIN_TABS: Array<{ id: AdminTab; label: string; icon: typeof Users }> = [
   { id: 'users', label: 'User Management', icon: Users },
@@ -32,7 +31,6 @@ const ROLE_STYLES: Record<string, string> = {
   [UserRole.RESOURCE_MANAGER_NATIONAL]: 'bg-teal-500/10 text-teal-400 border-teal-500/20',
   [UserRole.RESOURCE_MANAGER_ZONAL]: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
   [UserRole.PUBLIC_USER]: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
-  // Mobile App Roles
   [UserRole.FIELD_OFFICER]: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
   [UserRole.LOGISTICS_STAFF]: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
   [UserRole.RESPONSE_TEAM_MEMBER]: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
@@ -44,28 +42,43 @@ export default function AdminPanelPage() {
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  
-  // Form State
+
   const [formData, setFormData] = useState({ name: '', email: '', role: UserRole.OPERATIONS_OFFICER_ZONAL });
   const [actionMessage, setActionMessage] = useState('');
 
-  // Tab State
   const [activeTab, setActiveTab] = useState<AdminTab>('users');
 
-  // Disaster Management State
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY! // Use service key to query users safely
+  );
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      const { data, error } = await supabase.from('User').select('*');
+      if (data && !error) {
+        setUsers(data.map((u: any) => ({ ...u, status: 'ACTIVE' })));
+      }
+    };
+
+    if (activeTab === 'users') {
+      fetchUsers();
+    }
+  }, [activeTab, supabase]);
+
   const [disasterTypes, setDisasterTypes] = useState<string[]>([
     DISASTER_TYPES.FLOOD, DISASTER_TYPES.LANDSLIDE, DISASTER_TYPES.DROUGHT, DISASTER_TYPES.OTHER, 'CYCLONE'
   ]);
   const [newDisasterType, setNewDisasterType] = useState('');
 
-  // System Config State
   const [sysConfig, setSysConfig] = useState({
     floodWarningThreshold: 4.5,
     autoAlertsEnabled: true,
     maintenanceMode: false,
     maxUploadSizeMB: 10
   });
-  const filteredUsers = users.filter(u => 
+
+  const filteredUsers = users.filter(u =>
     u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -74,19 +87,32 @@ export default function AdminPanelPage() {
     setTimeout(() => setActionMessage(''), 3000);
   };
 
-  const handleSaveUser = (e: React.FormEvent) => {
+  const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isCreating) {
-      const newUser: AdminUser = {
+      const newUser = {
         id: `USR-${Math.floor(Math.random() * 1000)}`,
-        name: formData.name, email: formData.email, role: formData.role as UserRole, password: 'temp_password', status: 'ACTIVE'
-      };
+        name: formData.name,
+        email: formData.email,
+        role: formData.role as UserRole,
+        status: 'ACTIVE' as const
+      } as AdminUser;
+
       setUsers([...users, newUser]);
       showMessage('User created successfully');
     } else if (selectedUser) {
-      setUsers(users.map(u => u.id === selectedUser.id ? { ...u, ...formData } : u));
-      setSelectedUser({ ...selectedUser, ...formData });
-      showMessage('User updated successfully');
+      const { error } = await supabase
+        .from('User')
+        .update({ name: formData.name, role: formData.role })
+        .eq('id', selectedUser.id);
+
+      if (!error) {
+        setUsers(users.map(u => u.id === selectedUser.id ? { ...u, ...formData } : u));
+        setSelectedUser({ ...selectedUser, ...formData });
+        showMessage('User updated successfully');
+      } else {
+        showMessage('Failed to update user');
+      }
     }
     setIsCreating(false); setIsEditing(false);
   };
@@ -146,17 +172,15 @@ export default function AdminPanelPage() {
           )}
         </div>
 
-        {/* Tab Navigation */}
         <div className="flex gap-1 mb-6 bg-[#131924] border border-slate-800/80 rounded-lg p-1 overflow-x-auto">
           {ADMIN_TABS.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 min-w-[150px] py-2.5 px-4 rounded-md text-xs font-bold transition-colors flex items-center justify-center gap-2 ${
-                activeTab === tab.id 
-                  ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' 
-                  : 'text-slate-400 hover:text-slate-300'
-              }`}
+              className={`flex-1 min-w-[150px] py-2.5 px-4 rounded-md text-xs font-bold transition-colors flex items-center justify-center gap-2 ${activeTab === tab.id
+                ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                : 'text-slate-400 hover:text-slate-300'
+                }`}
             >
               <tab.icon size={14} /> {tab.label}
             </button>
@@ -169,7 +193,6 @@ export default function AdminPanelPage() {
           </div>
         )}
 
-        {/* TAB 1: USER MANAGEMENT */}
         {activeTab === 'users' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 flex flex-col gap-4">
@@ -213,15 +236,15 @@ export default function AdminPanelPage() {
                     <form onSubmit={handleSaveUser} className="space-y-4">
                       <div>
                         <label className="block text-[10px] font-bold text-slate-400 mb-1.5 tracking-widest uppercase">Full Name</label>
-                        <input type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required className="w-full bg-[#0a0f16] border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
+                        <input type="text" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} required className="w-full bg-[#0a0f16] border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-slate-400 mb-1.5 tracking-widest uppercase">Email Address</label>
-                        <input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} required className="w-full bg-[#0a0f16] border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
+                        <input type="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} required className="w-full bg-[#0a0f16] border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500" />
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-slate-400 mb-1.5 tracking-widest uppercase">System Role</label>
-                        <select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value as UserRole})} className="w-full bg-[#0a0f16] border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                        <select value={formData.role} onChange={e => setFormData({ ...formData, role: e.target.value as UserRole })} className="w-full bg-[#0a0f16] border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
                           <optgroup label="Command Roles">
                             <option value={UserRole.SYSTEM_ADMIN}>System Administrator</option>
                             <option value={UserRole.INCIDENT_COMMANDER_NATIONAL}>National Incident Commander</option>
@@ -257,8 +280,8 @@ export default function AdminPanelPage() {
                       </div>
                     </div>
                     <div className="space-y-5 mb-8">
-                      <div><p className="text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-1 flex items-center gap-1.5"><Mail size={12}/> EMAIL</p><p className="text-sm text-slate-200">{selectedUser.email}</p></div>
-                      <div><p className="text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-1 flex items-center gap-1.5"><Shield size={12}/> ROLE</p>
+                      <div><p className="text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-1 flex items-center gap-1.5"><Mail size={12} /> EMAIL</p><p className="text-sm text-slate-200">{selectedUser.email}</p></div>
+                      <div><p className="text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-1 flex items-center gap-1.5"><Shield size={12} /> ROLE</p>
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-widest border ${ROLE_STYLES[selectedUser.role]}`}>{selectedUser.role.replace(/_/g, ' ')}</span>
                       </div>
                       <div><p className="text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-1">ACCOUNT STATUS</p>
@@ -281,7 +304,6 @@ export default function AdminPanelPage() {
           </div>
         )}
 
-        {/* TAB 2: DISASTER TYPES */}
         {activeTab === 'disasters' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 flex flex-col gap-4">
@@ -316,7 +338,6 @@ export default function AdminPanelPage() {
           </div>
         )}
 
-        {/* TAB 3: SYSTEM CONFIG */}
         {activeTab === 'config' && (
           <div className="max-w-3xl mx-auto">
             <div className="bg-[#131924] border border-slate-800/80 rounded-xl overflow-hidden">
@@ -324,28 +345,26 @@ export default function AdminPanelPage() {
                 <h2 className="text-lg font-bold flex items-center gap-2"><Settings size={20} className="text-blue-400" /> Global System Parameters</h2>
                 <p className="text-xs text-slate-400 mt-1">Changes made here affect the core logic of the J2 Risk Engine and J3 Dashboard.</p>
               </div>
-              
+
               <form onSubmit={handleSaveConfig} className="p-6 space-y-8">
-                {/* Section 1: Telemetry & Engine */}
                 <div>
-                  <h3 className="text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-4 flex items-center gap-2"><Activity size={12}/> J2 Risk Engine Thresholds</h3>
+                  <h3 className="text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-4 flex items-center gap-2"><Activity size={12} /> J2 Risk Engine Thresholds</h3>
                   <div className="grid grid-cols-2 gap-6">
                     <div>
                       <label className="block text-xs font-bold text-slate-300 mb-1.5">River Flood Danger Threshold (m)</label>
                       <p className="text-[10px] text-slate-500 mb-2">Triggers automatic alerts if telemetry exceeds this average level.</p>
-                      <input type="number" step="0.1" value={sysConfig.floodWarningThreshold} onChange={e => setSysConfig({...sysConfig, floodWarningThreshold: parseFloat(e.target.value)})} 
+                      <input type="number" step="0.1" value={sysConfig.floodWarningThreshold} onChange={e => setSysConfig({ ...sysConfig, floodWarningThreshold: parseFloat(e.target.value) })}
                         className="w-full bg-[#0a0f16] border border-slate-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500" />
                     </div>
                   </div>
                 </div>
 
-                {/* Section 2: Automation */}
                 <div className="pt-6 border-t border-slate-800/50">
                   <h3 className="text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-4">Automation & Triage</h3>
                   <div className="space-y-4">
                     <label className="flex items-start gap-3 cursor-pointer group">
                       <div className="relative flex items-center mt-0.5">
-                        <input type="checkbox" checked={sysConfig.autoAlertsEnabled} onChange={e => setSysConfig({...sysConfig, autoAlertsEnabled: e.target.checked})} className="sr-only" />
+                        <input type="checkbox" checked={sysConfig.autoAlertsEnabled} onChange={e => setSysConfig({ ...sysConfig, autoAlertsEnabled: e.target.checked })} className="sr-only" />
                         <div className={`w-10 h-5 rounded-full transition-colors ${sysConfig.autoAlertsEnabled ? 'bg-blue-500' : 'bg-slate-700'}`}></div>
                         <div className={`absolute w-3.5 h-3.5 bg-white rounded-full transition-transform ${sysConfig.autoAlertsEnabled ? 'translate-x-5' : 'translate-x-1'}`}></div>
                       </div>
@@ -357,20 +376,19 @@ export default function AdminPanelPage() {
                   </div>
                 </div>
 
-                {/* Section 3: Uploads & Maintenance */}
                 <div className="pt-6 border-t border-slate-800/50">
                   <h3 className="text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-4">System Operations</h3>
                   <div className="grid grid-cols-2 gap-6 mb-6">
                     <div>
                       <label className="block text-xs font-bold text-slate-300 mb-1.5">Max Media Upload Size (MB)</label>
-                      <input type="number" value={sysConfig.maxUploadSizeMB} onChange={e => setSysConfig({...sysConfig, maxUploadSizeMB: parseInt(e.target.value)})} 
+                      <input type="number" value={sysConfig.maxUploadSizeMB} onChange={e => setSysConfig({ ...sysConfig, maxUploadSizeMB: parseInt(e.target.value) })}
                         className="w-full bg-[#0a0f16] border border-slate-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500" />
                     </div>
                   </div>
 
                   <label className="flex items-start gap-3 cursor-pointer group p-4 bg-orange-500/5 border border-orange-500/20 rounded-lg">
                     <div className="relative flex items-center mt-0.5">
-                      <input type="checkbox" checked={sysConfig.maintenanceMode} onChange={e => setSysConfig({...sysConfig, maintenanceMode: e.target.checked})} className="sr-only" />
+                      <input type="checkbox" checked={sysConfig.maintenanceMode} onChange={e => setSysConfig({ ...sysConfig, maintenanceMode: e.target.checked })} className="sr-only" />
                       <div className={`w-10 h-5 rounded-full transition-colors ${sysConfig.maintenanceMode ? 'bg-orange-500' : 'bg-slate-700'}`}></div>
                       <div className={`absolute w-3.5 h-3.5 bg-white rounded-full transition-transform ${sysConfig.maintenanceMode ? 'translate-x-5' : 'translate-x-1'}`}></div>
                     </div>
@@ -391,7 +409,6 @@ export default function AdminPanelPage() {
           </div>
         )}
 
-        {/* TAB 4: AUDIT LOGS */}
         {activeTab === 'audit' && (
           <AdminAuditDashboard />
         )}
