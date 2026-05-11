@@ -80,7 +80,8 @@ def run_bridge():
             client = mqtt.Client(client_id=CLIENT_ID)
             if MQTT_USERNAME:
                 client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
-            client.tls_set(cert_reqs=ssl.CERT_REQUIRED)
+            if int(MQTT_PORT) == 8883:
+                client.tls_set(cert_reqs=ssl.CERT_REQUIRED)
             client.on_connect = on_connect
             client.on_message = make_on_message(producer)
 
