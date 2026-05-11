@@ -1,0 +1,9 @@
+{
+  "name": "j3-event-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "kafkajs": "^2.2.4",
+    "socket.io": "^4.8.1"
+  }
+}

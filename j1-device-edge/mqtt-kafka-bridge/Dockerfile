@@ -1,13 +1,20 @@
-FROM python:3.11-slim
+FROM python:3.11-alpine AS builder
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+WORKDIR /build
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+
+
+FROM python:3.11-alpine
 
 WORKDIR /app
 
-COPY requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r /app/requirements.txt
+RUN adduser -D -u 1000 appuser
 
-COPY bridge.py /app/bridge.py
+COPY --from=builder /install /usr/local
+COPY --chown=appuser:appuser bridge.py .
+
+USER appuser
 
 CMD ["python", "bridge.py"]

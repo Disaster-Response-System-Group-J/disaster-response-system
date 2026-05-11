@@ -2,6 +2,7 @@ node_modules
 .next
 .git
 .env
+.env.*
 *.log
 .DS_Store
 npm-debug.log*
@@ -11,3 +12,10 @@ docs/
 README.md
 CLAUDE.md
 AGENTS.md
+DIVISIONS_*.md
+WEATHER_*.md
+*.db
+local_alerts.db
+scratch.py
+tests/
+scripts/

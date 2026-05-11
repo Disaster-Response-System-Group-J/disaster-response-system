@@ -1,0 +1,123 @@
+# J2 Data & Intelligence - Local Development Docker Compose
+#
+# This file sets up all services needed for J2 development:
+# - PostgreSQL database
+# - Kafka with Zookeeper
+# - J2 service itself
+#
+# Usage:
+#   docker-compose up -d
+#   docker exec j2-data-intelligence python seed_data.py
+
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: j2-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: j2_data_intelligence
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - j2-network
+
+  # Zookeeper (required by Kafka)
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: j2-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - j2-network
+
+  # Kafka Broker
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: j2-kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    networks:
+      - j2-network
+
+  # J2 Data & Intelligence Service
+  j2-data-intelligence:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: j2-data-intelligence
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/j2_data_intelligence
+      KAFKA_BROKER: kafka:29092
+      KAFKA_TOPIC_SENSOR_DATA: j1.sensor-data
+      KAFKA_TOPIC_RISK_ALERTS: j2.engine.risk-alerts
+      KAFKA_CONSUMER_GROUP: j2-sensor-consumer
+      HOST: 0.0.0.0
+      PORT: 8082
+      LOG_LEVEL: INFO
+    ports:
+      - "8082:8082"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - j2-network
+    volumes:
+      # Mount source code for development
+      - ./app:/app/app
+      - ./seed_data.py:/app/seed_data.py
+
+  # Kafka UI (optional - for monitoring)
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: j2-kafka-ui
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    ports:
+      - "8080:8080"
+    networks:
+      - j2-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  j2-network:
+    driver: bridge

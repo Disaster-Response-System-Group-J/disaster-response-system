@@ -1,9 +1,7 @@
 services:
-  # ─────────────────────────────────────────────────────────────
-  # INFRASTRUCTURE  (managed by J4)
-  # ─────────────────────────────────────────────────────────────
 
-  # Shared PostgreSQL — creates j3db, kong, keycloak databases via init.sql
+  # ── Infrastructure ────────────────────────────────────────────────────────
+
   postgres:
     image: postgres:16-alpine
     container_name: disaster-postgres
@@ -12,52 +10,30 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
+      J3_DB_USER: ${J3_DB_USER}
+      J3_DB_PASSWORD: ${J3_DB_PASSWORD}
+      J3_DB_NAME: ${J3_DB_NAME}
+      KONG_DB_USER: ${KONG_DB_USER}
+      KONG_DB_PASSWORD: ${KONG_DB_PASSWORD}
+      KONG_DB_NAME: ${KONG_DB_NAME}
+      KC_DB_USERNAME: ${KC_DB_USERNAME}
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./postgres/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 5s
     networks:
       - disaster-net
 
-  # ─────────────────────────────────────────────────────────────
-  # J1 — Device & Edge Systems: MQTT-Kafka bridge
-  # Subscribes to HiveMQ (j1/disaster/#) and routes sensor data
-  # into two separate Kafka topics:
-  #   j1.sensor.telemetry.flood     ← flood sensor readings
-  #   j1.sensor.telemetry.landslide ← landslide sensor readings
-  # Both J1 and J2 teams consume from the same root Kafka cluster
-  # at kafka:29092.
-  # ─────────────────────────────────────────────────────────────
-  mqtt-kafka-bridge:
-    build:
-      context: ./j1-device-edge/mqtt-kafka-bridge
-    container_name: disaster-mqtt-kafka-bridge
-    restart: unless-stopped
-    environment:
-      MQTT_BROKER: 8e659da889be4ff7a3d839144a0f8aaa.s1.eu.hivemq.cloud
-      MQTT_PORT: 8883
-      MQTT_USERNAME: j1_gateway
-      MQTT_PASSWORD: 8797Sudil
-      MQTT_TOPICS: j1/disaster/#
-      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      KAFKA_TOPIC: disaster_data_stream
-      KAFKA_TOPIC_FLOOD: j1.sensor.telemetry.flood
-      KAFKA_TOPIC_LANDSLIDE: j1.sensor.telemetry.landslide
-    depends_on:
-      kafka:
-        condition: service_started
-    networks:
-      - disaster-net
-
-  # Apache Kafka — KRaft mode, dual listener (EXTERNAL for host, INTERNAL for containers)
   kafka:
-    image: apache/kafka:latest
+    image: apache/kafka:3.7.1
     container_name: disaster-kafka
     restart: unless-stopped
     ports:
@@ -74,91 +50,190 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list > /dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
     networks:
       - disaster-net
 
-  # Kafka Topic Initialiser — runs once after Kafka is up and creates all
-  # required topics so producers never hit "Unknown Topic" on first publish.
-  kafka-topic-init:
-    image: apache/kafka:latest
-    container_name: disaster-kafka-topic-init
-    restart: "no"
-    command: >
-      sh -c "
-        echo 'Waiting for Kafka to be ready...' &&
-        sleep 20 &&
-        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic j1.events               --partitions 3 --replication-factor 1 &&
-        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic j1.sensor.telemetry.flood      --partitions 3 --replication-factor 1 &&
-        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic j1.sensor.telemetry.landslide  --partitions 3 --replication-factor 1 &&
-        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic j2.engine.risk-alerts          --partitions 3 --replication-factor 1 &&
-        echo 'All Kafka topics created.'
-      "
-    depends_on:
-      kafka:
-        condition: service_started
-    networks:
-      - disaster-net
+  # ── J1 — Device & Edge Systems ────────────────────────────────────────────
+>>>>>>> main
+  # ── J1 — Device & Edge Systems ────────────────────────────────────────────
+>>>>>>> main
 
-  # Kafka Exporter — exposes Kafka metrics for Prometheus
-  kafka-exporter:
-    image: danielqsj/kafka-exporter:latest
-    container_name: disaster-kafka-exporter
-    restart: unless-stopped
-    ports:
-      - "9308:9308"
-    labels:
-      prometheus-scrape: "true"
-      prometheus-port: "9308"
-      prometheus-path: "/metrics"
-      prometheus-job: "kafka"
-    command:
-      - --kafka.server=kafka:29092
-    depends_on:
-      kafka:
-        condition: service_started
-    networks:
-      - disaster-net
-
-  # Postgres exporter — exposes Postgres metrics for Prometheus
-  postgres-exporter:
-    image: prometheuscommunity/postgres-exporter:latest
-    container_name: disaster-postgres-exporter
+  mqtt-kafka-bridge:
+    build:
+      context: ./j1-device-edge/mqtt-kafka-bridge
+    image: disaster/mqtt-kafka-bridge:latest
+    container_name: disaster-mqtt-kafka-bridge
     restart: unless-stopped
     environment:
-      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable"
-    ports:
-      - "9187:9187"
-    labels:
-      prometheus-scrape: "true"
-      prometheus-port: "9187"
-      prometheus-path: "/metrics"
-      prometheus-job: "postgres"
+      MQTT_BROKER: ${MQTT_BROKER}
+      MQTT_PORT: ${MQTT_PORT}
+      MQTT_USERNAME: ${MQTT_USERNAME}
+      MQTT_PASSWORD: ${MQTT_PASSWORD}
+      MQTT_TOPICS: j1/disaster/#
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_TOPIC: disaster_data_stream
+      KAFKA_TOPIC_FLOOD: j1.sensor.telemetry.flood
+      KAFKA_TOPIC_LANDSLIDE: j1.sensor.telemetry.landslide
     depends_on:
-      postgres:
+      kafka:
         condition: service_healthy
     networks:
       - disaster-net
 
-# keycloak-exporter:
-  #   image: ghcr.io/ivanklee86/keycloak_exporter:latest
-  #   container_name: disaster-keycloak-exporter
-  #   restart: unless-stopped
-  #   environment:
-  #     KC_URL: "http://keycloak:8080"
-  #     KC_USERNAME: "${KEYCLOAK_ADMIN}"
-  #     KC_PASSWORD: "${KEYCLOAK_ADMIN_PASSWORD}"
-  #     KC_REALM: "master"
-  #     METRICS_PORT: "9404"
-  #   ports:
-  #     - "9404:9404"
-  #   depends_on:
-  #     keycloak:
-  #       condition: service_started
-  #   networks:
-  #     - disaster-net
+  j1-bridge-api:
+    build:
+      context: ./j1-device-edge/backend
+    image: disaster/j1-bridge-api:latest
+    container_name: j1-bridge-api
+    restart: unless-stopped
+    ports:
+      - "8081:8000"
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_TOPIC_EVENTS: j1.events
+      KAFKA_PRODUCER_TIMEOUT: "10"
+      API_HOST: 0.0.0.0
+      API_PORT: "8000"
+      CORS_ORIGINS: "*"
+      IDEMPOTENCY_MAX_KEYS: "50000"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - disaster-net
 
+  # ── J2 — Data & Intelligence ──────────────────────────────────────────────
 
-  # Keycloak — identity & access management, imports disaster-response realm on startup
+  j2-data-intelligence:
+    build: ./j2-data-intelligence
+    image: disaster/j2-data-intelligence:latest
+    container_name: j2-data-intelligence
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      KAFKA_BROKER: kafka:29092
+      KAFKA_ALERT_THRESHOLD: "0.0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - disaster-net
+
+  # ── J3 — System Interaction ───────────────────────────────────────────────
+
+  j3-event-bridge:
+    build:
+      context: ./j3-system-interaction/dms
+      dockerfile: Dockerfile.mock
+    image: disaster/j3-event-bridge:latest
+    container_name: j3-event-bridge
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      KAFKA_BROKER: kafka:29092
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - disaster-net
+
+  j3-dms:
+    build:
+      context: ./j3-system-interaction/dms
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://${SERVER_IP:-localhost}:3000
+        NEXT_PUBLIC_SOCKET_URL: http://${SERVER_IP:-localhost}:3001
+    image: disaster/j3-dms:latest
+    container_name: j3-dms
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://${J3_DB_USER}:${J3_DB_PASSWORD}@postgres:5432/${J3_DB_NAME}
+      SQLITE_DB_PATH: /app/data/local_alerts.db
+      AUDIT_API_BASE_URL: http://j4-audit-api:8084
+      KAFKA_BROKER: kafka:29092
+    labels:
+      prometheus-scrape: "true"
+      prometheus-port: "3000"
+      prometheus-path: "/api/metrics"
+      prometheus-job: "j3-dms"
+    volumes:
+      - j3_dms_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      j3-event-bridge:
+        condition: service_healthy
+    networks:
+      - disaster-net
+
+  # ── J4 — Platform Security: Blockchain Audit ─────────────────────────────
+
+  hardhat-node:
+    build:
+      context: ./j4-platform-security/blockchain-audit
+      dockerfile: Dockerfile.hardhat
+    image: disaster/hardhat-node:latest
+    container_name: hardhat-node
+    restart: unless-stopped
+    ports:
+      - "8545:8545"
+    networks:
+      - disaster-net
+
+  deploy-audit-contract:
+    build:
+      context: ./j4-platform-security/blockchain-audit
+      dockerfile: Dockerfile.deployer
+    image: disaster/deploy-audit-contract:latest
+    container_name: deploy-audit-contract
+    restart: "no"
+    volumes:
+      - audit-deployment:/deployment
+    depends_on:
+      hardhat-node:
+        condition: service_healthy
+    networks:
+      - disaster-net
+
+  j4-audit-api:
+    build:
+      context: ./j4-platform-security/blockchain-audit
+      dockerfile: Dockerfile
+    image: disaster/j4-audit-api:latest
+    container_name: j4-audit-api
+    restart: unless-stopped
+    ports:
+      - "8084:8084"
+    environment:
+      PORT: "8084"
+      BLOCKCHAIN_RPC_URL: http://hardhat-node:8545
+      AUDIT_PRIVATE_KEY: ${AUDIT_PRIVATE_KEY}
+    volumes:
+      - audit-deployment:/deployment:ro
+    depends_on:
+      deploy-audit-contract:
+        condition: service_completed_successfully
+    networks:
+      - disaster-net
+
+  # ── J4 — Identity & Access Management ────────────────────────────────────
+
   keycloak:
     image: quay.io/keycloak/keycloak:24.0
     container_name: disaster-keycloak
@@ -169,11 +244,12 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
-      KC_DB_USERNAME: ${KC_DB_USERNAME:-keycloak}
-      KC_DB_PASSWORD: ${KC_DB_PASSWORD:-keycloak123}
+      KC_DB_USERNAME: ${KC_DB_USERNAME}
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD}
       KC_METRICS_ENABLED: "true"
       KC_METRICS_PATH: "/metrics"
       KC_PROXY_HEADERS: xforwarded
+      KC_HEALTH_ENABLED: "true"
     ports:
       - "8180:8080"
     labels:
@@ -183,14 +259,18 @@ services:
       prometheus-job: "keycloak"
     volumes:
       - ./j4-platform-security/keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080 && printf \"GET /realms/master HTTP/1.0\\r\\nHost: 127.0.0.1\\r\\n\\r\\n\" >&3 && timeout 3 cat <&3 | head -1 | grep -q 200'"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
     depends_on:
       postgres:
         condition: service_healthy
     networks:
       - disaster-net
 
-  # HashiCorp Vault — secrets management. Dev mode for local work:
-  # in-memory storage, auto-unsealed, single root token. NOT for prod.
   vault:
     image: hashicorp/vault:1.17
     container_name: disaster-vault
@@ -198,23 +278,28 @@ services:
     cap_add:
       - IPC_LOCK
     environment:
-      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_DEV_ROOT_TOKEN_ID:-dev-root-token}
+      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_DEV_ROOT_TOKEN_ID}
       VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
       VAULT_ADDR: http://0.0.0.0:8200
     ports:
       - "8200:8200"
     command: vault server -dev
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8200/v1/sys/health | grep -q '\"initialized\":true' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       - disaster-net
 
-  # Vault secret seeding — runs once after Vault is up.
   vault-setup:
     image: alpine:3.19
     container_name: disaster-vault-setup
     restart: "no"
     environment:
       VAULT_ADDR: http://vault:8200
-      VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN_ID:-dev-root-token}
+      VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN_ID}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
     volumes:
       - ./j4-platform-security/vault/setup.sh:/setup.sh:ro
@@ -226,11 +311,10 @@ services:
         bash /setup.sh
     depends_on:
       vault:
-        condition: service_started
+        condition: service_healthy
     networks:
       - disaster-net
 
-  # Keycloak realm provisioning — runs once after Keycloak is up.
   keycloak-setup:
     image: alpine:3.19
     container_name: disaster-keycloak-setup
@@ -239,23 +323,25 @@ services:
       KC_URL: http://keycloak:8080
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
       VAULT_ADDR: http://vault:8200
-      VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN_ID:-dev-root-token}
+      VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN_ID}
     volumes:
       - ./j4-platform-security/keycloak/setup.sh:/setup.sh:ro
-    entrypoint: >
-      sh -c "
-        apk add --no-cache bash curl jq -q &&
+    entrypoint:
+      - sh
+      - -c
+      - |
+        apk add --no-cache bash curl jq -q
         bash /setup.sh
-      "
     depends_on:
       keycloak:
-        condition: service_started
+        condition: service_healthy
       vault-setup:
         condition: service_completed_successfully
     networks:
       - disaster-net
 
-  # Kong DB migration — runs once to bootstrap Kong's schema
+  # ── J4 — API Gateway ─────────────────────────────────────────────────────
+
   kong-migration:
     image: kong:3.7
     container_name: disaster-kong-migration
@@ -273,7 +359,6 @@ services:
     networks:
       - disaster-net
 
-  # Kong API Gateway — all external API traffic routes through here
   kong:
     image: kong:3.7
     container_name: disaster-kong
@@ -287,8 +372,6 @@ services:
       KONG_PROXY_LISTEN: 0.0.0.0:8000
       KONG_ADMIN_LISTEN: 0.0.0.0:8001
       KONG_LOG_LEVEL: warn
-      # Allow `require "cjson.safe"` from inside post-function plugin
-      # sandbox (used by the J3 RBAC role-gating Lua in kong/setup.sh).
       KONG_UNTRUSTED_LUA_SANDBOX_REQUIRES: cjson.safe
     ports:
       - "8000:8000"
@@ -303,18 +386,13 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 20s
     depends_on:
       kong-migration:
         condition: service_completed_successfully
     networks:
       - disaster-net
 
-  # Kong route registration — runs once after Kong is healthy.
-  # Mounts the canonical j4-platform-security/kong/setup.sh and execs it,
-  # rather than duplicating logic inline. KC_REALM_URL points at the
-  # docker-internal Keycloak (where the sidecar can reach it) while
-  # KC_ISSUER stays on the host-published URL because that's the iss
-  # claim baked into tokens minted via the public port.
   kong-setup:
     image: alpine:3.19
     container_name: disaster-kong-setup
@@ -322,7 +400,7 @@ services:
     environment:
       KONG_ADMIN: http://kong:8001
       KC_REALM_URL: http://keycloak:8080/realms/disaster-response
-      KC_ISSUER: http://localhost:8180/realms/disaster-response
+      KC_ISSUER: ${KC_ISSUER}
     volumes:
       - ./j4-platform-security/kong:/opt/kong-setup:ro
     entrypoint:
@@ -335,11 +413,79 @@ services:
       kong:
         condition: service_healthy
       keycloak:
-        condition: service_started
+        condition: service_healthy
     networks:
       - disaster-net
 
-  # Prometheus — metrics collection & alert evaluation
+  # ── J4 — Monitoring ───────────────────────────────────────────────────────
+
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:v1.8.0
+    container_name: disaster-kafka-exporter
+    restart: unless-stopped
+    ports:
+      - "9308:9308"
+    labels:
+      prometheus-scrape: "true"
+      prometheus-port: "9308"
+      prometheus-path: "/metrics"
+      prometheus-job: "kafka"
+    command:
+      - --kafka.server=kafka:29092
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - disaster-net
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: disaster-postgres-exporter
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable"
+    ports:
+      - "9187:9187"
+    labels:
+      prometheus-scrape: "true"
+      prometheus-port: "9187"
+      prometheus-path: "/metrics"
+      prometheus-job: "postgres"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - disaster-net
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: disaster-alertmanager
+    restart: unless-stopped
+    ports:
+      - "9093:9093"
+    labels:
+      prometheus-scrape: "true"
+      prometheus-port: "9093"
+      prometheus-path: "/metrics"
+      prometheus-job: "alertmanager"
+    environment:
+      ALERTMANAGER_EMAIL_PASSWORD: ${ALERTMANAGER_EMAIL_PASSWORD}
+    volumes:
+      - ./j4-platform-security/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml.tpl:ro
+      - alertmanager_data:/alertmanager
+    entrypoint:
+      - sh
+      - -c
+      - |
+        sed "s|__ALERTMANAGER_EMAIL_PASSWORD__|${ALERTMANAGER_EMAIL_PASSWORD}|g" \
+            /etc/alertmanager/alertmanager.yml.tpl > /alertmanager/alertmanager.yml
+        exec /bin/alertmanager \
+            --config.file=/alertmanager/alertmanager.yml \
+            --storage.path=/alertmanager \
+            --web.external-url=http://localhost:9093
+    networks:
+      - disaster-net
+
   prometheus:
     image: prom/prometheus:v2.52.0
     container_name: disaster-prometheus
@@ -361,36 +507,17 @@ services:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--web.enable-lifecycle'
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9090/-/healthy || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     depends_on:
       - alertmanager
     networks:
       - disaster-net
 
-  # Alertmanager — alert routing, deduplication, and notification delivery
-  alertmanager:
-    image: prom/alertmanager:v0.27.0
-    container_name: disaster-alertmanager
-    restart: unless-stopped
-    ports:
-      - "9093:9093"
-    labels:
-      prometheus-scrape: "true"
-      prometheus-port: "9093"
-      prometheus-path: "/metrics"
-      prometheus-job: "alertmanager"
-    environment:
-      ALERTMANAGER_EMAIL_PASSWORD: "${ALERTMANAGER_EMAIL_PASSWORD}"
-    volumes:
-      - ./j4-platform-security/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml.tpl:ro
-      - alertmanager_data:/alertmanager
-    entrypoint:
-    - sh
-    - -c
-    - 'sed "s|__ALERTMANAGER_EMAIL_PASSWORD__|$${ALERTMANAGER_EMAIL_PASSWORD}|g" /etc/alertmanager/alertmanager.yml.tpl > /alertmanager/alertmanager.yml && /bin/alertmanager --config.file=/alertmanager/alertmanager.yml --storage.path=/alertmanager --web.external-url=http://localhost:9093'
-    networks:
-      - disaster-net
-
-  # Grafana — observability dashboards (port 3030 — J3 DMS uses 3000)
   grafana:
     image: grafana/grafana:10.4.0
     container_name: disaster-grafana
@@ -404,15 +531,13 @@ services:
       - ./j4-platform-security/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./j4-platform-security/grafana/dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
-      - prometheus
+      prometheus:
+        condition: service_healthy
     networks:
       - disaster-net
 
-  # ─────────────────────────────────────────────────────────────
-  # ELK — logs collection, indexing, and search
-  # ─────────────────────────────────────────────────────────────
+  # ── ELK Stack ─────────────────────────────────────────────────────────────
 
-  # Elasticsearch — stores all system logs
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
     container_name: disaster-elasticsearch
@@ -426,10 +551,15 @@ services:
       - "9200:9200"
     volumes:
       - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f 'http://127.0.0.1:9200/_cluster/health?wait_for_status=yellow' || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
     networks:
       - disaster-net
 
-  # Elasticsearch bootstrap — ILM policy + index template for drs-logs-*
   elasticsearch-setup:
     image: alpine:3.19
     container_name: disaster-elasticsearch-setup
@@ -440,44 +570,11 @@ services:
       - ./j4-platform-security/elk/scripts/bootstrap-elasticsearch.sh:/setup/bootstrap-elasticsearch.sh:ro
     entrypoint: ["sh", "/setup/bootstrap-elasticsearch.sh"]
     depends_on:
-      - elasticsearch
+      elasticsearch:
+        condition: service_healthy
     networks:
       - disaster-net
 
-  # Environment-specific Elasticsearch bootstraps (run with --profile dev or --profile prod)
-  elasticsearch-setup-dev:
-    image: alpine:3.19
-    container_name: disaster-elasticsearch-setup-dev
-    restart: "no"
-    profiles:
-      - dev
-    environment:
-      ELK_LOG_RETENTION_DAYS: 7
-    volumes:
-      - ./j4-platform-security/elk/scripts/bootstrap-elasticsearch.sh:/setup/bootstrap-elasticsearch.sh:ro
-    entrypoint: ["sh", "/setup/bootstrap-elasticsearch.sh"]
-    depends_on:
-      - elasticsearch
-    networks:
-      - disaster-net
-
-  elasticsearch-setup-prod:
-    image: alpine:3.19
-    container_name: disaster-elasticsearch-setup-prod
-    restart: "no"
-    profiles:
-      - prod
-    environment:
-      ELK_LOG_RETENTION_DAYS: 30
-    volumes:
-      - ./j4-platform-security/elk/scripts/bootstrap-elasticsearch.sh:/setup/bootstrap-elasticsearch.sh:ro
-    entrypoint: ["sh", "/setup/bootstrap-elasticsearch.sh"]
-    depends_on:
-      - elasticsearch
-    networks:
-      - disaster-net
-
-  # Logstash — receives Filebeat events and writes them to Elasticsearch
   logstash:
     image: docker.elastic.co/logstash/logstash:8.13.4
     container_name: disaster-logstash
@@ -490,13 +587,20 @@ services:
     volumes:
       - ./j4-platform-security/elk/logstash/pipeline:/usr/share/logstash/pipeline:ro
       - ./j4-platform-security/elk/logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:9600/ || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
     depends_on:
-      - elasticsearch
-      - elasticsearch-setup
+      elasticsearch:
+        condition: service_healthy
+      elasticsearch-setup:
+        condition: service_completed_successfully
     networks:
       - disaster-net
 
-  # Kibana — log search and visualization UI
   kibana:
     image: docker.elastic.co/kibana/kibana:8.13.4
     container_name: disaster-kibana
@@ -507,12 +611,18 @@ services:
       ELASTICSEARCH_HOSTS: http://elasticsearch:9200
     ports:
       - "5601:5601"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:5601/api/status || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
     depends_on:
-      - elasticsearch
+      elasticsearch:
+        condition: service_healthy
     networks:
       - disaster-net
 
-  # Kibana bootstrap — creates a default DRS logs data view
   kibana-setup:
     image: alpine:3.19
     container_name: disaster-kibana-setup
@@ -525,11 +635,11 @@ services:
       - ./j4-platform-security/elk/scripts/create-kibana-alerts.sh:/setup/create-kibana-alerts.sh:ro
     entrypoint: ["sh", "/setup/bootstrap-kibana.sh"]
     depends_on:
-      - kibana
+      kibana:
+        condition: service_healthy
     networks:
       - disaster-net
 
-  # Filebeat — collects container stdout/stderr and forwards to Logstash
   filebeat:
     image: docker.elastic.co/beats/filebeat:8.13.4
     container_name: disaster-filebeat
@@ -541,187 +651,25 @@ services:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     depends_on:
-      - logstash
-    networks:
-      - disaster-net
-
-  # ─────────────────────────────────────────────────────────────
-  # J3 — System Engineering & Interaction
-  # ─────────────────────────────────────────────────────────────
-
-  # Event Bridge — Kafka consumer → Socket.IO relay (real-time dashboard updates)
-  j3-event-bridge:
-    build:
-      context: ./j3-system-interaction/dms
-      dockerfile: Dockerfile.mock
-    container_name: j3-event-bridge
-    restart: unless-stopped
-    ports:
-      - "3001:3001"
-    environment:
-      KAFKA_BROKER: kafka:29092
-    depends_on:
-      kafka:
-        condition: service_started
-    networks:
-      - disaster-net
-
-  # J3 DMS — Next.js command centre dashboard
-  j3-dms:
-    build:
-      context: ./j3-system-interaction/dms
-      dockerfile: Dockerfile
-      args:
-        NEXT_PUBLIC_API_URL: http://${SERVER_IP:-localhost}:3000
-        NEXT_PUBLIC_SOCKET_URL: http://${SERVER_IP:-localhost}:3001
-    container_name: j3-dms
-    restart: unless-stopped
-    env_file:
-      - ./j3-system-interaction/dms/.env
-    ports:
-      - "3000:3000"
-    labels:
-      prometheus-scrape: "true"
-      prometheus-port: "3000"
-      prometheus-path: "/api/metrics"
-      prometheus-job: "j3-dms"
-    depends_on:
-      postgres:
+      logstash:
         condition: service_healthy
-      kafka:
-        condition: service_started
-      j3-event-bridge:
-        condition: service_started
     networks:
       - disaster-net
 
-  # ─────────────────────────────────────────────────────────────
-  # J1 — Device & Edge Systems
-  # j1-bridge-api  → mobile SOS events   → Kafka topic j1.events
-  # mqtt-kafka-bridge → sensor telemetry → Kafka topics j1.sensor.telemetry.*
-  # ─────────────────────────────────────────────────────────────
-  j1-bridge-api:
-    build: ./j1-device-edge/backend
-    container_name: j1-bridge-api
-    restart: unless-stopped
-    ports:
-      - "8000:8000"
-    environment:
-      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      KAFKA_TOPIC_EVENTS: j1.events
-      KAFKA_PRODUCER_TIMEOUT: "10"
-      API_HOST: 0.0.0.0
-      API_PORT: "8000"
-      CORS_ORIGINS: "*"
-      IDEMPOTENCY_MAX_KEYS: "50000"
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
-    depends_on:
-      kafka:
-        condition: service_started
-      kafka-topic-init:
-        condition: service_completed_successfully
-    networks:
-      - disaster-net
-
-  # ─────────────────────────────────────────────────────────────
-  # J2 — Data & Intelligence
-  # Consumes from Kafka topics produced by J1:
-  #   j1.sensor.telemetry.flood
-  #   j1.sensor.telemetry.landslide
-  #   j1.events
-  # ─────────────────────────────────────────────────────────────
-  j2-data-intelligence:
-    build: ./j2-data-intelligence
-    container_name: j2-data-intelligence
-    ports:
-      - "8082:8082"
-    environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      KAFKA_BROKER: kafka:29092
-      KAFKA_ALERT_THRESHOLD: "0.0"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8082/api/v1/health"]
-      interval: 30s
-      timeout: 10s
-      start_period: 30s
-      retries: 3
-    depends_on:
-      postgres:
-        condition: service_healthy
-      kafka:
-        condition: service_started
-    networks:
-      - disaster-net
-
-  # ─────────────────────────────────────────────────────────────
-  # J4 — Blockchain Audit (Hardhat local dev)
-  # ─────────────────────────────────────────────────────────────
-
-  # Local Hardhat blockchain node for J4 blockchain audit demo/development
-  hardhat-node:
-    image: node:22-alpine
-    container_name: hardhat-node
-    working_dir: /app
-    volumes:
-      - ./j4-platform-security/blockchain-audit:/app
-      - hardhat-node-modules:/app/node_modules
-    command: sh -c "npm ci && npx hardhat node --hostname 0.0.0.0"
-    ports:
-      - "8545:8545"
-    networks:
-      - disaster-net
-
-  # One-time deployment — deploys IncidentAuditLog contract and writes address to shared volume
-  deploy-audit-contract:
-    image: node:22-alpine
-    working_dir: /app
-    volumes:
-      - ./j4-platform-security/blockchain-audit:/app
-      - hardhat-node-modules:/app/node_modules
-      - audit-deployment:/deployment
-    command: sh -c "npm ci && npx hardhat run scripts/deploy.ts --network docker"
-    depends_on:
-      - hardhat-node
-    restart: "no"
-    networks:
-      - disaster-net
-
-  # J4 blockchain audit API — reads contract address from /deployment volume
-  j4-audit-api:
-    build: ./j4-platform-security/blockchain-audit
-    container_name: j4-audit-api
-    ports:
-      - "8084:8084"
-    environment:
-      PORT: 8084
-      BLOCKCHAIN_RPC_URL: http://hardhat-node:8545
-      AUDIT_PRIVATE_KEY: ${AUDIT_PRIVATE_KEY:-0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80}
-    volumes:
-      - audit-deployment:/deployment:ro
-    depends_on:
-      deploy-audit-contract:
-        condition: service_completed_successfully
-    networks:
-      - disaster-net
-
-# ── Named Volumes ──────────────────────────────────────────────────────────────
+# ── Named Volumes ─────────────────────────────────────────────────────────────
+>>>>>>> main
+# ── Named Volumes ─────────────────────────────────────────────────────────────
+>>>>>>> main
 volumes:
   postgres_data:
   elasticsearch_data:
-  logstash_data:
   prometheus_data:
   alertmanager_data:
   grafana_data:
-  kibana_data:
-  hardhat-node-modules:
   audit-deployment:
+  j3_dms_data:
 
-# ── Networks ───────────────────────────────────────────────────────────────────
+# ── Networks ──────────────────────────────────────────────────────────────────
 networks:
   disaster-net:
     driver: bridge

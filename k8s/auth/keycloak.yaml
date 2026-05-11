@@ -1,13 +1,120 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-config
+  namespace: disaster-response
+data:
+  realm-export.json: |
+    {
+        "id": "a5bcfe90-fcec-441b-a29c-6d1b100056db",
+        "realm": "disaster-response",
+        "displayName": "Disaster Response System",
+        "notBefore": 0,
+        "defaultSignatureAlgorithm": "RS256",
+        "revokeRefreshToken": false,
+        "accessTokenLifespan": 300,
+        "ssoSessionIdleTimeout": 1800,
+        "ssoSessionMaxLifespan": 36000,
+        "enabled": true,
+        "sslRequired": "none",
+        "registrationAllowed": false,
+        "loginWithEmailAllowed": true,
+        "duplicateEmailsAllowed": false,
+        "bruteForceProtected": false,
+        "defaultRole": {
+            "id": "8b4b7bd7-e14a-47b3-9a2e-d32125b05419",
+            "name": "default-roles-disaster-response",
+            "composite": true,
+            "clientRole": false,
+            "containerId": "a5bcfe90-fcec-441b-a29c-6d1b100056db"
+        },
+        "requiredCredentials": ["password"],
+        "browserFlow": "browser",
+        "registrationFlow": "registration",
+        "directGrantFlow": "direct grant",
+        "resetCredentialsFlow": "reset credentials",
+        "clientAuthenticationFlow": "clients",
+        "dockerAuthenticationFlow": "docker auth",
+        "attributes": {
+            "cibaBackchannelTokenDeliveryMode": "poll",
+            "cibaExpiresIn": "120",
+            "parRequestUriLifespan": "60",
+            "cibaInterval": "5"
+        },
+        "userManagedAccessAllowed": false,
+        "clientProfiles": {"profiles": []},
+        "clientPolicies": {"policies": []}
+    }
+  setup.sh: |
+    #!/usr/bin/env bash
+    set -euo pipefail
+    KC_URL="${KC_URL:-http://keycloak:8080}"
+    KC_REALM="${KC_REALM:-disaster-response}"
+    KC_ADMIN_USER="${KEYCLOAK_ADMIN:-admin}"
+    KC_ADMIN_PASS="${KEYCLOAK_ADMIN_PASSWORD:-admin123}"
+    kc_curl() { curl -H "X-Forwarded-Proto: https" "$@"; }
+    echo "==> Waiting for Keycloak realm..."
+    until kc_curl -sf "$KC_URL/realms/$KC_REALM/.well-known/openid-configuration" >/dev/null; do sleep 2; done
+    TOKEN=$(kc_curl -s -X POST "$KC_URL/realms/master/protocol/openid-connect/token" \
+      -d "grant_type=password&client_id=admin-cli&username=$KC_ADMIN_USER&password=$KC_ADMIN_PASS" \
+      | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4)
+    [[ -z "$TOKEN" ]] && { echo "ERROR: failed to get admin token"; exit 1; }
+    AUTH="Authorization: Bearer $TOKEN"
+    ROLES=(SYSTEM_ADMIN OPERATIONS_OFFICER_ZONAL OPERATIONS_OFFICER_NATIONAL
+           INCIDENT_COMMANDER_ZONAL INCIDENT_COMMANDER_NATIONAL
+           RESOURCE_MANAGEMENT_ZONAL RESOURCE_MANAGEMENT_NATIONAL
+           FIELD_OFFICER PUBLIC_CITIZEN LOGISTICS RESPONSE_TEAM)
+    echo "==> Creating realm roles..."
+    for role in "${ROLES[@]}"; do
+      kc_curl -sf -H "$AUTH" "$KC_URL/admin/realms/$KC_REALM/roles/$role" >/dev/null 2>&1 \
+        || kc_curl -sf -H "$AUTH" -H "Content-Type: application/json" \
+           -X POST "$KC_URL/admin/realms/$KC_REALM/roles" -d "{\"name\":\"$role\"}" >/dev/null
+      echo "    $role OK"
+    done
+    CLIENT_ID="disaster-app"
+    existing=$(kc_curl -sf -H "$AUTH" "$KC_URL/admin/realms/$KC_REALM/clients?clientId=$CLIENT_ID" \
+      | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+    if [[ -z "$existing" ]]; then
+      kc_curl -sf -H "$AUTH" -H "Content-Type: application/json" \
+        -X POST "$KC_URL/admin/realms/$KC_REALM/clients" \
+        -d '{"clientId":"disaster-app","enabled":true,"publicClient":true,"directAccessGrantsEnabled":true,"redirectUris":["*"],"webOrigins":["*"]}' >/dev/null
+      echo "==> Client disaster-app created"
+    fi
+    USERS=(system-admin-test:SYSTEM_ADMIN ops-officer-zonal-test:OPERATIONS_OFFICER_ZONAL
+           incident-cmd-zonal-test:INCIDENT_COMMANDER_ZONAL public-citizen-test:PUBLIC_CITIZEN)
+    for entry in "${USERS[@]}"; do
+      username="${entry%%:*}"; role="${entry##*:}"
+      user_id=$(kc_curl -sf -H "$AUTH" "$KC_URL/admin/realms/$KC_REALM/users?username=$username&exact=true" \
+        | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+      if [[ -z "$user_id" ]]; then
+        kc_curl -sf -H "$AUTH" -H "Content-Type: application/json" \
+          -X POST "$KC_URL/admin/realms/$KC_REALM/users" \
+          -d "{\"username\":\"$username\",\"enabled\":true,\"emailVerified\":true,\"email\":\"$username@example.test\",\"firstName\":\"Test\",\"lastName\":\"User\",\"credentials\":[{\"type\":\"password\",\"value\":\"test123\",\"temporary\":false}]}" >/dev/null
+        user_id=$(kc_curl -sf -H "$AUTH" "$KC_URL/admin/realms/$KC_REALM/users?username=$username&exact=true" \
+          | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+      fi
+      role_repr=$(kc_curl -sf -H "$AUTH" "$KC_URL/admin/realms/$KC_REALM/roles/$role")
+      kc_curl -sf -H "$AUTH" -H "Content-Type: application/json" \
+        -X POST "$KC_URL/admin/realms/$KC_REALM/users/$user_id/role-mappings/realm" \
+        -d "[$role_repr]" >/dev/null
+      echo "    $username <- $role OK"
+    done
+    echo "==> Keycloak setup complete!"
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: keycloak
   namespace: disaster-response
+  labels:
+    app: keycloak
 spec:
   replicas: 1
   selector:
     matchLabels:
       app: keycloak
+  strategy:
+    type: Recreate
   template:
     metadata:
       labels:
@@ -15,12 +122,22 @@ spec:
     spec:
       initContainers:
         - name: wait-for-postgres
-          image: busybox:1.36
-          command: ['sh', '-c', 'until nc -z postgres 5432; do echo waiting for postgres; sleep 3; done']
+          image: busybox:1.37
+          command: ["sh", "-c", "until nc -w1 postgres 5432 >/dev/null 2>&1; do echo 'waiting for postgres...'; sleep 3; done"]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
       containers:
         - name: keycloak
           image: quay.io/keycloak/keycloak:24.0
+          imagePullPolicy: IfNotPresent
           args: ["start-dev", "--import-realm"]
+          ports:
+            - containerPort: 8080
           env:
             - name: KEYCLOAK_ADMIN
               valueFrom:
@@ -33,39 +150,60 @@ spec:
                   name: disaster-secrets
                   key: KEYCLOAK_ADMIN_PASSWORD
             - name: KC_DB
-              value: postgres
+              value: "postgres"
             - name: KC_DB_URL
-              value: jdbc:postgresql://postgres:5432/keycloak
+              value: "jdbc:postgresql://postgres:5432/keycloak"
             - name: KC_DB_USERNAME
-              value: keycloak
+              valueFrom:
+                secretKeyRef:
+                  name: disaster-secrets
+                  key: KC_DB_USERNAME
             - name: KC_DB_PASSWORD
-              value: keycloak123
+              valueFrom:
+                secretKeyRef:
+                  name: disaster-secrets
+                  key: KC_DB_PASSWORD
             - name: KC_METRICS_ENABLED
               value: "true"
-            - name: JAVA_OPTS_APPEND
-              value: "-Xms256m -Xmx512m"
+            - name: KC_PROXY_HEADERS
+              value: "xforwarded"
+            - name: KC_HEALTH_ENABLED
+              value: "true"
           resources:
             requests:
-              memory: "512Mi"
+              cpu: 300m
+              memory: 256Mi
             limits:
-              memory: "768Mi"
-          ports:
-            - containerPort: 8080
+              cpu: "2"
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /realms/master
+              port: 8080
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /realms/master
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 10
           volumeMounts:
             - name: realm-import
-              mountPath: /opt/keycloak/data/import
-          readinessProbe:
-            tcpSocket:
-              port: 8080
-            initialDelaySeconds: 30
-            periodSeconds: 10
-            failureThreshold: 10
+              mountPath: /opt/keycloak/data/import/realm-export.json
+              subPath: realm-export.json
       volumes:
         - name: realm-import
           configMap:
-            name: keycloak-realm
+            name: keycloak-config
+            items:
+              - key: realm-export.json
+                path: realm-export.json
 ---
-# NodePort exposes Keycloak on port 30180 of your machine (minikube ip):30180
 apiVersion: v1
 kind: Service
 metadata:
@@ -79,3 +217,66 @@ spec:
     - port: 8080
       targetPort: 8080
       nodePort: 30180
+---
+# One-shot Job — creates realm roles, disaster-app client, and test users
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: keycloak-setup
+  namespace: disaster-response
+spec:
+  backoffLimit: 5
+  template:
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+        - name: wait-for-keycloak
+          image: busybox:1.37
+          command: ["sh", "-c", "until nc -w1 keycloak 8080 >/dev/null 2>&1; do echo 'waiting for keycloak...'; sleep 5; done; sleep 10"]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+      containers:
+        - name: setup
+          image: alpine:3.19
+          command:
+            - sh
+            - -c
+            - |
+              apk add --no-cache bash curl jq -q
+              bash /setup/setup.sh
+          env:
+            - name: KC_URL
+              value: "http://keycloak:8080"
+            - name: KEYCLOAK_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: disaster-secrets
+                  key: KEYCLOAK_ADMIN
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: disaster-secrets
+                  key: KEYCLOAK_ADMIN_PASSWORD
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi
+          volumeMounts:
+            - name: script
+              mountPath: /setup
+      volumes:
+        - name: script
+          configMap:
+            name: keycloak-config
+            items:
+              - key: setup.sh
+                path: setup.sh
+            defaultMode: 0755
