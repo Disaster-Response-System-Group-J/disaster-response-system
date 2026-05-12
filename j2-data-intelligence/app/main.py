@@ -33,14 +33,16 @@ def _run_sensor_consumer():
         consumer.connect()
         consumer.subscribe_to_topics(SENSOR_TOPICS)
         logger.info("Sensor consumer subscribed to %s", SENSOR_TOPICS)
-        while True:
-            db = SessionLocal()
-            try:
-                consumer.consume_once(db, timeout=1.0)
-            except Exception as exc:
-                logger.error("Sensor consumer error: %s", exc)
-            finally:
-                db.close()
+        db = SessionLocal()
+        try:
+            while True:
+                try:
+                    consumer.consume_once(db, timeout=1.0)
+                except Exception as exc:
+                    logger.error("Sensor consumer error: %s", exc)
+                    db.rollback()
+        finally:
+            db.close()
     except Exception as exc:
         logger.error("Sensor consumer failed to start: %s", exc)
     finally:
@@ -106,14 +108,16 @@ def _run_sos_consumer():
         consumer.connect()
         consumer.subscribe_to_topics(["j1.sos.raw-reports"])
         logger.info("SOS consumer subscribed to j1.sos.raw-reports")
-        while True:
-            db = SessionLocal()
-            try:
-                consumer.consume_once(db, timeout=1.0)
-            except Exception as exc:
-                logger.error("SOS consumer error: %s", exc)
-            finally:
-                db.close()
+        db = SessionLocal()
+        try:
+            while True:
+                try:
+                    consumer.consume_once(db, timeout=1.0)
+                except Exception as exc:
+                    logger.error("SOS consumer error: %s", exc)
+                    db.rollback()
+        finally:
+            db.close()
     except Exception as exc:
         logger.error("SOS consumer failed to start: %s", exc)
     finally:

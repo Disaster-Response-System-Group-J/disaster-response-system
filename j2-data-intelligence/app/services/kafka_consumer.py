@@ -122,7 +122,9 @@ class SensorDataConsumer:
             raise RuntimeError(f"Kafka error: {msg.error()}")
 
         message_value = json.loads(msg.value().decode("utf-8"))
-        return self.process_sensor_message(db, message_value, kafka_topic=msg.topic())
+        result = self.process_sensor_message(db, message_value, kafka_topic=msg.topic())
+        self.consumer.commit(message=msg)  # Only commit after successful DB write
+        return result
 
     def close(self) -> None:
         if self.consumer:
@@ -134,7 +136,7 @@ def create_kafka_consumer_config(bootstrap_servers: str, group_id: str = "j2-sen
         "bootstrap.servers": bootstrap_servers,
         "group.id": group_id,
         "auto.offset.reset": "earliest",
-        "enable.auto.commit": True,
+        "enable.auto.commit": False,  # Manual commit after successful DB write prevents data loss on crash
         "session.timeout.ms": 30000,
     }
 
@@ -250,6 +252,7 @@ class SOSRequestConsumer:
 
         message_value = json.loads(msg.value().decode("utf-8"))
         self.process_sos_message(db, message_value)
+        self.consumer.commit(message=msg)  # Only commit after successful DB write
 
     def close(self) -> None:
         if self.consumer:
