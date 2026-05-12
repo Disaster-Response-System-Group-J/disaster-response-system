@@ -5,7 +5,7 @@ RUN apk upgrade --no-cache && apk add --no-cache openssl
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci --frozen-lockfile
+RUN npm install
 
 
 FROM node:20.19.2-alpine3.21 AS builder
