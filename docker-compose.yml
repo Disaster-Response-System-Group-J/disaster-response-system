@@ -59,30 +59,6 @@ services:
     networks:
       - disaster-net
 
-  # ── J1 — Device & Edge Systems ────────────────────────────────────────────
-
-  mqtt-kafka-bridge:
-    build:
-      context: ./j1-device-edge/mqtt-kafka-bridge
-    image: disaster/mqtt-kafka-bridge:latest
-    container_name: disaster-mqtt-kafka-bridge
-    restart: unless-stopped
-    environment:
-      MQTT_BROKER: ${MQTT_BROKER}
-      MQTT_PORT: ${MQTT_PORT}
-      MQTT_USERNAME: ${MQTT_USERNAME}
-      MQTT_PASSWORD: ${MQTT_PASSWORD}
-      MQTT_TOPICS: j1/disaster/#
-      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      KAFKA_TOPIC: disaster_data_stream
-      KAFKA_TOPIC_FLOOD: j1.sensor.telemetry.flood
-      KAFKA_TOPIC_LANDSLIDE: j1.sensor.telemetry.landslide
-    depends_on:
-      kafka:
-        condition: service_healthy
-    networks:
-      - disaster-net
-
   j1-bridge-api:
     build:
       context: ./j1-device-edge/backend
