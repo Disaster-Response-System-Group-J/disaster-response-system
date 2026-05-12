@@ -11,19 +11,119 @@ env:
 
 jobs:
   # ─────────────────────────────────────────────
+  # Path detection — determines which jobs run
+  # ─────────────────────────────────────────────
+  changes:
+    name: "Detect Changed Paths"
+    runs-on: ubuntu-latest
+    outputs:
+      j1: ${{ steps.filter.outputs.j1 }}
+      j2: ${{ steps.filter.outputs.j2 }}
+      j3: ${{ steps.filter.outputs.j3 }}
+      j4: ${{ steps.filter.outputs.j4 }}
+      k8s: ${{ steps.filter.outputs.k8s }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            j1:
+              - 'j1-device-edge/**'
+            j2:
+              - 'j2-data-intelligence/**'
+            j3:
+              - 'j3-system-interaction/**'
+            j4:
+              - 'j4-platform-security/**'
+            k8s:
+              - 'k8s/**'
+
+  # ─────────────────────────────────────────────
+  # J1 — Device & Edge
+  # ─────────────────────────────────────────────
+  j1-docker-validate:
+    name: "J1 · Docker — Build Validation"
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.j1 == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image (no push)
+        uses: docker/build-push-action@v5
+        with:
+          context: j1-device-edge/mqtt-kafka-bridge
+          file: j1-device-edge/mqtt-kafka-bridge/Dockerfile
+          push: false
+          tags: ${{ env.IMAGE_PREFIX }}/disaster-j1-bridge-api:ci-validate
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  trivy-scan-j1:
+    name: "J1 · Trivy — Security Scan"
+    runs-on: ubuntu-latest
+    needs: [changes, j1-docker-validate]
+    if: needs.changes.outputs.j1 == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image for scanning
+        uses: docker/build-push-action@v5
+        with:
+          context: j1-device-edge/mqtt-kafka-bridge
+          file: j1-device-edge/mqtt-kafka-bridge/Dockerfile
+          push: false
+          load: true
+          tags: j1-bridge-api:scan
+
+      - name: Run Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: j1-bridge-api:scan
+          format: table
+          exit-code: 1
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+          vuln-type: os,library
+          trivyignores: .trivyignore
+
+      - name: Run Trivy and upload SARIF report
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: j1-bridge-api:scan
+          format: sarif
+          output: trivy-j1-results.sarif
+        continue-on-error: true
+
+      - name: Upload Trivy results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-j1-results.sarif
+          category: trivy-j1
+        continue-on-error: true
+
+  # ─────────────────────────────────────────────
   # J2 — Data & Intelligence (Python / FastAPI)
   # ─────────────────────────────────────────────
   j2-ci:
     name: "J2 · Python — Lint & Test"
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.j2 == 'true'
     defaults:
       run:
         working-directory: j2-data-intelligence
-
-    # Only run when J2 files change
-    if: |
-      github.event_name == 'push' ||
-      contains(toJson(github.event.pull_request.changed_files), 'j2-data-intelligence')
 
     steps:
       - name: Checkout
@@ -33,7 +133,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          #cache: pip
 
       - name: Install dependencies
         run: |
@@ -48,17 +147,14 @@ jobs:
       - name: Lint (flake8)
         run: |
           pip install flake8
-          # Fail on syntax errors or undefined names; warn on style
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
           flake8 . --count --exit-zero --max-complexity=10 --statistics
 
       - name: Run tests (pytest)
         run: |
           pip install pytest pytest-cov
-          # Run pytest, excluding Model Training folder
           pytest -v --ignore="Model Training and Validation" || {
             exit_code=$?
-            # Exit code 5 means no tests collected — that's okay
             if [ $exit_code -eq 5 ]; then
               echo "No tests found — this is okay"
               exit 0
@@ -66,12 +162,62 @@ jobs:
             exit $exit_code
           }
 
+  trivy-scan-j2:
+    name: "J2 · Trivy — Security Scan"
+    runs-on: ubuntu-latest
+    needs: [changes, j2-ci]
+    if: needs.changes.outputs.j2 == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image for scanning
+        uses: docker/build-push-action@v5
+        with:
+          context: j2-data-intelligence
+          file: j2-data-intelligence/Dockerfile
+          push: false
+          load: true
+          tags: j2-data-intelligence:scan
+
+      - name: Run Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: j2-data-intelligence:scan
+          format: table
+          exit-code: 1
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+          vuln-type: os,library
+          trivyignores: .trivyignore
+
+      - name: Run Trivy and upload SARIF report
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: j2-data-intelligence:scan
+          format: sarif
+          output: trivy-j2-results.sarif
+        continue-on-error: true
+
+      - name: Upload Trivy results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-j2-results.sarif
+          category: trivy-j2
+        continue-on-error: true
+
   # ─────────────────────────────────────────────
   # J3 — System Interaction (Next.js)
   # ─────────────────────────────────────────────
   j3-ci:
     name: "J3 · Next.js — Install, Build & Test"
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.j3 == 'true'
     defaults:
       run:
         working-directory: j3-system-interaction/dms
@@ -92,11 +238,11 @@ jobs:
 
       - name: Type-check
         run: npx tsc --noEmit
-        continue-on-error: true # Remove once types are stable
+        continue-on-error: true
 
       - name: Lint (ESLint)
         run: npm run lint --if-present
-        continue-on-error: true # known lint issues tracked in issue #XX — J3 to resolve before demo
+        continue-on-error: true
 
       - name: Run tests
         run: npm test --if-present -- --passWithNoTests --watchAll=false
@@ -104,17 +250,13 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          # Prevent Next.js telemetry in CI
           NEXT_TELEMETRY_DISABLED: 1
 
-  # ─────────────────────────────────────────────
-  # J3 — Docker build validation (no push)
-  # Push to Docker Hub happens in cd.yml
-  # ─────────────────────────────────────────────
   j3-docker-validate:
     name: "J3 · Docker — Build Validation"
     runs-on: ubuntu-latest
-    needs: j3-ci # Only validate if app CI passes first
+    needs: [changes, j3-ci]
+    if: needs.changes.outputs.j3 == 'true'
 
     steps:
       - name: Checkout
@@ -133,15 +275,11 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # ─────────────────────────────────────────────
-  # #16 — Trivy Security Scanning
-  # Scans J3 Docker image for vulnerabilities
-  # Other subgroups scanned once they add Dockerfiles
-  # ─────────────────────────────────────────────
   trivy-scan-j3:
     name: "J3 · Trivy — Security Scan"
     runs-on: ubuntu-latest
-    needs: j3-docker-validate # Only scan if image builds successfully
+    needs: [changes, j3-docker-validate]
+    if: needs.changes.outputs.j3 == 'true'
 
     steps:
       - name: Checkout
@@ -156,7 +294,7 @@ jobs:
           context: j3-system-interaction/dms
           file: j3-system-interaction/dms/Dockerfile
           push: false
-          load: true # ← loads image into local Docker daemon so Trivy can scan it
+          load: true
           tags: j3-dms:scan
 
       - name: Run Trivy vulnerability scan
@@ -176,23 +314,96 @@ jobs:
           image-ref: j3-dms:scan
           format: sarif
           output: trivy-j3-results.sarif
-        continue-on-error: true # upload even if scan found issues
+        continue-on-error: true
 
       - name: Upload Trivy results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: trivy-j3-results.sarif
           category: trivy-j3
-        continue-on-error: true # don't fail if Security tab not enabled
+        continue-on-error: true
+
+  # ─────────────────────────────────────────────
+  # J4 — Platform Security (Blockchain Audit)
+  # ─────────────────────────────────────────────
+  j4-docker-validate:
+    name: "J4 · Docker — Build Validation"
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.j4 == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image (no push)
+        uses: docker/build-push-action@v5
+        with:
+          context: j4-platform-security/blockchain-audit
+          file: j4-platform-security/blockchain-audit/Dockerfile
+          push: false
+          tags: ${{ env.IMAGE_PREFIX }}/disaster-j4-audit-api:ci-validate
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  trivy-scan-j4:
+    name: "J4 · Trivy — Security Scan"
+    runs-on: ubuntu-latest
+    needs: [changes, j4-docker-validate]
+    if: needs.changes.outputs.j4 == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image for scanning
+        uses: docker/build-push-action@v5
+        with:
+          context: j4-platform-security/blockchain-audit
+          file: j4-platform-security/blockchain-audit/Dockerfile
+          push: false
+          load: true
+          tags: j4-audit-api:scan
+
+      - name: Run Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: j4-audit-api:scan
+          format: table
+          exit-code: 1
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+          vuln-type: os,library
+          trivyignores: .trivyignore
+
+      - name: Run Trivy and upload SARIF report
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: j4-audit-api:scan
+          format: sarif
+          output: trivy-j4-results.sarif
+        continue-on-error: true
+
+      - name: Upload Trivy results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-j4-results.sarif
+          category: trivy-j4
+        continue-on-error: true
 
   # ─────────────────────────────────────────────
   # Trivy filesystem scan — catch secrets/misconfigs
-  # in source code across ALL subgroups
+  # Runs on every push regardless of what changed
   # ─────────────────────────────────────────────
   trivy-scan-filesystem:
     name: "All · Trivy — Filesystem & Secret Scan"
     runs-on: ubuntu-latest
-    needs: [j2-ci, j3-ci, k8s-validate] # run after code & manifest jobs pass
 
     steps:
       - name: Checkout
@@ -201,13 +412,13 @@ jobs:
       - name: Scan filesystem for secrets and misconfigs
         uses: aquasecurity/trivy-action@master
         with:
-          scan-type: fs # scan the repo itself, not an image
-          scan-ref: . # scan from root
+          scan-type: fs
+          scan-ref: .
           format: table
           exit-code: 1
           severity: CRITICAL,HIGH
-          scanners: secret,misconfig # look for hardcoded secrets + bad configs
-        continue-on-error: true # warn but don't block — secrets scan can have false positives
+          scanners: secret,misconfig
+        continue-on-error: true
 
       - name: Upload filesystem scan SARIF
         uses: aquasecurity/trivy-action@master
@@ -226,37 +437,13 @@ jobs:
         continue-on-error: true
 
   # ─────────────────────────────────────────────
-  # Trivy placeholders — J1, J2, J4
-  # Wired in once they add Dockerfiles
-  # ─────────────────────────────────────────────
-  trivy-scan-j1-placeholder:
-    name: "J1 · Trivy — Pending Dockerfile"
-    runs-on: ubuntu-latest
-    steps:
-      - name: Placeholder
-        run: echo "J1 Trivy scan will run once edge service Dockerfile is added"
-
-  trivy-scan-j2-placeholder:
-    name: "J2 · Trivy — Pending Dockerfile"
-    runs-on: ubuntu-latest
-    steps:
-      - name: Placeholder
-        run: echo "J2 Trivy scan will run once data service Dockerfile is added"
-
-  trivy-scan-j4-placeholder:
-    name: "J4 · Trivy — Pending Dockerfile"
-    runs-on: ubuntu-latest
-    steps:
-      - name: Placeholder
-        run: echo "J4 Trivy scan will run once platform Dockerfile is added"
-
-  # ─────────────────────────────────────────────
   # K8s Manifest Validation
-  # Validates all K8s manifests in k8s/ folder
   # ─────────────────────────────────────────────
   k8s-validate:
     name: "K8s · Manifests — Dry Run Validation"
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.k8s == 'true'
 
     steps:
       - name: Checkout
@@ -274,7 +461,6 @@ jobs:
 
       - name: Validate K8s manifests (dry-run)
         run: |
-          # Validate manifests in k8s/ folder
           if find k8s -name "*.yaml" -o -name "*.yml" | grep -q .; then
             find k8s \( -name "*.yaml" -o -name "*.yml" \) \
               ! -name "*.github*" \
@@ -283,13 +469,3 @@ jobs:
           else
             echo "No K8s manifests found — skipping validation"
           fi
-
-  # ─────────────────────────────────────────────
-  # J1 — Device & Edge (placeholder)
-  # ─────────────────────────────────────────────
-  j1-placeholder:
-    name: "J1 · Edge Systems — Pending"
-    runs-on: ubuntu-latest
-    steps:
-      - name: Placeholder
-        run: echo "J1 CI will be configured once edge service code is committed"
