@@ -61,9 +61,7 @@ export async function PATCH(req: Request) {
       const { rows } = await pool.query(query, [status, incidentId]);
       return NextResponse.json(rows[0]);
     } else {
-      const query = 'UPDATE public."ConfirmedIncident" SET status = $1 WHERE incident_id = $2 RETURNING *';
-      const { rows } = await pool.query(query, [status, incidentId]);
-      return NextResponse.json(rows[0] || {});
+      return NextResponse.json({ error: 'Incident not found' }, { status: 404 });
     }
   } catch (error) {
     console.error('Database Error:', error);

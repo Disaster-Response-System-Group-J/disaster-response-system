@@ -9,6 +9,7 @@ import { SRI_LANKA_CENTER, DISTRICT_NAMES } from '@/data/districts';
 import { useAuth } from '@/context/AuthContext';
 import { createClient } from '@supabase/supabase-js';
 import { useSocket } from '@/context/SocketContext';
+import Link from 'next/link';
 
 // Module-level singleton — avoids creating a new GoTrueClient on every render
 const supabase = createClient(
@@ -371,9 +372,12 @@ export default function IncidentMapPage() {
                   );
                 })()}
 
-                <button className="w-full mt-3 py-2 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 rounded-lg text-xs font-semibold text-blue-400 transition-colors">
+                <Link 
+                  href={`/dashboard/incidents/${selectedIncident.incidentId}`}
+                  className="w-full mt-3 py-2 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 rounded-lg text-xs font-semibold text-blue-400 transition-colors block text-center"
+                >
                   View Full Details
-                </button>
+                </Link>
               </div>
             </Popup>
           )}
