@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { pool } from '@/lib/db';
 
 const J2_BASE_URL = process.env.J2_DATA_INTELLIGENCE_URL ?? 'http://localhost:8082';
+const J2_REQUEST_TIMEOUT_MS = 60_000;
 
 async function saveResourcePlan({
   incidentId,
@@ -41,16 +42,38 @@ async function saveResourcePlan({
 export async function POST(request: Request) {
   try {
     const { incidentId, triggeredBy, adminDecisions, targetDate } = await request.json();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), J2_REQUEST_TIMEOUT_MS);
 
-    const j2Response = await fetch(`${J2_BASE_URL}/api/v1/intelligence/agent/allocate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        admin_decisions: adminDecisions ?? '',
-        target_date: targetDate ?? null,
-      }),
-      cache: 'no-store',
-    });
+    let j2Response: Response;
+    try {
+      j2Response = await fetch(`${J2_BASE_URL}/api/v1/intelligence/agent/allocate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          admin_decisions: adminDecisions ?? '',
+          target_date: targetDate ?? null,
+        }),
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+    } catch (error) {
+      const isTimeout = error instanceof Error && error.name === 'AbortError';
+      return NextResponse.json(
+        {
+          error: isTimeout
+            ? 'J2 allocation agent timed out while generating the resource plan'
+            : 'J2 allocation agent is unreachable',
+          details: isTimeout
+            ? `No response from ${J2_BASE_URL} within ${J2_REQUEST_TIMEOUT_MS / 1000} seconds.`
+            : error instanceof Error ? error.message : String(error),
+          status: 'FAILED',
+        },
+        { status: 502 }
+      );
+    } finally {
+      clearTimeout(timeout);
+    }
 
     if (!j2Response.ok) {
       const message = await j2Response.text();
@@ -77,6 +100,7 @@ export async function POST(request: Request) {
       {
         ...savedPlan,
         plan_data: planData,
+        source: 'j2-allocation-agent',
       },
       { status: 201 }
     );

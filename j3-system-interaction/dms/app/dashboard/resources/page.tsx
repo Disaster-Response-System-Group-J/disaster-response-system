@@ -145,9 +145,10 @@ export default function ResourcesPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to generate resource plan');
+        throw new Error(data.details ? `${data.error}: ${data.details}` : data.error || 'Failed to generate resource plan');
       }
-      setCurrentPlan(data);
+      const latest = await fetch('/api/resource-plan');
+      setCurrentPlan(latest.ok ? await latest.json() : data);
     } catch (err) {
       console.error('Failed to generate plan:', err);
       setPlanError(err instanceof Error ? err.message : 'Failed to generate resource plan.');
