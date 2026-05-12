@@ -8,17 +8,15 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY . .
+RUN npx hardhat compile
 
-RUN npx hardhat compile \
-    && rm -rf \
-        node_modules/forge-std \
-        node_modules/mocha \
-        node_modules/chai \
-        node_modules/chai-as-promised \
-        node_modules/@types \
-        contracts \
-        test \
-        ignition
+RUN rm -rf \
+    node_modules/forge-std \
+    node_modules/mocha \
+    node_modules/@types \
+    contracts \
+    test \
+    ignition
 
 
 FROM node:22-alpine AS runner
@@ -36,4 +34,4 @@ RUN chown -R node:node /app
 
 USER node
 
-CMD ["npx", "hardhat", "run", "scripts/deploy.ts", "--network", "docker"]
+CMD ["npx", "hardhat", "run", "scripts/deploy.ts", "--network", "docker", "--no-compile"]
