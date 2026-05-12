@@ -74,6 +74,24 @@ static String resolveMqttTopic(const JsonDocument& doc) {
     return "";
 }
 
+// Flood Level Detection (max height 19cm)
+// Minor: 5-9cm, Moderate: 10-14cm, Heavy: 15+cm
+bool shouldPublishToMainFloodTopic(const JsonDocument& doc) {
+    String type = doc["type"] | "";
+    
+    // Only apply flood level filtering to flood data
+    if (type == "FLOOD" || type == "SENSOR_DATA_FLOOD") {
+        float depth = doc["depth"] | 0.0;
+        // Don't publish to main topic if depth is below minor level (5cm)
+        if (depth < 5.0) {
+            return false;  // Below minor level - monitoring only
+        }
+    }
+    
+    // For non-flood data or depth >= 5cm, always publish to main topic
+    return true;
+}
+
 void setup_wifi() {
     Serial.print("\nConnecting to Wi-Fi: ");
     Serial.println(ssid);
@@ -147,6 +165,10 @@ void setup() {
     Serial.println("✅ LoRa Gateway Initialized OK! Waiting for packets...");
 }
 
+// Timing control for MQTT publishing
+unsigned long lastPublishToRedTopic = 0;    // For 1s interval to flood_red
+unsigned long lastPublishToMainTopic = 0;   // For 5s interval to flood
+
 void loop() {
     // Watchdog: If no packets received for 45 seconds, reboot!
     static unsigned long lastPacketTime = millis();
@@ -210,11 +232,32 @@ void loop() {
             String topic = resolveMqttTopic(doc);
 
             if (topic != "") {
-                if (client.publish(topic.c_str(), normalizedData.c_str())) {
-                    Serial.print("   ✅ Published to MQTT topic: ");
-                    Serial.println(topic);
-                } else {
-                    Serial.println("   ❌ MQTT Publish Failed!");
+                bool publishToMain = shouldPublishToMainFloodTopic(doc);
+                unsigned long currentTime = millis();
+                
+                // Publish to j1/disaster/flood_red every 1 second
+                if (currentTime - lastPublishToRedTopic >= 1000) {
+                    String nodeRedTopic = topic + "_red";
+                    if (client.publish(nodeRedTopic.c_str(), receivedData.c_str())) {
+                        Serial.print("   ✅ Published to Node-RED topic: ");
+                        Serial.println(nodeRedTopic);
+                    } else {
+                        Serial.println("   ❌ Node-RED topic publish failed!");
+                    }
+                    lastPublishToRedTopic = currentTime;
+                }
+                
+                // Publish to j1/disaster/flood every 5 seconds (if conditions met)
+                if (publishToMain && (currentTime - lastPublishToMainTopic >= 5000)) {
+                    if (client.publish(topic.c_str(), receivedData.c_str())) {
+                        Serial.print("   ✅ Published to MQTT topic: ");
+                        Serial.println(topic);
+                    } else {
+                        Serial.println("   ❌ MQTT Publish Failed!");
+                    }
+                    lastPublishToMainTopic = currentTime;
+                } else if (!publishToMain) {
+                    Serial.println("   ℹ️ Skipped main topic - depth below minor level threshold (5cm)");
                 }
             } else {
                 Serial.println("   ⚠️ Unknown node or type. Packet ignored.");
