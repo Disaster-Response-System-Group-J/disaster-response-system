@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Float, String, Date, DateTime, ForeignKey, UniqueConstraint, Text, Numeric
+from sqlalchemy import Column, Integer, Float, String, Date, DateTime, ForeignKey, UniqueConstraint, Text, Numeric, JSON
 from sqlalchemy.orm import relationship
 from app.db.database import Base
 
@@ -163,3 +163,28 @@ class IoTPrediction(Base):
     predicted_at = Column(DateTime)
     __table_args__ = (UniqueConstraint('source_id', 'disaster_type', 'horizon',
                                        name='iot_predictions_source_type_horizon_unique'),)
+
+
+class DivisionResource(Base):
+    __tablename__ = "DivisionResources"
+    __table_args__ = {'extend_existing': True}
+    division_id = Column(Integer, ForeignKey("Division.division_id"), primary_key=True)
+    hospital_bed_capacity = Column(Integer)
+    emergency_shelters = Column(Integer)
+    ambulance_count = Column(Integer)
+    food_stock_tons = Column(Float)
+    clean_water_capacity_liters = Column(Float)
+    power_grid_resilience = Column(Float)
+
+
+class ResourceRecommendation(Base):
+    __tablename__ = "ResourceRecommendation"
+    recommendation_id = Column(Integer, primary_key=True, index=True)
+    division_id = Column(Integer, ForeignKey("Division.division_id"), nullable=False)
+    hazard_type = Column(String, nullable=False)
+    risk_category = Column(String, nullable=False)
+    consideration_score = Column(Float)
+    recommendation_text = Column(Text)
+    resource_allocation_json = Column(Text)
+    model_name = Column(String)
+    created_at = Column(DateTime)

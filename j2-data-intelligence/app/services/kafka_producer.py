@@ -169,6 +169,59 @@ def publish_predictions(predictions):
     producer.flush()
 
 
+def publish_prediction(division: dict, prediction: dict) -> bool:
+    """Publish a single prediction event to Kafka. Returns True if published."""
+    producer = get_producer()
+    if not producer:
+        return False
+    merged = {**prediction, **division}
+    message = build_prediction_message(merged)
+    try:
+        producer.produce(
+            KAFKA_TOPIC,
+            key=str(prediction.get("division_id", "")),
+            value=json.dumps(message),
+        )
+        producer.flush()
+        return True
+    except Exception as exc:
+        print(f"[kafka] publish_prediction failed: {exc}")
+        return False
+
+
+def publish_recommendation(division: dict, recommendation: dict) -> bool:
+    """Publish a resource recommendation event to Kafka. Returns True if published."""
+    producer = get_producer()
+    if not producer:
+        return False
+    try:
+        envelope = {
+            "eventId": f"rec-{recommendation.get('recommendation_id', '')}",
+            "eventType": "resource-recommendation",
+            "timestamp": datetime.utcnow().isoformat(),
+            "payload": {
+                "divisionId": recommendation.get("division_id"),
+                "divisionName": division.get("division_name"),
+                "district": division.get("district"),
+                "hazardType": recommendation.get("hazard_type"),
+                "riskCategory": recommendation.get("risk_category"),
+                "considerationScore": recommendation.get("consideration_score"),
+                "recommendationText": recommendation.get("recommendation_text"),
+                "resourceAllocation": recommendation.get("resource_allocation", {}),
+            },
+        }
+        producer.produce(
+            KAFKA_TOPIC,
+            key=str(recommendation.get("division_id", "")),
+            value=json.dumps(envelope),
+        )
+        producer.flush()
+        return True
+    except Exception as exc:
+        print(f"[kafka] publish_recommendation failed: {exc}")
+        return False
+
+
 KAFKA_TOPIC_ALLOCATION = os.getenv("KAFKA_TOPIC_ALLOCATION", "j2.engine.allocation-plan")
 
 
