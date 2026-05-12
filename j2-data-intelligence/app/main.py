@@ -6,6 +6,7 @@ from app.services.weather_fetcher import fetch_weather_all_divisions
 from app.services.feature_engineering import engineer_features
 from app.services.model_predictor import generate_predictions
 from app.services.event_manager import event_manager
+from app.api.ingest import router as ingest_router
 from apscheduler.schedulers.background import BackgroundScheduler
 import uvicorn
 import logging
@@ -18,6 +19,8 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="J2 Data & Intelligence Microservice")
 
+# Include ingest router
+app.include_router(ingest_router)
 async def handle_data_fetched(start_date: date, end_date: date):
     logger.info(f"DATA_FETCHED event received for date range {start_date} to {end_date}. Running computations...")
     db = SessionLocal()
