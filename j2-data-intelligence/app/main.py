@@ -2,6 +2,7 @@ from fastapi import FastAPI, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 from datetime import date, timedelta
 from app.db.database import Base, engine, get_db, SessionLocal
+from app.models.resource_plan import ResourcePlan  # noqa: F401 — registers table with Base
 from app.services.weather_fetcher import fetch_weather_all_divisions
 from app.services.feature_engineering import engineer_features
 from app.services.model_predictor import generate_predictions

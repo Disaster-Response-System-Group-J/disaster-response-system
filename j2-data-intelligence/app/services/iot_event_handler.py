@@ -36,6 +36,7 @@ import sqlalchemy as sa
 
 from app.db.database import SessionLocal
 from app.services.iot_predictor import predict_flood, predict_landslide
+from app.services.moratuwa_resource_planner import trigger_moratuwa_resource_plan
 
 logger = logging.getLogger(__name__)
 
@@ -198,6 +199,7 @@ def _process_flood_rows(db) -> None:
             depth_prev_0 = float(prev.depth) if (prev and prev.depth is not None) else 0.0
 
             now = datetime.now(timezone.utc)
+            h0_status = "Normal"
 
             for h in HORIZONS:
                 p_temp  = _project_damped(base_temp,  rate_temp,  h)
@@ -206,6 +208,8 @@ def _process_flood_rows(db) -> None:
                 p_dprev = depth_prev_0 if h == 0 else _project_damped(base_depth, rate_depth, h - 1, lo=0.0)
 
                 status = predict_flood(p_temp, p_hum, p_dprev, p_depth)
+                if h == 0:
+                    h0_status = status
 
                 db.execute(_INSERT_SQL, {
                     "id":               str(uuid.uuid4()),
@@ -226,6 +230,8 @@ def _process_flood_rows(db) -> None:
             db.commit()
             logger.info(f"[IoT-Flood] {row.id} capped rates: "
                         f"temp={rate_temp:+.2f} hum={rate_hum:+.2f} depth={rate_depth:+.2f} /day")
+
+            trigger_moratuwa_resource_plan(db, "flood", h0_status)
 
         except Exception as exc:
             db.rollback()
@@ -264,6 +270,7 @@ def _process_landslide_rows(db) -> None:
             gx = float(row.gx or 0.0); gy = float(row.gy or 0.0); gz = float(row.gz or 0.0)
 
             now = datetime.now(timezone.utc)
+            h0_status = "Normal"
 
             for h in HORIZONS:
                 p_temp  = _project_damped(base_temp,  rate_temp,  h)
@@ -271,6 +278,8 @@ def _process_landslide_rows(db) -> None:
                 p_moist = _project_damped(base_moist, rate_moist, h, lo=0.0, hi=4095.0)
 
                 status = predict_landslide(p_temp, p_hum, p_moist, ax, ay, az, gx, gy, gz)
+                if h == 0:
+                    h0_status = status
 
                 db.execute(_INSERT_SQL, {
                     "id":               str(uuid.uuid4()),
@@ -291,6 +300,8 @@ def _process_landslide_rows(db) -> None:
             db.commit()
             logger.info(f"[IoT-Landslide] {row.id} capped rates: "
                         f"temp={rate_temp:+.2f} hum={rate_hum:+.2f} moist={rate_moist:+.2f} /day")
+
+            trigger_moratuwa_resource_plan(db, "landslide", h0_status)
 
         except Exception as exc:
             db.rollback()
