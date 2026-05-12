@@ -32,7 +32,7 @@ RUN npm run build
 FROM node:20.19.2-alpine3.21 AS runner
 
 RUN apk upgrade --no-cache && apk add --no-cache openssl py3-pip \
-    && pip3 install --no-cache-dir --upgrade pip wheel "jaraco.context>=6.1.0"
+    && pip3 install --no-cache-dir --break-system-packages --upgrade pip wheel "jaraco.context>=6.1.0"
 
 WORKDIR /app
 
