@@ -137,7 +137,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Use your computer\'s LAN address so the phone can reach the bridge API on the same Wi-Fi network.',
+                    'For Android emulator use http://10.0.2.2:8000. For a USB-connected phone, either use your PC LAN IP such as http://10.10.20.234:8000, or run adb reverse tcp:8000 tcp:8000 and use http://127.0.0.1:8000.',
                   ),
                   const SizedBox(height: 12),
                   TextField(
@@ -146,13 +146,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     keyboardType: TextInputType.url,
                     decoration: const InputDecoration(
                       labelText: 'Backend API URL',
-                      hintText: 'http://192.168.1.50:8000',
+                      hintText: 'http://127.0.0.1:8000 or http://10.10.20.234:8000',
                       border: OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Default on emulators: ${AppConstants.apiBaseUrl}',
+                    'Default on emulators: ${AppConstants.apiBaseUrl}. USB reverse option: http://127.0.0.1:8000',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   if (_apiUrlError != null) ...[

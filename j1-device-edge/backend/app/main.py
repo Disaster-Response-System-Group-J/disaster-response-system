@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
 from .kafka_producer import kafka_producer
 from .routes import events, health, resources
+from .routes import upload
 
 logging.basicConfig(
     level=logging.INFO,
@@ -62,6 +63,7 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(events.router)
 app.include_router(resources.router)
+app.include_router(upload.router)
 
 
 @app.get("/", tags=["Root"])
