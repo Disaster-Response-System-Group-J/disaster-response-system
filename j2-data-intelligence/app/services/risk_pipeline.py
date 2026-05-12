@@ -4,8 +4,10 @@ from datetime import datetime, timezone
 from typing import Dict, Optional
 
 from sqlalchemy.orm import Session
+import sqlalchemy as sa
 
 from app.db.models import DisasterPrediction, Division, IoTDevice, RawTelemetry
+from app.services.iot_predictor import predict_flood, predict_landslide, label_to_probabilities, label_to_severity_index
 
 SEVERITY_LABELS = ["NORMAL", "MODERATE", "SEVERE", "EXTREME"]
 
@@ -73,81 +75,100 @@ def store_raw_telemetry(
     return reading
 
 
-def _risk_score(hazard: str, payload: Dict[str, float], features: Optional[Dict[str, float]] = None) -> float:
+def _get_prev_flood_depth(db: Session, current_telemetry_id: int) -> float:
+    """Look up the depth from the raw_telemetry row immediately before this one."""
+    row = db.execute(sa.text("""
+        SELECT depth FROM raw_telemetry
+        WHERE hazard_type = 'FLOOD'
+          AND depth IS NOT NULL
+          AND telemetry_id < :current_id
+        ORDER BY telemetry_id DESC
+        LIMIT 1
+    """), {"current_id": current_telemetry_id}).fetchone()
+    return float(row.depth) if row and row.depth is not None else 0.0
+
+
+def _drought_heuristic_score(payload: Dict, spi: float = 0.0) -> float:
+    """Simple heuristic for drought (no IoT-specific model available)."""
     temp = float(payload.get("temp") or 0.0)
-    hum = float(payload.get("hum") or 0.0)
-    depth = float(payload.get("depth") or 0.0)
-    moist = float(payload.get("moist") or 0.0)
-    ax = float(payload.get("ax") or 0.0)
-    ay = float(payload.get("ay") or 0.0)
-    az = float(payload.get("az") or 0.0)
-
+    hum  = float(payload.get("hum")  or 0.0)
     temp_norm = _clamp((temp - 10.0) / 30.0)
-    hum_norm = _clamp(hum / 100.0)
-    features = features or {}
-    rain_lag_1 = float(features.get("rain_lag_1") or 0.0)
-    rain_rolling_3d = float(features.get("rain_rolling_3d") or 0.0)
-    rain_rolling_7d = float(features.get("rain_rolling_7d") or 0.0)
-    spi = float(features.get("spi") or 0.0)
-    level_difference = float(features.get("level_difference") or 0.0)
-
-    hazard = hazard.upper()
-    if hazard == "FLOOD":
-        depth_norm = _clamp(depth / 2.0)
-        rolling_norm = _clamp((rain_rolling_3d + rain_rolling_7d) / 30.0)
-        spike_norm = _clamp(abs(level_difference) / 3.0)
-        spi_norm = _clamp(abs(spi) / 3.0)
-        return _clamp(0.45 * depth_norm + 0.20 * hum_norm + 0.15 * rolling_norm + 0.10 * spike_norm + 0.10 * spi_norm)
-
-    if hazard == "LANDSLIDE":
-        moist_norm = _clamp(moist / 1023.0)
-        accel = math.sqrt(ax * ax + ay * ay + az * az)
-        accel_delta_norm = _clamp(abs(accel - 9.81) / 5.0)
-        return _clamp(0.50 * moist_norm + 0.25 * accel_delta_norm + 0.15 * hum_norm + 0.10 * _clamp(abs(spi) / 3.0))
-
-    if hazard == "DROUGHT":
-        dry_air = 1.0 - hum_norm
-        return _clamp(0.45 * temp_norm + 0.35 * dry_air + 0.20 * _clamp(abs(spi) / 3.0))
-
-    return 0.5
+    hum_norm  = _clamp(hum / 100.0)
+    dry_air   = 1.0 - hum_norm
+    spi_norm  = _clamp(abs(spi) / 3.0)
+    return _clamp(0.45 * temp_norm + 0.35 * dry_air + 0.20 * spi_norm)
 
 
-def _risk_to_class_probabilities(score: float) -> Dict[str, float]:
-    centers = {
-        "NORMAL": 0.10,
-        "MODERATE": 0.35,
-        "SEVERE": 0.65,
-        "EXTREME": 0.90,
-    }
+def _score_to_probs(score: float) -> Dict[str, float]:
+    centers = {"NORMAL": 0.10, "MODERATE": 0.35, "SEVERE": 0.65, "EXTREME": 0.90}
     sigma = 0.18
-
-    weights: Dict[str, float] = {}
-    for label, center in centers.items():
-        exponent = -((score - center) ** 2) / (2 * sigma * sigma)
-        weights[label] = math.exp(exponent)
-
+    weights = {k: math.exp(-((score - c) ** 2) / (2 * sigma * sigma)) for k, c in centers.items()}
     total = sum(weights.values()) or 1.0
-    return {label: value / total for label, value in weights.items()}
+    return {k: v / total for k, v in weights.items()}
 
 
-def create_prediction(db: Session, *, division: Division, hazard_type: str, payload: Dict[str, float], features: Optional[Dict[str, float]] = None) -> DisasterPrediction:
-    score = _risk_score(hazard_type, payload, features)
-    probs = _risk_to_class_probabilities(score)
-    top_label = max(probs, key=probs.get)
+def create_prediction(
+    db: Session,
+    *,
+    division: Division,
+    hazard_type: str,
+    payload: Dict[str, float],
+    features: Optional[Dict[str, float]] = None,
+    telemetry: Optional[RawTelemetry] = None,
+) -> DisasterPrediction:
+    hazard = hazard_type.upper()
+    now = datetime.now(timezone.utc)
+
+    if hazard == "FLOOD":
+        depth_prev = _get_prev_flood_depth(db, telemetry.telemetry_id) if telemetry else 0.0
+        label = predict_flood(
+            temp=float(payload.get("temp") or 0.0),
+            hum=float(payload.get("hum") or 0.0),
+            depth_prev=depth_prev,
+            depth=float(payload.get("depth") or 0.0),
+        )
+        probs = label_to_probabilities(label)
+        severity_idx = label_to_severity_index(label)
+        severity_label = label.upper()
+
+    elif hazard == "LANDSLIDE":
+        label = predict_landslide(
+            temp=float(payload.get("temp")  or 0.0),
+            hum=float(payload.get("hum")    or 0.0),
+            moist=float(payload.get("moist") or 0.0),
+            ax=float(payload.get("ax") or 0.0),
+            ay=float(payload.get("ay") or 0.0),
+            az=float(payload.get("az") or 0.0),
+            gx=float(payload.get("gx") or 0.0),
+            gy=float(payload.get("gy") or 0.0),
+            gz=float(payload.get("gz") or 0.0),
+        )
+        probs = label_to_probabilities(label)
+        severity_idx = label_to_severity_index(label)
+        severity_label = label.upper()
+
+    else:
+        # DROUGHT — use heuristic (no IoT sensor model trained for drought)
+        score = _drought_heuristic_score(payload, spi=float((features or {}).get("spi") or 0.0))
+        raw_probs = _score_to_probs(score)
+        probs = {k.lower(): v for k, v in raw_probs.items()}
+        top_label = max(raw_probs, key=raw_probs.get)
+        severity_idx = SEVERITY_LABELS.index(top_label)
+        severity_label = top_label
 
     prediction = DisasterPrediction(
         division_id=division.division_id,
-        feature_date=datetime.now(timezone.utc).date(),
-        predicted_for_date=datetime.now(timezone.utc).date(),
+        feature_date=now.date(),
+        predicted_for_date=now.date(),
         horizon=1,
-        hazard_type=hazard_type.upper(),
-        prob_normal=probs["NORMAL"],
-        prob_moderate=probs["MODERATE"],
-        prob_severe=probs["SEVERE"],
-        prob_extreme=probs["EXTREME"],
-        predicted_severity=SEVERITY_LABELS.index(top_label),
-        predicted_severity_label=top_label,
-        run_at=datetime.now(timezone.utc),
+        hazard_type=hazard,
+        prob_normal=probs.get("normal", 0.0),
+        prob_moderate=probs.get("moderate", 0.0),
+        prob_severe=probs.get("severe", 0.0),
+        prob_extreme=probs.get("extreme", 0.0),
+        predicted_severity=severity_idx,
+        predicted_severity_label=severity_label,
+        run_at=now,
     )
     db.add(prediction)
     db.flush()

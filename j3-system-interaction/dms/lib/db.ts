@@ -1,6 +1,9 @@
+import dns from 'dns';
 import { Pool } from 'pg';
 import sqlite3 from 'sqlite3';
 import path from 'path';
+
+dns.setDefaultResultOrder('ipv4first');
 
 // ==========================================
 // 1. SUPABASE POSTGRESQL CONNECTION

@@ -1,11 +1,16 @@
 import sys
 from unittest.mock import MagicMock
 
-# Mock only missing web and db dependencies
+# Mock all heavy/external dependencies before any app imports
 for mod in [
-    'fastapi', 'sqlalchemy', 'sqlalchemy.orm', 'sqlalchemy.dialects', 'sqlalchemy.dialects.postgresql',
+    'fastapi', 'fastapi.routing',
+    'sqlalchemy', 'sqlalchemy.orm', 'sqlalchemy.dialects', 'sqlalchemy.dialects.postgresql',
+    'sqlalchemy.ext', 'sqlalchemy.ext.declarative',
     'apscheduler', 'apscheduler.schedulers', 'apscheduler.schedulers.background',
-    'uvicorn', 'httpx', 'confluent_kafka'
+    'uvicorn', 'httpx', 'confluent_kafka',
+    'google', 'google.genai', 'google.genai.types',
+    # Mock API route modules to avoid annotation evaluation issues with mocked SQLAlchemy
+    'app.api.routes', 'app.api.agent_routes',
 ]:
     sys.modules[mod] = MagicMock()
 
