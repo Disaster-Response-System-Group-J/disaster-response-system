@@ -10,7 +10,7 @@ RUN apt-get update && apt-get upgrade -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip wheel && \
+RUN pip install --no-cache-dir --upgrade pip wheel setuptools && \
     pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 
@@ -25,6 +25,7 @@ RUN apt-get update && apt-get upgrade -y --no-install-recommends \
         libgomp1 \
         curl \
     && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir --upgrade pip wheel setuptools \
     && useradd -r --no-create-home -u 1000 appuser
 
 WORKDIR /app

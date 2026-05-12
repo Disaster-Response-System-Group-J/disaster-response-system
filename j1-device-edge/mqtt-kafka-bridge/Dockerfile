@@ -11,7 +11,7 @@ RUN pip install --no-cache-dir --upgrade pip wheel && \
 
 FROM python:3.11-alpine
 
-RUN apk upgrade --no-cache
+RUN apk upgrade --no-cache && pip install --no-cache-dir --upgrade pip wheel
 
 WORKDIR /app
 
