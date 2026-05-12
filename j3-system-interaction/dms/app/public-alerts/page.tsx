@@ -1,12 +1,11 @@
 'use client';
 
-import Link from 'next/link';
-import { Shield, AlertTriangle, ArrowLeft, Waves, Mountain, Clock, MapPin } from 'lucide-react';
-import { MOCK_ALERTS } from '@/data/mock-data';
-import { IncidentSeverity } from '@/types';
-import { normalizeRiskAlert } from '@/lib/risk-alert';
 import { useState, useEffect } from 'react';
 import { useSocket } from '@/context/SocketContext';
+import Link from 'next/link';
+import { Shield, AlertTriangle, ArrowLeft, Waves, Mountain, Clock, MapPin } from 'lucide-react';
+import { IncidentSeverity } from '@/types';
+import { normalizeRiskAlert } from '@/lib/risk-alert';
 
 const SEVERITY_STYLES: Record<string, string> = {
   CRITICAL: 'bg-red-500/10 border-red-500/30 text-red-400',
@@ -17,12 +16,34 @@ const SEVERITY_STYLES: Record<string, string> = {
 
 export default function PublicAlertsPage() {
   const socket = useSocket();
-  const [alerts, setAlerts] = useState(MOCK_ALERTS.filter(a => a.isPublic && a.isActive));
+  const [alerts, setAlerts] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
+  // Fetch initial public alerts from the database via API
+  useEffect(() => {
+    const fetchAlerts = async () => {
+      try {
+        const response = await fetch('/api/alerts');
+        if (!response.ok) throw new Error('Failed to fetch alerts');
+        const data = await response.json();
+        // Filter to only public + active alerts
+        const publicAlerts = (data as any[])
+          .map(normalizeRiskAlert)
+          .filter((a: any) => a.isPublic && a.isActive);
+        setAlerts(publicAlerts);
+      } catch (err) {
+        console.error('Error fetching public alerts:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchAlerts();
+  }, []);
+
+  // Listen for real-time risk alerts pushed via Socket.IO
   useEffect(() => {
     if (!socket) return;
 
-    // Listen for new risk alerts from Kafka
     const handleNewAlert = (incoming: any) => {
       const normalized = normalizeRiskAlert(incoming) as any;
       // Only add if public
@@ -65,7 +86,11 @@ export default function PublicAlertsPage() {
           </div>
         </div>
 
-        {publicAlerts.length === 0 ? (
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+          </div>
+        ) : publicAlerts.length === 0 ? (
           <div className="text-center py-20 text-slate-500">
             <AlertTriangle size={32} className="mx-auto mb-4 opacity-50" />
             <p className="text-sm font-medium">No active public alerts at this time.</p>
@@ -138,7 +163,7 @@ export default function PublicAlertsPage() {
                         <div className="text-[8px] text-green-400 mt-0.5">{alert.resourceSummary.overall.available} available</div>
                       </div>
                       {/* By Type */}
-                      {Object.entries(alert.resourceSummary.by_type).map(([type, counts]) => (
+                      {Object.entries(alert.resourceSummary.by_type).map(([type, counts]: [string, any]) => (
                         <div key={type} className="p-2 rounded bg-slate-800/20 border border-slate-700/30">
                           <div className="text-[8px] text-slate-400 uppercase tracking-wide truncate">{type.replace(/_/g, ' ')}</div>
                           <div className="flex items-center justify-between mt-1">
@@ -146,7 +171,7 @@ export default function PublicAlertsPage() {
                             <div className="text-[10px] text-teal-400 font-bold">{counts.available}</div>
                           </div>
                           <div className="w-full h-1 bg-slate-700 rounded-full mt-1 overflow-hidden">
-                            <div className="h-full bg-teal-500" style={{width: `${(counts.available / counts.total) * 100}%`}} />
+                            <div className="h-full bg-teal-500" style={{ width: `${(counts.available / counts.total) * 100}%` }} />
                           </div>
                         </div>
                       ))}
@@ -159,7 +184,7 @@ export default function PublicAlertsPage() {
                   <div className="mt-3 pt-3 border-t border-slate-800/50">
                     <div className="text-[10px] font-bold text-slate-400 tracking-widest uppercase mb-2">Scenario Probabilities</div>
                     <div className="space-y-1.5">
-                      {Object.entries(alert.probabilities).map(([key, prob]) => (
+                      {Object.entries(alert.probabilities).map(([key, prob]: [string, any]) => (
                         <div key={key} className="flex items-center gap-2">
                           <div className="w-20 text-[9px] font-semibold text-slate-400 uppercase tracking-wider">{key}</div>
                           <div className="flex-1 h-2 bg-slate-700/50 rounded-full overflow-hidden">

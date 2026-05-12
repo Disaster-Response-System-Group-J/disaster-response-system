@@ -16,6 +16,7 @@ class KafkaClientStub {
     RAW_SOS_REPORTS: 'j1.sos.raw-reports',
     RISK_ALERTS: 'j2.engine.risk-alerts',
     RESOURCE_REC: 'j2.engine.resource-recommendations',
+    RESOURCE_PLANS: 'j2.engine.resource-plans',
   };
 
   // Topics J3 needs to produce to
@@ -23,7 +24,11 @@ class KafkaClientStub {
     RAW_PUBLIC_REPORTS: 'j3.portal.raw-reports',
     INCIDENT_UPDATES: 'j3.dashboard.incident-updates',
     RESOURCE_UPDATES: 'j3.dashboard.resource-updates',
+    RESOURCE_PLAN_REQUEST: 'j3.dashboard.resource-plan-request',
   };
+
+  // Topics J3 needs to consume (additions)
+  // j2.engine.resource-plans — J2 responds with the completed allocation plan
 
   /**
    * Subscribe to a Kafka topic

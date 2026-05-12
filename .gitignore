@@ -56,9 +56,18 @@ secrets/
 
 **/secrets.yaml
 
+# Terraform — never commit token files or local state
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/terraform.tfvars
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+
 # Kubernetes sensitive files
 *kubeconfig*
 *.kubeconfig
 kube/config
 ~/.kube/
 k8s/secrets.yaml
+
+.claude/
