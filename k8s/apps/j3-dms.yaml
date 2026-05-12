@@ -59,9 +59,19 @@ spec:
             limits:
               cpu: 100m
               memory: 64Mi
+        - name: wait-for-event-bridge
+          image: busybox:1.37
+          command: ["sh", "-c", "until nc -w1 j3-event-bridge 3001 >/dev/null 2>&1; do echo 'waiting for j3-event-bridge...'; sleep 3; done"]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
       containers:
         - name: j3-dms
-          image: dehanns/disaster-j3-dms:v1.0
+          image: dehanns/disaster-j3-dms:v1.6
           imagePullPolicy: Always
           ports:
             - containerPort: 3000
@@ -114,7 +124,7 @@ metadata:
   name: j3-dms
   namespace: disaster-response
 spec:
-  type: ClusterIP
+  type: LoadBalancer
   selector:
     app: j3-dms
   ports:

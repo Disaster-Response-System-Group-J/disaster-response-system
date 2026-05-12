@@ -1,0 +1,13 @@
+# Shared volume for the contract address file.
+# Startup order: this PVC must be Bound before the deployer Job or audit-api can start.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: deployment-data
+  namespace: disaster-response
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Mi

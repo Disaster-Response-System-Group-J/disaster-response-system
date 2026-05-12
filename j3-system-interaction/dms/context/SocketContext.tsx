@@ -9,7 +9,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
   const [socket, setSocket] = useState<Socket | null>(null);
 
   useEffect(() => {
-    const socketInstance = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001');
+    const socketInstance = io({ path: '/socket.io' });
     setSocket(socketInstance);
     return () => { socketInstance.disconnect(); };
   }, []);
