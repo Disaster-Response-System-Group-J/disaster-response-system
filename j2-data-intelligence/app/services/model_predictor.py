@@ -1,10 +1,12 @@
 import os
+import __main__
 import joblib
 import numpy as np
 import pandas as pd
 from sqlalchemy.orm import Session
 from sqlalchemy.dialects.postgresql import insert
-from app.db.models import Predictions, Division
+from app.db.models import Predictions, Division, Resource
+from app.services.kafka_producer import publish_predictions
 
 class SoftVotingEnsemble:
     def __init__(self, xgb_model, lgbm_model, n_classes=4):
@@ -28,6 +30,10 @@ class SoftVotingEnsemble:
 MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "models")
 _models = {}
 
+# Some trained artifacts reference SoftVotingEnsemble as __main__.SoftVotingEnsemble.
+# Register it here so joblib can unpickle those models when running under uvicorn.
+setattr(__main__, "SoftVotingEnsemble", SoftVotingEnsemble)
+
 def load_models():
     if not _models:
         for hazard in ["Flood", "Landslide", "Drought"]:
@@ -40,11 +46,49 @@ def load_models():
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
 
+
+def _summarize_resources(db: Session, district: str):
+    if not district:
+        return None
+
+    resources = db.query(Resource).filter(Resource.district == district).all()
+    if not resources:
+        return {
+            "district": district,
+            "totalResources": 0,
+            "availableResources": 0,
+            "resourceByType": {},
+            "resourceByStatus": {},
+        }
+
+    resource_by_type = {}
+    resource_by_status = {}
+    available_resources = 0
+
+    for resource in resources:
+        resource_type = resource.type or "UNKNOWN"
+        resource_status = resource.status or "UNKNOWN"
+
+        resource_by_type[resource_type] = resource_by_type.get(resource_type, 0) + 1
+        resource_by_status[resource_status] = resource_by_status.get(resource_status, 0) + 1
+        if str(resource_status).upper() == "AVAILABLE":
+            available_resources += 1
+
+    return {
+        "district": district,
+        "totalResources": len(resources),
+        "availableResources": available_resources,
+        "resourceByType": resource_by_type,
+        "resourceByStatus": resource_by_status,
+    }
+
 def generate_predictions(df_features: pd.DataFrame, db: Session):
     load_models()
     
     if df_features.empty:
         return []
+
+    df_features = df_features.reset_index(drop=True)
 
     FEATURES = [
         'rain_sum', 'temperature_2m_mean',
@@ -82,11 +126,22 @@ def generate_predictions(df_features: pd.DataFrame, db: Session):
     
     for i, row in df_features.iterrows():
         div_id = int(row['division_id'])
+        district = row.get("district") or row.get("division_name")
         date_val = row['date']
         
         p_flood = float(crisis_probs["Flood"][i])
         p_landslide = float(crisis_probs["Landslide"][i])
         p_drought = float(crisis_probs["Drought"][i])
+
+        hazard_probs = {
+            "Flood": p_flood,
+            "Landslide": p_landslide,
+            "Drought": p_drought,
+        }
+        dominant_hazard = max(hazard_probs, key=hazard_probs.get)
+        dominant_hazard_probability = hazard_probs[dominant_hazard]
+
+        resource_summary = _summarize_resources(db, district)
         
         # Multi-hazard composite
         p_composite = 0.40 * p_flood + 0.35 * p_landslide + 0.25 * p_drought
@@ -123,12 +178,21 @@ def generate_predictions(df_features: pd.DataFrame, db: Session):
         
         results.append({
             "division_id": div_id,
+            "division_name": row.get("division_name"),
+            "district": district,
             "date": date_val,
             "flood": p_flood,
             "landslide": p_landslide,
             "drought": p_drought,
-            "consideration_score": s_consideration
+            "dominant_hazard": dominant_hazard,
+            "dominant_hazard_probability": dominant_hazard_probability,
+            "consideration_score": s_consideration,
+            "resource_summary": resource_summary,
         })
         
     db.commit()
+    try:
+        publish_predictions(results)
+    except Exception as exc:
+        print(f"Warning: failed to publish predictions to Kafka: {exc}")
     return results

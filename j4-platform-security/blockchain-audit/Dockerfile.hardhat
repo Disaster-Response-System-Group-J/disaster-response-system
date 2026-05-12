@@ -1,7 +1,42 @@
-FROM node:22-alpine
+FROM node:22-alpine AS builder
+
+RUN apk add --no-cache python3 make g++
+
 WORKDIR /app
+
 COPY package.json package-lock.json ./
 RUN npm ci
+
 COPY . .
+RUN npx hardhat compile
+
+RUN rm -rf \
+    node_modules/forge-std \
+    node_modules/mocha \
+    node_modules/@types \
+    contracts \
+    test \
+    ignition
+
+
+FROM node:22-alpine AS runner
+
+WORKDIR /app
+
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/artifacts   ./artifacts
+COPY package.json hardhat.config.ts  ./
+
+RUN chown -R node:node /app
+
+USER node
+
 EXPOSE 8545
+
+HEALTHCHECK --interval=5s --timeout=5s --start-period=30s --retries=10 \
+    CMD wget -qO- \
+        --post-data='{"jsonrpc":"2.0","method":"net_version","id":1}' \
+        --header='Content-Type: application/json' \
+        http://127.0.0.1:8545 > /dev/null || exit 1
+
 CMD ["npx", "hardhat", "node", "--hostname", "0.0.0.0"]

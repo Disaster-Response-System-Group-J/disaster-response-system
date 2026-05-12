@@ -1,0 +1,54 @@
+# Startup order: PVC must exist → hardhat-node Service ready (init container polls) → deployer runs once
+# The deployer writes /deployment/audit-contract-address.txt; audit-api reads it on startup.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: deploy-audit-contract
+  namespace: disaster-response
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      securityContext:
+        fsGroup: 1000
+      initContainers:
+        # Block until hardhat-node is accepting JSON-RPC requests before deploying.
+        - name: wait-for-hardhat
+          image: busybox:1.37
+          command:
+            - sh
+            - -c
+            - |
+              until wget -qO- \
+                --post-data='{"jsonrpc":"2.0","method":"net_version","id":1}' \
+                --header='Content-Type: application/json' \
+                http://hardhat-node:8545 > /dev/null 2>&1; do
+                echo 'waiting for hardhat-node...'
+                sleep 3
+              done
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+      containers:
+        - name: deployer
+          image: dehanns/disaster-audit-deployer:v1.0
+          imagePullPolicy: Always
+          volumeMounts:
+            - name: deployment-data
+              mountPath: /deployment
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+      volumes:
+        - name: deployment-data
+          persistentVolumeClaim:
+            claimName: deployment-data

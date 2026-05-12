@@ -4,6 +4,9 @@ import Link from 'next/link';
 import { Shield, AlertTriangle, ArrowLeft, Waves, Mountain, Clock, MapPin } from 'lucide-react';
 import { MOCK_ALERTS } from '@/data/mock-data';
 import { IncidentSeverity } from '@/types';
+import { normalizeRiskAlert } from '@/lib/risk-alert';
+import { useState, useEffect } from 'react';
+import { useSocket } from '@/context/SocketContext';
 
 const SEVERITY_STYLES: Record<string, string> = {
   CRITICAL: 'bg-red-500/10 border-red-500/30 text-red-400',
@@ -13,7 +16,29 @@ const SEVERITY_STYLES: Record<string, string> = {
 };
 
 export default function PublicAlertsPage() {
-  const publicAlerts = MOCK_ALERTS.filter(a => a.isPublic && a.isActive);
+  const socket = useSocket();
+  const [alerts, setAlerts] = useState(MOCK_ALERTS.filter(a => a.isPublic && a.isActive));
+
+  useEffect(() => {
+    if (!socket) return;
+
+    // Listen for new risk alerts from Kafka
+    const handleNewAlert = (incoming: any) => {
+      const normalized = normalizeRiskAlert(incoming) as any;
+      // Only add if public
+      if (normalized.isPublic) {
+        setAlerts((prev) => [normalized, ...prev]);
+      }
+    };
+
+    socket.on('dashboard:risk-alert', handleNewAlert);
+
+    return () => {
+      socket.off('dashboard:risk-alert', handleNewAlert);
+    };
+  }, [socket]);
+
+  const publicAlerts = alerts;
 
   return (
     <div className="min-h-screen bg-[#0a0f16] text-white font-sans">
@@ -70,7 +95,92 @@ export default function PublicAlertsPage() {
                   </span>
                 </div>
                 <p className="text-sm text-slate-300 leading-relaxed">{alert.description}</p>
-                {alert.source && <p className="text-[10px] text-slate-500 mt-3">Source: {alert.source}</p>}
+
+                {/* AI Prediction & Confidence Metrics */}
+                {(alert.predictionProbability !== undefined || alert.considerationScore !== undefined || alert.resourcePressure !== undefined) && (
+                  <div className="mt-4 pt-4 border-t border-slate-800/50 grid grid-cols-3 gap-4">
+                    {/* Prediction Probability */}
+                    {alert.predictionProbability !== undefined && (
+                      <div className="flex flex-col items-center justify-center p-3 rounded-lg bg-blue-500/5 border border-blue-500/20">
+                        <div className="text-[9px] font-bold text-slate-500 tracking-widest uppercase mb-1">Prediction Probability</div>
+                        <div className="text-xl font-bold text-blue-400">{(alert.predictionProbability * 100).toFixed(0)}%</div>
+                        <div className="text-[8px] text-slate-600 mt-1">AI Confidence</div>
+                      </div>
+                    )}
+                    {/* Consideration Score */}
+                    {alert.considerationScore !== undefined && (
+                      <div className="flex flex-col items-center justify-center p-3 rounded-lg bg-cyan-500/5 border border-cyan-500/20">
+                        <div className="text-[9px] font-bold text-slate-500 tracking-widest uppercase mb-1">Consideration Score</div>
+                        <div className="text-xl font-bold text-cyan-400">{(alert.considerationScore * 100).toFixed(0)}%</div>
+                        <div className="text-[8px] text-slate-600 mt-1">Decision Support</div>
+                      </div>
+                    )}
+                    {/* Resource Pressure */}
+                    {alert.resourcePressure !== undefined && (
+                      <div className="flex flex-col items-center justify-center p-3 rounded-lg bg-orange-500/5 border border-orange-500/20">
+                        <div className="text-[9px] font-bold text-slate-500 tracking-widest uppercase mb-1">Resource Pressure</div>
+                        <div className="text-xl font-bold text-orange-400">{(alert.resourcePressure * 100).toFixed(0)}%</div>
+                        <div className="text-[8px] text-slate-600 mt-1">District Strain</div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Resource Summary Breakdown */}
+                {alert.resourceSummary && (
+                  <div className="mt-4 pt-4 border-t border-slate-800/50">
+                    <div className="text-[10px] font-bold text-slate-400 tracking-widest uppercase mb-2">District Resources</div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+                      {/* Overall Summary */}
+                      <div className="p-2 rounded bg-slate-800/30 border border-slate-700/50">
+                        <div className="text-[8px] text-slate-500 uppercase tracking-wide">Total Resources</div>
+                        <div className="text-sm font-bold text-white mt-1">{alert.resourceSummary.overall.total}</div>
+                        <div className="text-[8px] text-green-400 mt-0.5">{alert.resourceSummary.overall.available} available</div>
+                      </div>
+                      {/* By Type */}
+                      {Object.entries(alert.resourceSummary.by_type).map(([type, counts]) => (
+                        <div key={type} className="p-2 rounded bg-slate-800/20 border border-slate-700/30">
+                          <div className="text-[8px] text-slate-400 uppercase tracking-wide truncate">{type.replace(/_/g, ' ')}</div>
+                          <div className="flex items-center justify-between mt-1">
+                            <div className="text-xs font-semibold text-white">{counts.total}</div>
+                            <div className="text-[10px] text-teal-400 font-bold">{counts.available}</div>
+                          </div>
+                          <div className="w-full h-1 bg-slate-700 rounded-full mt-1 overflow-hidden">
+                            <div className="h-full bg-teal-500" style={{width: `${(counts.available / counts.total) * 100}%`}} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Probability Distribution */}
+                {alert.probabilities && Object.keys(alert.probabilities).length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-slate-800/50">
+                    <div className="text-[10px] font-bold text-slate-400 tracking-widest uppercase mb-2">Scenario Probabilities</div>
+                    <div className="space-y-1.5">
+                      {Object.entries(alert.probabilities).map(([key, prob]) => (
+                        <div key={key} className="flex items-center gap-2">
+                          <div className="w-20 text-[9px] font-semibold text-slate-400 uppercase tracking-wider">{key}</div>
+                          <div className="flex-1 h-2 bg-slate-700/50 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full flex items-center justify-end pr-1" style={{
+                              width: `${prob * 100}%`,
+                              background: key === 'EXTREME' ? '#ef4444' : key === 'SEVERE' ? '#f97316' : key === 'MODERATE' ? '#eab308' : '#3b82f6'
+                            }} />
+                          </div>
+                          <div className="w-10 text-right text-[9px] font-bold text-white">{(prob * 100).toFixed(1)}%</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="mt-4 pt-3 border-t border-slate-800/50 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {alert.source && <p className="text-[10px] text-slate-500"><span className="font-bold text-slate-400">Source:</span> {alert.source}</p>}
+                  </div>
+                  {alert.predictionCategory && <span className="text-[9px] font-bold px-2 py-1 bg-slate-800/50 text-slate-300 rounded uppercase tracking-wider">{alert.predictionCategory}</span>}
+                </div>
               </div>
             ))}
           </div>

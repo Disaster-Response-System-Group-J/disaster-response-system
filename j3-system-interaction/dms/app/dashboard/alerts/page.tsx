@@ -8,6 +8,7 @@ import { DISTRICT_NAMES } from '@/data/districts';
 import { useSocket } from '@/context/SocketContext';
 import { useAuth } from '@/context/AuthContext';
 import { UserRole } from '@/types';
+import { normalizeRiskAlert } from '@/lib/risk-alert';
 
 const SEVERITY_STYLES: Record<string, string> = {
   CRITICAL: 'bg-red-500/10 text-red-400 border-red-500/30',
@@ -30,7 +31,7 @@ type Alert = typeof MOCK_ALERTS[0];
 export default function AlertsPage() {
   const socket = useSocket();
   const { user, hasPermission } = useAuth();
-  const [alerts, setAlerts] = useState<Alert[]>(MOCK_ALERTS);
+  const [alerts, setAlerts] = useState<Alert[]>(MOCK_ALERTS.map((alert) => normalizeRiskAlert(alert)) as Alert[]);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
@@ -49,8 +50,8 @@ export default function AlertsPage() {
   useEffect(() => {
     if (!socket) return;
 
-    const handleNewAlert = (newAlert: Alert) => {
-      setAlerts((prevAlerts) => [newAlert, ...prevAlerts]);
+    const handleNewAlert = (incoming: any) => {
+      setAlerts((prevAlerts) => [normalizeRiskAlert(incoming) as Alert, ...prevAlerts]);
     };
 
     socket.on('dashboard:risk-alert', handleNewAlert);
@@ -180,6 +181,14 @@ const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.inc
                 </div>
               </div>
               <p className="text-sm text-slate-300 leading-relaxed ml-16">{alert.description}</p>
+              {(alert.predictionCategory || alert.considerationScore !== undefined) && (
+                <div className="ml-16 mt-3 flex flex-wrap gap-2 text-[10px] font-bold tracking-widest text-slate-400">
+                  {alert.predictionCategory && <span className="px-2 py-1 rounded bg-slate-800 border border-slate-700">CATEGORY {alert.predictionCategory}</span>}
+                  {alert.predictionProbability !== undefined && <span className="px-2 py-1 rounded bg-slate-800 border border-slate-700">PROB {alert.predictionProbability.toFixed(3)}</span>}
+                  {alert.considerationScore !== undefined && <span className="px-2 py-1 rounded bg-slate-800 border border-slate-700">SCORE {alert.considerationScore.toFixed(3)}</span>}
+                  {alert.topProbabilityKey && <span className="px-2 py-1 rounded bg-slate-800 border border-slate-700">TOP {alert.topProbabilityKey}</span>}
+                </div>
+              )}
               <div className="mt-4 pt-4 border-t border-slate-800/50 flex justify-between items-center ml-16">
                 <div className="text-[10px] font-bold text-slate-500 tracking-widest">
                   SOURCE: <span className="text-slate-400">{alert.source || 'SYSTEM'}</span>

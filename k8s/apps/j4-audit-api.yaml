@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: j4-audit-api
+  namespace: disaster-response
+  labels:
+    app: j4-audit-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: j4-audit-api
+  template:
+    metadata:
+      labels:
+        app: j4-audit-api
+    spec:
+      containers:
+        - name: j4-audit-api
+          image: dehanns/disaster-j4-audit-api:v1.0
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8084
+          env:
+            - name: PORT
+              value: "8084"
+            - name: BLOCKCHAIN_RPC_URL
+              value: "http://hardhat-node:8545"
+            - name: AUDIT_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: disaster-secrets
+                  key: AUDIT_PRIVATE_KEY
+            # No AUDIT_CONTRACT_ADDRESS set; env.ts falls back to /deployment/audit-contract-address.txt
+            # written by the deploy-audit-contract Job once hardhat-node is ready.
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8084
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8084
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          volumeMounts:
+            - name: deployment
+              mountPath: /deployment
+      volumes:
+        # Startup order: PVC Bound → hardhat-node ready → deploy-audit-contract Job writes address → audit-api reads it here.
+        - name: deployment
+          persistentVolumeClaim:
+            claimName: deployment-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: j4-audit-api
+  namespace: disaster-response
+spec:
+  type: ClusterIP
+  selector:
+    app: j4-audit-api
+  ports:
+    - port: 8084
+      targetPort: 8084

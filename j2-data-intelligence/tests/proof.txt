@@ -1,0 +1,13 @@
+INFO:app.services.event_manager:Subscribed to event: DATA_FETCHED
+INFO:app.services.event_manager:Emitting event: DATA_FETCHED to 1 listeners
+INFO:app.main:DATA_FETCHED event received for date range 2026-05-07 to 2026-05-10. Running computations...
+INFO:app.main:Engineering features for 3-day forecast...
+INFO:app.main:Running model predictions...
+ERROR:app.main:Error in automated pipeline: Mock object has no attribute 'division_id'
+--- Starting Pipeline Test ---
+[TEST] Emitting DATA_FETCHED event for 2026-05-07 to 2026-05-10
+
+--- Verifying Pipeline Execution ---
+✅ Feature Engineering: Successfully queried database and computed features with Pandas.
+✅ Model Prediction: Successfully loaded models and executed SoftVotingEnsemble.
+❌ Kafka Producer: Failed to publish to Kafka. Check consideration score thresholds.

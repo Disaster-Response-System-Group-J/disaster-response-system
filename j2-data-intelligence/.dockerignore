@@ -1,0 +1,11 @@
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+tests/
+.env
+.env.*
+.git
+*.log
+README.md
+Model Training and Validation/

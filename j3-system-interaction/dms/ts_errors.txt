@@ -1,0 +1,8 @@
+app/api/weather/fetch/route.ts(8,52): error TS2307: Cannot find module '@/lib/weather-scheduler' or its corresponding type declarations.
+app/api/weather/scheduler/route.ts(14,8): error TS2307: Cannot find module '@/lib/weather-scheduler' or its corresponding type declarations.
+app/api/weather/scheduler/route.ts(83,55): error TS7006: Parameter 'error' implicitly has an 'any' type.
+lib/forecast-fetch.ts(11,8): error TS2307: Cannot find module './openmeteo' or its corresponding type declarations.
+scripts/fetch-weather.ts(1,52): error TS2307: Cannot find module '../lib/weather-scheduler' or its corresponding type declarations.
+scripts/update-division-population.ts(21,13): error TS2349: This expression is not callable.
+  Type '{ default: (optionsOrHeaders?: readonly string[] | Options | undefined) => Transform; }' has no call signatures.
+scripts/update-division-population.ts(33,21): error TS7006: Parameter 'error' implicitly has an 'any' type.

@@ -7,7 +7,8 @@ datasource db {
 }
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
 }
 
 // ------------------------------------------------------
@@ -23,7 +24,7 @@ model User {
   reviewedReports IncomingReport[] @relation("ReviewedBy")
 }
 
-eenum Role {
+enum Role {
   PUBLIC_USER
   INCIDENT_COMMANDER_NATIONAL
   INCIDENT_COMMANDER_ZONAL
@@ -300,6 +301,7 @@ model ComputedFeatures {
   monthCos        Float?   @map("month_cos")
   spi             Float?
   divisionEncoded Int?     @map("division_encoded")
+  levelDifference Float?   @map("level_difference")
 
   division Division @relation(fields: [divisionId], references: [divisionId])
 

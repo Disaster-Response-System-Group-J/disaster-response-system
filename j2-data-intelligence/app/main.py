@@ -5,7 +5,6 @@ from app.db.database import Base, engine, get_db, SessionLocal
 from app.services.weather_fetcher import fetch_weather_all_divisions
 from app.services.feature_engineering import engineer_features
 from app.services.model_predictor import generate_predictions
-from app.services.kafka_producer import publish_predictions
 from app.services.event_manager import event_manager
 from apscheduler.schedulers.background import BackgroundScheduler
 import uvicorn
@@ -30,10 +29,6 @@ async def handle_data_fetched(start_date: date, end_date: date):
         # 3. Model Prediction
         logger.info("Running model predictions...")
         predictions = generate_predictions(df_features, db)
-        
-        # 4. Publish to Kafka
-        logger.info("Publishing predictions to Kafka...")
-        publish_predictions(predictions)
         
         logger.info("Automated forecast pipeline completed.")
     except Exception as e:

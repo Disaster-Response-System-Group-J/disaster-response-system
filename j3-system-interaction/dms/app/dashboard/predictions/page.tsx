@@ -40,19 +40,28 @@ export default function PredictionsPage() {
       if (!response.ok) throw new Error('Failed to fetch predictions');
       
       const data = await response.json();
-      
-      // Map database rows to the UI format
-      const mappedZones: PredictionZone[] = data.map((row: any) => ({
-        zone: row.division_name || 'Unknown Zone',
-        district: 'Assigned Region', // Fallback, since district isn't directly in DisasterRisk table
-        // Convert score to a 0-100 scale if it's a probability (0-1), otherwise use directly
-        riskScore: row.score > 1 ? Math.round(row.score) : Math.round((row.score || 0) * 100),
-        riskLevel: (row.risk_level as RiskLevel) || 'LOW',
-        confidence: 85, // Placeholder: ML confidence score
-        leadTimeHours: 24, // Placeholder: Target horizon
-        likelyImpact: `Potential ${row.disaster_type || 'hazard'} impacts expected in ${row.division_name || 'the area'} based on current sensor data.`,
-        recommendedAction: `Initiate standard ${row.risk_level || 'LOW'} risk monitoring protocols and review resource availability.`
-      }));
+
+      const SEVERITY_MAP: Record<number, RiskLevel> = { 0: 'LOW', 1: 'MEDIUM', 2: 'HIGH', 3: 'CRITICAL' };
+
+      // Map disaster_predictions table columns to the UI format
+      const mappedZones: PredictionZone[] = (Array.isArray(data) ? data : []).map((row: any) => {
+        const severity: number = row.predicted_severity ?? 0;
+        const probs = [row.prob_normal, row.prob_moderate, row.prob_severe, row.prob_extreme];
+        const confidence = Math.round((probs[severity] ?? 0) * 100) || 85;
+        const riskLevel = SEVERITY_MAP[severity] ?? 'LOW';
+        const leadTimeHours = (row.horizon ?? 1) * 24;
+
+        return {
+          zone: row.division_name || 'Unknown Zone',
+          district: 'Assigned Region',
+          riskScore: Math.round((severity / 3) * 100),
+          riskLevel,
+          confidence,
+          leadTimeHours,
+          likelyImpact: `Potential ${row.hazard_type || 'hazard'} impacts expected in ${row.division_name || 'the area'} within ${leadTimeHours} hours.`,
+          recommendedAction: `Initiate standard ${riskLevel} risk monitoring protocols and review resource availability.`,
+        };
+      });
 
       setZones(mappedZones);
       setRefreshNote('Predictions synced successfully with live database.');

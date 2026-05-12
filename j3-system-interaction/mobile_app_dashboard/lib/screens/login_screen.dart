@@ -30,10 +30,15 @@ class _LoginScreenState extends State<LoginScreen>
     _glowController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
-    )..repeat(reverse: true);
+    );
     _glowAnimation = Tween<double>(begin: 0.15, end: 0.35).animate(
       CurvedAnimation(parent: _glowController, curve: Curves.easeInOut),
     );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _glowController.repeat(reverse: true);
+    });
   }
 
   @override

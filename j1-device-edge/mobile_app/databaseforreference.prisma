@@ -1,0 +1,177 @@
+// Database Schema Definition (Prisma Format)
+// This documents the expected data models for J3 operations.
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ------------------------------------------------------
+// Users & Roles
+// ------------------------------------------------------
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  role      Role     @default(PUBLIC_USER)
+  createdAt DateTime @default(now())
+
+  reviewedReports IncomingReport[] @relation("ReviewedBy")
+}
+
+enum Role {
+  PUBLIC_USER
+  OFFICER
+  RESOURCE_MANAGER
+  ADMIN
+}
+
+// ------------------------------------------------------
+// Incidents & Reports
+// ------------------------------------------------------
+model IncomingReport {
+  id                 String             @id @default(uuid())
+  source             ReportSource
+  disasterType       DisasterType
+  district           String
+  latitude           Float
+  longitude          Float
+  description        String
+  contact            String?
+  mediaUrls          String[]
+  verificationStatus VerificationStatus @default(PENDING_REVIEW)
+  createdAt          DateTime           @default(now())
+
+  // External IDs
+  sosId              String?
+  deviceId           String?
+
+  // Review tracking
+  officerNotes       String?
+  reviewedById       String?
+  reviewedBy         User?              @relation("ReviewedBy", fields: [reviewedById], references: [id])
+  reviewedAt         DateTime?
+
+  // Relation to confirmed incident
+  incidentId         String?
+  incident           ConfirmedIncident? @relation(fields: [incidentId], references: [id])
+}
+
+model ConfirmedIncident {
+  id               String           @id @default(uuid())
+  title            String
+  disasterType     DisasterType
+  district         String
+  severity         IncidentSeverity
+  status           IncidentStatus   @default(ACTIVE)
+  latitude         Float
+  longitude        Float
+  description      String
+  publicVisibility Boolean          @default(true)
+  affectedPeople   Int              @default(0)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  sourceReports    IncomingReport[]
+  assignedResources Resource[]
+}
+
+enum ReportSource {
+  J1_SOS_APP
+  J3_PUBLIC_PORTAL
+  J1_SENSOR_SYSTEM
+  WEATHER_API
+  OFFICER_CREATED
+}
+
+enum VerificationStatus {
+  PENDING_REVIEW
+  VERIFIED
+  REJECTED
+  DUPLICATE
+  CONVERTED_TO_INCIDENT
+}
+
+enum DisasterType {
+  FLOOD
+  LANDSLIDE
+  OTHER
+}
+
+enum IncidentSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum IncidentStatus {
+  ACTIVE
+  UNDER_RESPONSE
+  RESOLVED
+  CLOSED
+}
+
+// ------------------------------------------------------
+// Resources
+// ------------------------------------------------------
+model Resource {
+  id           String         @id @default(uuid())
+  type         ResourceType
+  name         String
+  district     String
+  status       ResourceStatus @default(AVAILABLE)
+  latitude     Float?
+  longitude    Float?
+  capacity     Int?
+  currentLoad  Int?
+  lastUpdated  DateTime       @default(now())
+
+  incidentId   String?
+  incident     ConfirmedIncident? @relation(fields: [incidentId], references: [id])
+}
+
+enum ResourceType {
+  RESCUE_TEAM
+  BOAT
+  AMBULANCE
+  SHELTER
+  MEDICAL_TEAM
+  FOOD_WATER
+}
+
+enum ResourceStatus {
+  AVAILABLE
+  ASSIGNED
+  BUSY
+  OUT_OF_SERVICE
+}
+
+// ------------------------------------------------------
+// Alerts
+// ------------------------------------------------------
+model Alert {
+  id          String           @id @default(uuid())
+  type        AlertType
+  severity    IncidentSeverity
+  title       String
+  description String
+  district    String
+  isPublic    Boolean          @default(false)
+  isActive    Boolean          @default(true)
+  source      String?
+  createdAt   DateTime         @default(now())
+  expiresAt   DateTime?
+}
+
+enum AlertType {
+  RISK_ALERT
+  PUBLIC_ALERT
+  SHELTER_CAPACITY
+  RESOURCE_SHORTAGE
+  INCIDENT_STATUS
+} so can you check if the system is currently using this schema . this is the main apps schema in prisma. when we sync we have to match right. can you check. and give me a diagnosis please. dont code

@@ -1,0 +1,73 @@
+# Startup order: PVC → hardhat-node ready → deployer Job completes → audit-api reads from PVC
+# hardhat-node must be Ready before the deployer Job's init container exits.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hardhat-node
+  namespace: disaster-response
+  labels:
+    app: hardhat-node
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hardhat-node
+  template:
+    metadata:
+      labels:
+        app: hardhat-node
+    spec:
+      containers:
+        - name: hardhat-node
+          image: dehanns/disaster-hardhat-node:v1.0
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8545
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - |
+                  wget -qO- \
+                    --post-data='{"jsonrpc":"2.0","method":"net_version","id":1}' \
+                    --header='Content-Type: application/json' \
+                    http://127.0.0.1:8545 > /dev/null
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 10
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - |
+                  wget -qO- \
+                    --post-data='{"jsonrpc":"2.0","method":"net_version","id":1}' \
+                    --header='Content-Type: application/json' \
+                    http://127.0.0.1:8545 > /dev/null
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hardhat-node
+  namespace: disaster-response
+spec:
+  type: ClusterIP
+  selector:
+    app: hardhat-node
+  ports:
+    - port: 8545
+      targetPort: 8545

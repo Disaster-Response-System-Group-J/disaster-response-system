@@ -6,6 +6,7 @@ import { useSocket } from '@/context/SocketContext';
 import { AlertTriangle, FileText } from 'lucide-react';
 import { IncidentSeverity } from '@/types';
 import { useRouter } from 'next/navigation';
+import { normalizeRiskAlert } from '@/lib/risk-alert';
 
 export default function GlobalSocketListener() {
   const socket = useSocket();
@@ -15,10 +16,18 @@ export default function GlobalSocketListener() {
     if (!socket) return;
 
     // 1. Listen for new Risk Alerts
-    const handleNewAlert = (alert: any) => {
+    const handleNewAlert = (incoming: any) => {
+      const alert = normalizeRiskAlert(incoming);
+      const probabilityText = alert.predictionCategory
+        ? `Prediction: ${alert.predictionCategory}${alert.predictionProbability !== undefined ? ` (${alert.predictionProbability.toFixed(3)})` : ''}`
+        : '';
+      const scoreText = alert.considerationScore !== undefined ? `Consideration: ${alert.considerationScore.toFixed(3)}` : '';
+      const metaText = [probabilityText, scoreText].filter(Boolean).join(' | ');
+      const sourceText = alert.source ? `Source: ${alert.source}` : 'Source: System';
+
       if (alert.severity === IncidentSeverity.CRITICAL || alert.severity === IncidentSeverity.HIGH) {
         toast.error(`${alert.severity} ALERT: ${alert.title}`, {
-          description: `Location: ${alert.district} | Source: ${alert.source || 'System'}`,
+          description: `Location: ${alert.district}${metaText ? ` | ${metaText}` : ''} | ${sourceText}`,
           icon: <AlertTriangle size={16} className="text-red-400" />,
           duration: 8000,
           action: {
@@ -28,7 +37,7 @@ export default function GlobalSocketListener() {
         });
       } else {
         toast.info(`${alert.severity} Alert: ${alert.title}`, {
-          description: `Location: ${alert.district}`,
+          description: `Location: ${alert.district}${metaText ? ` | ${metaText}` : ''}`,
           duration: 5000,
           action: {
             label: 'View Alert',

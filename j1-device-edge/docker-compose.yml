@@ -1,0 +1,48 @@
+# J1 Device-Edge local development stack.
+#
+# Start:      docker compose up -d --build
+# Logs:       docker compose logs -f
+# Stop:       docker compose down
+# Reset data: docker compose down -v
+
+services:
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: j1-kafka-ui
+    ports:
+      - "18085:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: j1-local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      DYNAMIC_CONFIG_ENABLED: "true"
+    networks:
+      - disaster-net
+
+  j1-bridge-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: j1-bridge-api
+    ports:
+      - "8000:8000"
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_TOPIC_EVENTS: j1.events
+      KAFKA_PRODUCER_TIMEOUT: 10
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+      CORS_ORIGINS: "*"
+      IDEMPOTENCY_MAX_KEYS: 50000
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - disaster-net
+
+networks:
+  disaster-net:
+    external: true
+    name: disaster-net
