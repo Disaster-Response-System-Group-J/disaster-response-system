@@ -8,7 +8,6 @@ Replaces Kafka producer with direct HTTP ingestion.
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 from typing import Any
 
@@ -115,14 +114,18 @@ class J2Client:
                 response = await self._client.post(endpoint, json=payload)
 
                 # Success or client error (no retry needed)
-                if response.status_code < 500 or response.status_code in (400, 409, 422):
+                if response.status_code < 500:
                     logger.info(
                         "J2 response: %d for %s (eventId=%s)",
                         response.status_code,
                         endpoint,
                         payload.get("eventId", "unknown"),
                     )
-                    return response.json()
+                    try:
+                        body = response.json()
+                    except ValueError:
+                        body = {"success": False, "error": response.text}
+                    return {"status_code": response.status_code, "body": body}
 
                 # Server error: retry
                 logger.warning(

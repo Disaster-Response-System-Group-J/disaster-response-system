@@ -77,11 +77,11 @@ async def ingest_report(
         )
 
     # Forward to J2
-    normalized_payload["source"] = "MOBILE_APP"
+    normalized_payload["source"] = "J1_SOS_APP"
     normalized_payload["createdAt"] = datetime.now(timezone.utc).isoformat()
 
     try:
-        response = await j2_client.ingest_report(normalized_payload)
+        j2_response = await j2_client.ingest_report(normalized_payload)
     except Exception as e:
         logger.error("J2 forward failed for report %s: %s", payload.eventId, e)
         raise HTTPException(
@@ -92,19 +92,31 @@ async def ingest_report(
             ).model_dump(),
         )
 
-    # Record in idempotency store
-    idempotency_store.add(idem_key)
+    status_code = j2_response.get("status_code", 503)
+    response_body = j2_response.get("body", {"success": False, "error": "Invalid J2 response"})
 
-    logger.info("Report accepted: eventId=%s district=%s", payload.eventId, payload.district)
+    if status_code == 201:
+        idempotency_store.add(idem_key)
+        logger.info("Report accepted: eventId=%s district=%s", payload.eventId, payload.district)
+        return ApiResponse(
+            success=True,
+            data={
+                "eventId": payload.eventId,
+                "status": "ACCEPTED",
+                "id": response_body.get("data", {}).get("id"),
+            },
+        )
 
-    return ApiResponse(
-        success=True,
-        data={
-            "eventId": payload.eventId,
-            "status": "ACCEPTED",
-            "id": response.get("data", {}).get("id") if response.get("success") else None,
-        },
-    )
+    if status_code == 409:
+        # Mark as seen locally to short-circuit repeated retries for same duplicate.
+        idempotency_store.add(idem_key)
+        raise HTTPException(status_code=409, detail=response_body)
+
+    if status_code == 422:
+        raise HTTPException(status_code=422, detail=response_body)
+
+    logger.error("Unexpected J2 status for report %s: %s", payload.eventId, status_code)
+    raise HTTPException(status_code=503, detail=response_body)
 
 
 @router.post("/sensor", response_model=ApiResponse, status_code=201)
@@ -161,11 +173,12 @@ async def ingest_sensor(
         )
 
     # Forward to J2
+    normalized_payload["type"] = normalized_payload["hazardType"]
     normalized_payload["recorded_at"] = payload.timestamp
     normalized_payload["source"] = "IOT_DEVICE"
 
     try:
-        response = await j2_client.ingest_sensor(normalized_payload)
+        j2_response = await j2_client.ingest_sensor(normalized_payload)
     except Exception as e:
         logger.error("J2 forward failed for sensor %s: %s", payload.eventId, e)
         raise HTTPException(
@@ -176,21 +189,32 @@ async def ingest_sensor(
             ).model_dump(),
         )
 
-    # Record in idempotency store
-    idempotency_store.add(idem_key)
+    status_code = j2_response.get("status_code", 503)
+    response_body = j2_response.get("body", {"success": False, "error": "Invalid J2 response"})
 
-    logger.info("Sensor reading accepted: eventId=%s deviceId=%s type=%s", 
-                payload.eventId, payload.deviceId, payload.hazardType)
+    if status_code == 201:
+        idempotency_store.add(idem_key)
+        logger.info("Sensor reading accepted: eventId=%s deviceId=%s type=%s", 
+                    payload.eventId, payload.deviceId, payload.hazardType)
+        return ApiResponse(
+            success=True,
+            data={
+                "eventId": payload.eventId,
+                "deviceId": payload.deviceId,
+                "status": "ACCEPTED",
+                "alert_triggered": response_body.get("data", {}).get("alert_triggered", False),
+            },
+        )
 
-    return ApiResponse(
-        success=True,
-        data={
-            "eventId": payload.eventId,
-            "deviceId": payload.deviceId,
-            "status": "ACCEPTED",
-            "alert_triggered": response.get("data", {}).get("alert_triggered", False),
-        },
-    )
+    if status_code == 409:
+        idempotency_store.add(idem_key)
+        raise HTTPException(status_code=409, detail=response_body)
+
+    if status_code == 422:
+        raise HTTPException(status_code=422, detail=response_body)
+
+    logger.error("Unexpected J2 status for sensor %s: %s", payload.eventId, status_code)
+    raise HTTPException(status_code=503, detail=response_body)
 
 
 @router.get("", response_model=ApiResponse, tags=["Debug"])

@@ -1,7 +1,7 @@
 """
 J1 Bridge API - FastAPI application entry point.
 
-Data flow: Flutter mobile app -> FastAPI bridge -> Kafka topic j1.events.
+Data flow: Flutter mobile app -> FastAPI bridge -> J2 HTTP ingestion API.
 """
 
 from __future__ import annotations
