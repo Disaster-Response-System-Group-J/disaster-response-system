@@ -6,6 +6,8 @@ import '../utills/constants.dart';
 import 'database_helper.dart';
 
 class NetworkService {
+  static const String _usbReverseBaseUrl = 'http://127.0.0.1:8000';
+
   static final StreamController<bool> _controller =
       StreamController<bool>.broadcast();
 
@@ -24,36 +26,58 @@ class NetworkService {
   }) async {
     try {
       final baseUrl = await DatabaseHelper.instance.getApiBaseUrl();
-      final uri = Uri.parse(
-        '$baseUrl${AppConstants.apiHealthEndpoint}',
-      );
-      print('[NetworkService] Checking health: $uri');
-        print('[NetworkService] DEBUG: baseUrl from DB: "$baseUrl"');
+      final candidates = <String>[
+        baseUrl,
+        AppConstants.apiBaseUrl,
+        _usbReverseBaseUrl,
+        'http://10.0.2.2:8000',
+      ];
+
+      final uniqueCandidates = <String>[];
+      for (final candidate in candidates) {
+        if (candidate.isNotEmpty && !uniqueCandidates.contains(candidate)) {
+          uniqueCandidates.add(candidate);
+        }
+      }
+
+      for (final candidateBaseUrl in uniqueCandidates) {
+        final uri = Uri.parse('$candidateBaseUrl${AppConstants.apiHealthEndpoint}');
+        print('[NetworkService] Checking health: $uri');
+        print('[NetworkService] DEBUG: baseUrl candidate: "$candidateBaseUrl"');
         print('[NetworkService] DEBUG: apiHealthEndpoint: "${AppConstants.apiHealthEndpoint}"');
-        print('[NetworkService] DEBUG: constructed full string before parse: "$baseUrl${AppConstants.apiHealthEndpoint}"');
-      final response = await http.get(uri).timeout(timeout);
-      print('[NetworkService] Health response status: ${response.statusCode}');
-      print('[NetworkService] Health response body: ${response.body}');
-      
-      if (response.statusCode != 200) {
-        print('[NetworkService] ❌ Status code is not 200, returning false');
-        return false;
+
+        try {
+          final response = await http.get(uri).timeout(timeout);
+          print('[NetworkService] Health response status: ${response.statusCode}');
+          print('[NetworkService] Health response body: ${response.body}');
+
+          if (response.statusCode != 200) {
+            print('[NetworkService] ❌ Status code is not 200 for $candidateBaseUrl');
+            continue;
+          }
+
+          final dynamic decoded = jsonDecode(response.body);
+          print('[NetworkService] Parsed JSON: $decoded');
+          if (decoded is! Map<String, dynamic>) {
+            print('[NetworkService] ❌ Response is not a Map for $candidateBaseUrl');
+            continue;
+          }
+
+          final status = decoded['status']?.toString();
+          final service = decoded['service']?.toString();
+          print('[NetworkService] Checking: status=$status, service=$service');
+
+          final isHealthy = status == 'ok' && service == 'j1-bridge-api';
+          print('[NetworkService] ${isHealthy ? '✅ Online' : '❌ Not online'} - health check result: $isHealthy');
+          if (isHealthy) {
+            return true;
+          }
+        } catch (e) {
+          print('[NetworkService] ❌ Exception during health check on $candidateBaseUrl: $e');
+        }
       }
 
-      final dynamic decoded = jsonDecode(response.body);
-      print('[NetworkService] Parsed JSON: $decoded');
-      if (decoded is! Map<String, dynamic>) {
-        print('[NetworkService] ❌ Response is not a Map, returning false');
-        return false;
-      }
-
-      final status = decoded['status']?.toString();
-      final service = decoded['service']?.toString();
-      print('[NetworkService] Checking: status=$status, service=$service');
-      
-      final isHealthy = status == 'ok' && service == 'j1-bridge-api';
-      print('[NetworkService] ${isHealthy ? '✅ Online' : '❌ Not online'} - health check result: $isHealthy');
-      return isHealthy;
+      return false;
     } catch (e, stackTrace) {
       print('[NetworkService] ❌ Exception during health check: $e');
       print('[NetworkService] Stack trace: $stackTrace');

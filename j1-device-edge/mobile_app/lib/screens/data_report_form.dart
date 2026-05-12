@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 
 import '../services/auth_service.dart';
 import '../services/database_helper.dart';
 import '../services/offline_queue_manager.dart';
 import '../services/gps_service.dart';
+import '../services/image_upload_service.dart';
 import '../widgets/form_widgets.dart';
 
 class DataReportForm extends StatefulWidget {
@@ -18,11 +21,12 @@ class _DataReportFormState extends State<DataReportForm> {
   final _formKey = GlobalKey<FormState>();
   final _descriptionController = TextEditingController();
   final _locationController = TextEditingController();
-  final List<String> _selectedImages = [];
+  File? _selectedImageFile;
 
   String _selectedType = 'Flood level';
   bool _saving = false;
   bool _locating = false;
+  bool _uploading = false;
   bool _gpsCaptured = false;
   Position? _currentPosition;
 
@@ -42,6 +46,32 @@ class _DataReportFormState extends State<DataReportForm> {
     super.dispose();
   }
 
+  Future<void> _pickImage() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? pickedFile = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 85,
+      );
+
+      if (pickedFile != null) {
+        setState(() {
+          _selectedImageFile = File(pickedFile.path);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Image selected. It will be uploaded when you submit.')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error picking image: $e')),
+      );
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -52,14 +82,46 @@ class _DataReportFormState extends State<DataReportForm> {
     });
 
     try {
+      // Upload image if one was selected
+      String? mediaUrl;
+      if (_selectedImageFile != null) {
+        setState(() {
+          _uploading = true;
+        });
+
+        mediaUrl = await ImageUploadService.uploadImage(_selectedImageFile!);
+
+        if (!mounted) {
+          return;
+        }
+
+        setState(() {
+          _uploading = false;
+        });
+
+        if (mediaUrl == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Warning: Image upload failed, but submitting without image')),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Image uploaded successfully')),
+          );
+        }
+      }
+
       final payload = <String, dynamic>{
         'data_type': _selectedType,
         'description': _descriptionController.text.trim(),
         'location': _locationController.text.trim(),
-        'images': _selectedImages,
         'latitude': _currentPosition?.latitude,
         'longitude': _currentPosition?.longitude,
       };
+
+      // Include mediaUrls as array if one was uploaded
+      if (mediaUrl != null) {
+        payload['mediaUrls'] = [mediaUrl];
+      }
 
       final user = AuthService.instance.currentUser;
       if (user == null) {
@@ -80,7 +142,7 @@ class _DataReportFormState extends State<DataReportForm> {
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Saved locally')),
+        const SnackBar(content: Text('Report saved locally')),
       );
 
       _formKey.currentState!.reset();
@@ -91,7 +153,7 @@ class _DataReportFormState extends State<DataReportForm> {
         _gpsCaptured = false;
         _currentPosition = null;
         _saving = false;
-        _selectedImages.clear();
+        _selectedImageFile = null;
       });
     } catch (e) {
       if (!mounted) {
@@ -99,6 +161,7 @@ class _DataReportFormState extends State<DataReportForm> {
       }
       setState(() {
         _saving = false;
+        _uploading = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to save data report: $e')),
@@ -207,77 +270,69 @@ class _DataReportFormState extends State<DataReportForm> {
           ),
           const SizedBox(height: 16),
           Text(
-            'Images',
+            'Photo',
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 8),
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: () {
-                // TODO: Implement image picker
-              },
-              icon: const Icon(Icons.add_a_photo),
-              label: const Text('Add Images'),
+              onPressed: _uploading ? null : _pickImage,
+              icon: Icon(_uploading ? Icons.cloud_upload : Icons.add_a_photo),
+              label: Text(_uploading ? 'Uploading...' : 'Select Photo'),
             ),
           ),
           const SizedBox(height: 8),
-          if (_selectedImages.isEmpty)
-            const Text('No images selected')
+          if (_selectedImageFile == null)
+            const Text('No photo selected')
           else
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _selectedImages
-                  .map((imagePath) => Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey),
-                      borderRadius: BorderRadius.circular(8),
+            Container(
+              width: double.infinity,
+              height: 150,
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: Image.file(
+                      _selectedImageFile!,
+                      fit: BoxFit.cover,
                     ),
-                    child: Stack(
-                      children: [
-                        Positioned.fill(
-                          child: Container(
-                            color: Colors.grey[200],
-                            child: const Icon(Icons.image),
-                          ),
+                  ),
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _selectedImageFile = null;
+                        });
+                      },
+                      child: Container(
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
                         ),
-                        Positioned(
-                          top: 4,
-                          right: 4,
-                          child: GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                _selectedImages.remove(imagePath);
-                              });
-                            },
-                            child: Container(
-                              decoration: const BoxDecoration(
-                                color: Colors.red,
-                                shape: BoxShape.circle,
-                              ),
-                              padding: const EdgeInsets.all(4),
-                              child: const Icon(
-                                Icons.close,
-                                size: 16,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
+                        padding: const EdgeInsets.all(6),
+                        child: const Icon(
+                          Icons.close,
+                          size: 18,
+                          color: Colors.white,
                         ),
-                      ],
+                      ),
                     ),
-                  ))
-                  .toList(),
+                  ),
+                ],
+              ),
             ),
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: _saving ? null : _submit,
-              child: Text(_saving ? 'Saving...' : 'Submit Data Report'),
+              onPressed: (_saving || _uploading) ? null : _submit,
+              child: Text(_saving ? 'Saving...' : (_uploading ? 'Uploading...' : 'Submit Data Report')),
             ),
           ),
         ],
@@ -285,3 +340,4 @@ class _DataReportFormState extends State<DataReportForm> {
     );
   }
 }
+

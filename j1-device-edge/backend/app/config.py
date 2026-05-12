@@ -22,5 +22,12 @@ class Settings:
 
     CORS_ORIGINS: list[str] = os.getenv("CORS_ORIGINS", "*").split(",")
 
+    # Supabase storage settings
+    SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
+    SUPABASE_SERVICE_KEY: str = os.getenv("SUPABASE_SERVICE_KEY", "")
+    SUPABASE_REPORTS_BUCKET: str = os.getenv("SUPABASE_REPORTS_BUCKET", "reports")
+    # Max upload size in bytes (default 5 MB)
+    SUPABASE_MAX_UPLOAD_SIZE: int = int(os.getenv("SUPABASE_MAX_UPLOAD_SIZE", str(5 * 1024 * 1024)))
+
 
 settings = Settings()

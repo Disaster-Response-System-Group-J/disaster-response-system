@@ -114,6 +114,16 @@ services:
       API_PORT: "8000"
       CORS_ORIGINS: "*"
       IDEMPOTENCY_MAX_KEYS: "50000"
+      SUPABASE_URL: https://dndamppywklokjiygumz.supabase.co
+      SUPABASE_SERVICE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRuZGFtcHB5d2tsb2tqaXlndW16Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3ODU2NDg3MSwiZXhwIjoyMDk0MTQwODcxfQ._6Z_nSOGi2xtkYk5UrQEOIVMYzzq5v2KcDnlV6HEDNA
+      SUPABASE_REPORTS_BUCKET: reports
+      SUPABASE_MAX_UPLOAD_SIZE: 5242880
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     depends_on:
       kafka:
         condition: service_healthy
