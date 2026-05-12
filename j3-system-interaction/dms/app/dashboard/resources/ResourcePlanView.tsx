@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import {
   AlertTriangle, ArrowRight, CheckCircle2, ChevronDown, ChevronRight,
-  Flag, Package, ShieldAlert, Truck, Zap,
+  Flag, ShieldAlert, Truck, Zap,
 } from 'lucide-react';
 
 interface ResourcePlanViewProps {
@@ -25,14 +25,123 @@ const RISK_STYLES: Record<string, string> = {
   Low: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
 };
 
+type PlanRecord = Record<string, any>;
+
+function asObject(value: unknown): PlanRecord | null {
+  if (value && typeof value === 'object') return value as PlanRecord;
+  if (typeof value !== 'string') return null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+function getPlanData(plan: any): PlanRecord | null {
+  const planData = asObject(plan?.plan_data);
+  const planJson = asObject(plan?.plan_json);
+  const directAllocation = asObject(plan?.allocation_plan);
+
+  return (
+    planData?.allocation_plan ??
+    planData ??
+    planJson?.allocation_plan ??
+    planJson ??
+    directAllocation ??
+    null
+  );
+}
+
 export default function ResourcePlanView({ plan }: ResourcePlanViewProps) {
-  const data = plan.plan_data?.allocation_plan ?? plan.plan_data;
+  const data = getPlanData(plan);
   const [activeSection, setActiveSection] = useState<string>('summary');
   const [expandedTier1, setExpandedTier1] = useState<string | null>(null);
 
   if (!data) return (
     <div className="text-center py-12 text-slate-500">Plan data unavailable.</div>
   );
+
+  const isSingleDivisionPlan = Boolean(data.situation_summary || data.resource_assessment || data.immediate_actions);
+
+  if (isSingleDivisionPlan && !data.executive_summary) {
+    const resourceAssessment = data.resource_assessment ?? {};
+    const assessmentEntries = Object.entries(resourceAssessment);
+    const immediateActions = data.immediate_actions ?? [];
+
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-4 gap-4">
+          <StatCard icon={<ShieldAlert size={14} className="text-red-400" />} label="Risk Level" valueText={data.risk_level ?? 'Unknown'} color="red" />
+          <StatCard icon={<AlertTriangle size={14} className="text-orange-400" />} label="Score" valueText={data.consideration_score ?? 'N/A'} color="orange" />
+          <StatCard icon={<Truck size={14} className="text-blue-400" />} label="Actions" value={immediateActions.length} color="blue" />
+          <StatCard icon={<Flag size={14} className="text-yellow-400" />} label="External Aid" valueText={data.external_assistance_required ? 'Yes' : 'No'} color="yellow" />
+        </div>
+
+        <div className="bg-[#131924] border border-slate-800/80 rounded-xl p-6">
+          <div className="flex items-center justify-between gap-4 mb-4">
+            <h3 className="text-[10px] font-bold text-slate-400 tracking-widest uppercase">Situation Summary</h3>
+            <span className={`px-2 py-0.5 rounded text-[9px] font-bold border ${RISK_STYLES[data.risk_level] ?? RISK_STYLES.Severe}`}>
+              {data.risk_level ?? 'Unknown'}
+            </span>
+          </div>
+          <p className="text-sm text-slate-300 leading-relaxed">{data.situation_summary ?? 'No summary provided.'}</p>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-[#131924] border border-slate-800/80 rounded-xl p-6">
+            <h3 className="text-[10px] font-bold text-slate-400 tracking-widest uppercase mb-4">Immediate Actions</h3>
+            {immediateActions.length > 0 ? (
+              <ol className="space-y-3">
+                {immediateActions.map((action: string, i: number) => (
+                  <li key={i} className="flex gap-3 text-sm text-slate-300">
+                    <span className="text-blue-400 font-bold shrink-0">{i + 1}.</span>
+                    <span>{action}</span>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="text-sm text-slate-500">No immediate actions provided.</p>
+            )}
+          </div>
+
+          <div className="bg-[#131924] border border-slate-800/80 rounded-xl p-6">
+            <h3 className="text-[10px] font-bold text-slate-400 tracking-widest uppercase mb-4">Resource Assessment</h3>
+            <div className="space-y-2">
+              {assessmentEntries.map(([resource, assessment]: [string, any]) => (
+                <div key={resource} className="flex items-center justify-between bg-[#0a0f16] border border-slate-800 rounded-lg px-3 py-2">
+                  <div>
+                    <p className="text-xs font-semibold text-slate-300">{RESOURCE_LABELS[resource] ?? resource}</p>
+                    <p className="text-[10px] text-slate-500">Value: {assessment?.value ?? 'N/A'}</p>
+                  </div>
+                  <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded border ${
+                    assessment?.status === 'critical'
+                      ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                      : assessment?.status === 'insufficient'
+                        ? 'bg-orange-500/10 text-orange-400 border-orange-500/20'
+                        : 'bg-green-500/10 text-green-400 border-green-500/20'
+                  }`}>
+                    {assessment?.status ?? 'unknown'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {data.external_assistance_required && (
+          <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-xl p-5">
+            <div className="flex items-start gap-3">
+              <Zap size={14} className="text-yellow-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-bold text-yellow-300 mb-1">External assistance required</p>
+                <p className="text-xs text-slate-400">{data.escalation_reason ?? 'No escalation reason provided.'}</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   const tier1 = data.tier1_immediate ?? [];
   const tier2 = data.tier2_monitoring ?? [];
@@ -290,7 +399,7 @@ export default function ResourcePlanView({ plan }: ResourcePlanViewProps) {
   );
 }
 
-function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: number; color: string }) {
+function StatCard({ icon, label, value, valueText, color }: { icon: React.ReactNode; label: string; value?: number; valueText?: string | number; color: string }) {
   const colors: Record<string, string> = {
     red: 'border-red-500/20 bg-red-500/5',
     orange: 'border-orange-500/20 bg-orange-500/5',
@@ -300,7 +409,7 @@ function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label:
   return (
     <div className={`border rounded-xl p-4 ${colors[color]}`}>
       <div className="flex items-center gap-2 mb-2">{icon}<span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{label}</span></div>
-      <span className="text-3xl font-bold text-slate-100">{value}</span>
+      <span className="text-3xl font-bold text-slate-100">{valueText ?? value}</span>
     </div>
   );
 }

@@ -1,31 +1,87 @@
+import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
 import { pool } from '@/lib/db';
-import { kafkaClient } from '@/lib/kafka-stub';
+
+const J2_BASE_URL = process.env.J2_DATA_INTELLIGENCE_URL ?? 'http://localhost:8082';
+
+async function saveResourcePlan({
+  incidentId,
+  requestedBy,
+  planData,
+  divisionsAnalyzed,
+}: {
+  incidentId: string | null;
+  requestedBy: string | null;
+  planData: unknown;
+  divisionsAnalyzed: number | null;
+}) {
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO public."ResourcePlan"
+        (incident_id, requested_by, status, plan_json, divisions_analyzed)
+       VALUES ($1, $2, 'DRAFT', $3, $4)
+       RETURNING *`,
+      [incidentId, requestedBy, JSON.stringify(planData), divisionsAnalyzed]
+    );
+    return rows[0];
+  } catch (error) {
+    console.warn('ResourcePlan insert skipped:', error);
+    return {
+      plan_id: randomUUID(),
+      incident_id: incidentId,
+      requested_by: requestedBy,
+      generated_at: new Date().toISOString(),
+      status: 'DRAFT',
+      plan_json: planData,
+      divisions_analyzed: divisionsAnalyzed,
+    };
+  }
+}
 
 export async function POST(request: Request) {
   try {
-    const { incidentId, triggeredBy } = await request.json();
+    const { incidentId, triggeredBy, adminDecisions, targetDate } = await request.json();
 
-    // 1. Save PENDING plan record to DB
-    const { rows } = await pool.query(
-      `INSERT INTO resource_plans (incident_id, triggered_by, status)
-       VALUES ($1, $2, 'PENDING')
-       RETURNING plan_id, triggered_at`,
-      [incidentId ?? null, triggeredBy ?? null]
-    );
-    const plan = rows[0];
-
-    // 2. Publish request to Kafka — J2 will respond on j2.engine.resource-plans
-    await kafkaClient.publish(kafkaClient.PRODUCE_TOPICS.RESOURCE_PLAN_REQUEST, {
-      eventId: `rp-${plan.plan_id}-${Date.now()}`,
-      eventType: 'resource-plan-request',
-      timestamp: new Date().toISOString(),
-      payload: { planId: plan.plan_id, incidentId: incidentId ?? null },
+    const j2Response = await fetch(`${J2_BASE_URL}/api/v1/intelligence/agent/allocate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        admin_decisions: adminDecisions ?? '',
+        target_date: targetDate ?? null,
+      }),
+      cache: 'no-store',
     });
 
-    return NextResponse.json({ planId: plan.plan_id, status: 'PENDING', triggeredAt: plan.triggered_at });
+    if (!j2Response.ok) {
+      const message = await j2Response.text();
+      return NextResponse.json(
+        {
+          error: 'J2 allocation agent failed to generate a resource plan',
+          details: message,
+          status: 'FAILED',
+        },
+        { status: 502 }
+      );
+    }
+
+    const j2Payload = await j2Response.json();
+    const planData = j2Payload.allocation_plan ? j2Payload : { allocation_plan: j2Payload };
+    const savedPlan = await saveResourcePlan({
+      incidentId: incidentId ?? null,
+      requestedBy: triggeredBy ?? null,
+      planData,
+      divisionsAnalyzed: j2Payload.divisions_analyzed ?? null,
+    });
+
+    return NextResponse.json(
+      {
+        ...savedPlan,
+        plan_data: planData,
+      },
+      { status: 201 }
+    );
   } catch (error) {
     console.error('Resource plan generate error:', error);
-    return NextResponse.json({ error: 'Failed to trigger resource plan' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to generate resource plan' }, { status: 500 });
   }
 }

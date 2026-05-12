@@ -7,9 +7,9 @@ export async function GET(request: Request) {
     const incidentId = searchParams.get('incidentId');
 
     const { rows } = await pool.query(
-      `SELECT * FROM resource_plans
+      `SELECT * FROM public."ResourcePlan"
        ${incidentId ? 'WHERE incident_id = $1' : ''}
-       ORDER BY triggered_at DESC
+       ORDER BY generated_at DESC
        LIMIT 1`,
       incidentId ? [incidentId] : []
     );
@@ -22,13 +22,16 @@ export async function GET(request: Request) {
   }
 }
 
-// Called by the Kafka consumer when J2 responds with the completed plan
 export async function PATCH(request: Request) {
   try {
-    const { planId, planData } = await request.json();
+    const { planId, planData, status } = await request.json();
+    const nextStatus = ['DRAFT', 'APPROVED', 'EXECUTED'].includes(status) ? status : 'DRAFT';
     const { rows } = await pool.query(
-      `UPDATE resource_plans SET status = 'READY', plan_data = $1 WHERE plan_id = $2 RETURNING *`,
-      [JSON.stringify(planData), planId]
+      `UPDATE public."ResourcePlan"
+       SET status = $1, plan_json = $2
+       WHERE plan_id = $3
+       RETURNING *`,
+      [nextStatus, JSON.stringify(planData), planId]
     );
     return NextResponse.json(rows[0]);
   } catch (error) {
