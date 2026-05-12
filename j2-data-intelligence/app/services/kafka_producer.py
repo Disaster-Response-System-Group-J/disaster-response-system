@@ -1,6 +1,7 @@
 import json
 import os
-from datetime import datetime
+import uuid
+from datetime import datetime, timezone
 from confluent_kafka import Producer
 
 KAFKA_BROKER = os.getenv("KAFKA_BROKER", "localhost:9092")
@@ -166,3 +167,40 @@ def publish_predictions(predictions):
         )
 
     producer.flush()
+
+
+KAFKA_TOPIC_ALLOCATION = os.getenv("KAFKA_TOPIC_ALLOCATION", "j2.engine.allocation-plan")
+
+
+def publish_allocation_plan(
+    plan: dict,
+    divisions_analyzed: int,
+    high_risk_divisions: list,
+    generated_at: str,
+) -> bool:
+    """Publish a resource allocation plan to Kafka (used by resource_allocation_agent)."""
+    try:
+        producer = get_producer()
+        if not producer:
+            return False
+        envelope = {
+            "eventId": str(uuid.uuid4()),
+            "eventType": "allocation-plan",
+            "timestamp": datetime.utcnow().isoformat(),
+            "payload": {
+                "generated_at": generated_at,
+                "divisions_analyzed": divisions_analyzed,
+                "high_risk_divisions": high_risk_divisions,
+                "allocation_plan": plan,
+            },
+        }
+        producer.produce(
+            topic=KAFKA_TOPIC_ALLOCATION,
+            key="allocation-plan",
+            value=json.dumps(envelope),
+        )
+        producer.flush()
+        return True
+    except Exception as exc:
+        print(f"[kafka] Failed to publish allocation plan: {exc}")
+        return False

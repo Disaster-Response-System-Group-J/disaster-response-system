@@ -7,6 +7,8 @@ from app.services.feature_engineering import engineer_features
 from app.services.model_predictor import generate_predictions
 from app.services.event_manager import event_manager
 from app.services.iot_event_handler import run_iot_prediction_cycle
+from app.api.routes import router as intelligence_router
+from app.api.agent_routes import router as agent_router
 from apscheduler.schedulers.background import BackgroundScheduler
 import uvicorn
 import logging
@@ -14,21 +16,20 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize DB tables
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="J2 Data & Intelligence Microservice")
 
+app.include_router(intelligence_router)
+app.include_router(agent_router)
+
+
 async def handle_data_fetched(start_date: date, end_date: date):
-    logger.info(f"DATA_FETCHED event received for date range {start_date} to {end_date}. Running computations...")
+    logger.info(f"DATA_FETCHED event received for {start_date} to {end_date}. Running computations...")
     db = SessionLocal()
     try:
-        logger.info("Engineering features for 3-day forecast...")
         df_features = engineer_features(db, start_date, end_date)
-
-        logger.info("Running model predictions...")
-        predictions = generate_predictions(df_features, db)
-
+        generate_predictions(df_features, db)
         logger.info("Automated forecast pipeline completed.")
     except Exception as e:
         logger.error(f"Error in automated pipeline: {e}")
@@ -38,7 +39,6 @@ async def handle_data_fetched(start_date: date, end_date: date):
 
 @app.post("/api/v1/engine/trigger")
 async def trigger_pipeline(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    """Manually trigger the 3-day forecast pipeline"""
     target_date = date.today()
     background_tasks.add_task(fetch_weather_all_divisions, db, target_date)
     return {
@@ -53,13 +53,10 @@ def health_check():
     return {"status": "healthy"}
 
 
-# ── Scheduler ────────────────────────────────────────────────────────────────
-
 scheduler = BackgroundScheduler()
 
 
 def scheduled_weather_job():
-    """Daily weather-based forecast pipeline (runs at 02:00 UTC)."""
     logger.info("Running daily scheduled forecast pipeline...")
     import asyncio
     db = SessionLocal()
@@ -70,10 +67,7 @@ def scheduled_weather_job():
         db.close()
 
 
-# Daily weather forecast at 02:00 UTC
 scheduler.add_job(scheduled_weather_job, "cron", hour=2, minute=0, timezone="UTC")
-
-# IoT prediction polling every 30 seconds
 scheduler.add_job(run_iot_prediction_cycle, "interval", seconds=30, id="iot_prediction_poll")
 
 
