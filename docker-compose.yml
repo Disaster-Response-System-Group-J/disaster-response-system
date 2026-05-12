@@ -68,16 +68,37 @@ services:
     ports:
       - "8081:8000"
     environment:
-      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      KAFKA_TOPIC_EVENTS: j1.events
-      KAFKA_PRODUCER_TIMEOUT: "10"
+      J2_BASE_URL: http://j2-data-intelligence:8082
+      J2_SECRET_TOKEN: ${INTERNAL_SERVICE_TOKEN}
+      J2_REQUEST_TIMEOUT: "5.0"
       API_HOST: 0.0.0.0
       API_PORT: "8000"
       CORS_ORIGINS: "*"
       IDEMPOTENCY_MAX_KEYS: "50000"
     depends_on:
-      kafka:
-        condition: service_healthy
+      j2-data-intelligence:
+        condition: service_started
+    networks:
+      - disaster-net
+
+  j1-mqtt-http-forwarder:
+    build:
+      context: ./j1-device-edge/backend
+    image: disaster/j1-mqtt-http-forwarder:latest
+    container_name: j1-mqtt-http-forwarder
+    restart: unless-stopped
+    command: ["python", "-m", "app.mqtt_http_forwarder"]
+    environment:
+      MQTT_BROKER: ${MQTT_BROKER}
+      MQTT_PORT: ${MQTT_PORT}
+      MQTT_USERNAME: ${MQTT_USERNAME}
+      MQTT_PASSWORD: ${MQTT_PASSWORD}
+      MQTT_TOPICS: j1/disaster/#
+      J1_BASE_URL: http://j1-bridge-api:8000
+      J1_TIMEOUT_SECONDS: "8"
+    depends_on:
+      j1-bridge-api:
+        condition: service_started
     networks:
       - disaster-net
 
@@ -92,6 +113,7 @@ services:
       - "8082:8082"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      J1_INTERNAL_TOKEN: ${INTERNAL_SERVICE_TOKEN}
       KAFKA_BROKER: kafka:29092
       KAFKA_ALERT_THRESHOLD: "0.0"
     depends_on:

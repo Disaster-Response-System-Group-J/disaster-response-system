@@ -11,12 +11,13 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
+from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException
 
 from ..idempotency import idempotency_store
 from ..j2_client import j2_client
-from ..models import ApiResponse, ReportIngestPayload, SensorIngestPayload
+from ..models import ApiResponse, ReportIngestPayload
 from ..validation import ReportIngestionValidator, SensorIngestionValidator, ValidationError
 
 logger = logging.getLogger("j1.events")
@@ -121,7 +122,7 @@ async def ingest_report(
 
 @router.post("/sensor", response_model=ApiResponse, status_code=201)
 async def ingest_sensor(
-    payload: SensorIngestPayload,
+    payload: dict[str, Any],
     idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
 ):
     """
@@ -135,10 +136,29 @@ async def ingest_sensor(
         422 Unprocessable Entity: Validation error
         503 Service Unavailable: J2 is down, retry later
     """
-    idem_key = idempotency_key or payload.eventId
+    # Validate/normalize first so raw hardware payloads can derive eventId.
+    try:
+        normalized_payload = SensorIngestionValidator.validate(payload)
+    except ValidationError as e:
+        logger.warning("Sensor validation error: %s.%s", e.field, e.reason)
+        raise HTTPException(
+            status_code=422,
+            detail=ApiResponse(
+                success=False,
+                error="Validation failed",
+                errors=[{"field": e.field, "reason": e.reason}],
+            ).model_dump(),
+        )
 
-    if idem_key != payload.eventId:
-        logger.warning("Idempotency-Key mismatch for sensor: %s != %s", idem_key, payload.eventId)
+    event_id = normalized_payload["eventId"]
+    device_id = normalized_payload["deviceId"]
+    hazard_type = normalized_payload["hazardType"]
+    event_timestamp = normalized_payload["timestamp"]
+
+    idem_key = idempotency_key or event_id
+
+    if idem_key != event_id:
+        logger.warning("Idempotency-Key mismatch for sensor: %s != %s", idem_key, event_id)
         raise HTTPException(
             status_code=400,
             detail=ApiResponse(
@@ -158,29 +178,15 @@ async def ingest_sensor(
             ).model_dump(),
         )
 
-    # Validate payload
-    try:
-        normalized_payload = SensorIngestionValidator.validate(payload.model_dump())
-    except ValidationError as e:
-        logger.warning("Sensor validation error: %s.%s", e.field, e.reason)
-        raise HTTPException(
-            status_code=422,
-            detail=ApiResponse(
-                success=False,
-                error="Validation failed",
-                errors=[{"field": e.field, "reason": e.reason}],
-            ).model_dump(),
-        )
-
     # Forward to J2
     normalized_payload["type"] = normalized_payload["hazardType"]
-    normalized_payload["recorded_at"] = payload.timestamp
+    normalized_payload["recorded_at"] = event_timestamp
     normalized_payload["source"] = "IOT_DEVICE"
 
     try:
         j2_response = await j2_client.ingest_sensor(normalized_payload)
     except Exception as e:
-        logger.error("J2 forward failed for sensor %s: %s", payload.eventId, e)
+        logger.error("J2 forward failed for sensor %s: %s", event_id, e)
         raise HTTPException(
             status_code=503,
             detail=ApiResponse(
@@ -195,12 +201,12 @@ async def ingest_sensor(
     if status_code == 201:
         idempotency_store.add(idem_key)
         logger.info("Sensor reading accepted: eventId=%s deviceId=%s type=%s", 
-                    payload.eventId, payload.deviceId, payload.hazardType)
+                    event_id, device_id, hazard_type)
         return ApiResponse(
             success=True,
             data={
-                "eventId": payload.eventId,
-                "deviceId": payload.deviceId,
+                "eventId": event_id,
+                "deviceId": device_id,
                 "status": "ACCEPTED",
                 "alert_triggered": response_body.get("data", {}).get("alert_triggered", False),
             },
@@ -213,7 +219,7 @@ async def ingest_sensor(
     if status_code == 422:
         raise HTTPException(status_code=422, detail=response_body)
 
-    logger.error("Unexpected J2 status for sensor %s: %s", payload.eventId, status_code)
+    logger.error("Unexpected J2 status for sensor %s: %s", event_id, status_code)
     raise HTTPException(status_code=503, detail=response_body)
 
 

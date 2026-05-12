@@ -11,6 +11,7 @@ import re
 from datetime import datetime
 from enum import Enum
 from typing import Any, Optional
+from uuid import uuid4
 
 
 class HazardType(str, Enum):
@@ -230,18 +231,31 @@ class SensorIngestionValidator:
         """
         errors = []
 
+        # Accept both mobile schema and raw hardware schema.
+        device_raw = payload.get("deviceId") or payload.get("id")
+        hazard_raw = payload.get("hazardType") or payload.get("type")
+        timestamp_raw = payload.get("timestamp") or payload.get("recorded_at")
+
+        if not timestamp_raw:
+            timestamp_raw = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+
+        event_id = payload.get("eventId")
+        if not event_id:
+            ts_key = timestamp_raw.replace(":", "").replace("-", "").replace("T", "").replace("Z", "")
+            event_id = f"{device_raw or 'sensor'}-{ts_key}-{uuid4().hex[:8]}"
+
         try:
-            device_id = validate_required_string(payload.get("deviceId"), "deviceId")
+            device_id = validate_required_string(device_raw, "deviceId")
         except ValidationError as e:
             errors.append(e)
 
         try:
-            hazard_type = validate_enum(payload.get("hazardType"), "hazardType", HazardType)
+            hazard_type = validate_enum(hazard_raw, "hazardType", HazardType)
         except ValidationError as e:
             errors.append(e)
 
         try:
-            timestamp = validate_iso8601_timestamp(payload.get("timestamp"))
+            timestamp = validate_iso8601_timestamp(timestamp_raw)
         except ValidationError as e:
             errors.append(e)
 
@@ -250,9 +264,24 @@ class SensorIngestionValidator:
 
         # At least one sensor reading required
         depth = validate_optional_numeric(payload.get("depth"), "depth", min_value=0)
-        temp = validate_optional_numeric(payload.get("temperature"), "temperature", min_value=-50, max_value=60)
-        humidity = validate_optional_numeric(payload.get("humidity"), "humidity", min_value=0, max_value=100)
-        moisture = validate_optional_numeric(payload.get("moisture"), "moisture", min_value=0, max_value=100)
+        temp = validate_optional_numeric(
+            payload.get("temperature") if payload.get("temperature") is not None else payload.get("temp"),
+            "temperature",
+            min_value=-50,
+            max_value=60,
+        )
+        humidity = validate_optional_numeric(
+            payload.get("humidity") if payload.get("humidity") is not None else payload.get("hum"),
+            "humidity",
+            min_value=0,
+            max_value=100,
+        )
+        moisture = validate_optional_numeric(
+            payload.get("moisture") if payload.get("moisture") is not None else payload.get("moist"),
+            "moisture",
+            min_value=0,
+            max_value=100,
+        )
 
         if all(v is None for v in [depth, temp, humidity, moisture]):
             raise ValidationError("sensor_reading", "At least one of: depth, temperature, humidity, moisture")
@@ -277,6 +306,7 @@ class SensorIngestionValidator:
                 raise ValidationError("division_id", "Must be integer")
 
         return {
+            "eventId": event_id,
             "deviceId": device_id,
             "hazardType": hazard_type,
             "timestamp": timestamp,
