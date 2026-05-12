@@ -3,6 +3,8 @@
 #include <LoRa.h>
 #include <DHT.h>
 #include <ArduinoJson.h>
+#include <algorithm>
+
 
 // Sensor Pins
 #define DHTPIN 4
@@ -107,7 +109,7 @@ void loop() {
             doc["temp"] = round(temp * 10.0) / 10.0;
             doc["hum"] = round(hum * 10.0) / 10.0;
         }
-        doc["depth"] = round(depth * 10.0) / 10.0;
+        doc["depth"] = std::max(0.0f, 19.0f - static_cast<float>(round(depth * 10.0) / 10.0));
 
         String jsonString;
         serializeJson(doc, jsonString);
