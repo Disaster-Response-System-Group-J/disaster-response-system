@@ -265,26 +265,32 @@ class SensorIngestionValidator:
         # At least one sensor reading required
         depth = validate_optional_numeric(payload.get("depth"), "depth", min_value=0)
         temp = validate_optional_numeric(
-            payload.get("temperature") if payload.get("temperature") is not None else payload.get("temp"),
-            "temperature",
+            payload.get("temp") if payload.get("temp") is not None else payload.get("temperature"),
+            "temp",
             min_value=-50,
             max_value=60,
         )
-        humidity = validate_optional_numeric(
-            payload.get("humidity") if payload.get("humidity") is not None else payload.get("hum"),
-            "humidity",
+        hum = validate_optional_numeric(
+            payload.get("hum") if payload.get("hum") is not None else payload.get("humidity"),
+            "hum",
             min_value=0,
             max_value=100,
         )
-        moisture = validate_optional_numeric(
-            payload.get("moisture") if payload.get("moisture") is not None else payload.get("moist"),
-            "moisture",
-            min_value=0,
-            max_value=100,
+        moist = validate_optional_numeric(
+            payload.get("moist") if payload.get("moist") is not None else payload.get("moisture"),
+            "moist",
         )
 
-        if all(v is None for v in [depth, temp, humidity, moisture]):
-            raise ValidationError("sensor_reading", "At least one of: depth, temperature, humidity, moisture")
+        if all(v is None for v in [depth, temp, hum, moist]):
+            raise ValidationError("sensor_reading", "At least one of: depth, temp, hum, moist")
+
+        # Accel/gyro (landslide node)
+        ax = validate_optional_numeric(payload.get("ax"), "ax")
+        ay = validate_optional_numeric(payload.get("ay"), "ay")
+        az = validate_optional_numeric(payload.get("az"), "az")
+        gx = validate_optional_numeric(payload.get("gx"), "gx")
+        gy = validate_optional_numeric(payload.get("gy"), "gy")
+        gz = validate_optional_numeric(payload.get("gz"), "gz")
 
         # Optional location
         latitude = None
@@ -311,9 +317,15 @@ class SensorIngestionValidator:
             "hazardType": hazard_type,
             "timestamp": timestamp,
             "depth": depth,
-            "temperature": temp,
-            "humidity": humidity,
-            "moisture": moisture,
+            "temp": temp,
+            "hum": hum,
+            "moist": moist,
+            "ax": ax,
+            "ay": ay,
+            "az": az,
+            "gx": gx,
+            "gy": gy,
+            "gz": gz,
             "latitude": latitude,
             "longitude": longitude,
             "division_id": division_id,

@@ -28,13 +28,17 @@ class J2Client:
 
     async def connect(self) -> None:
         """Initialize the async HTTP client."""
+        headers = {
+            "Content-Type": "application/json",
+        }
+        token = (settings.J2_SECRET_TOKEN or "").strip()
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+
         self._client = httpx.AsyncClient(
             base_url=settings.J2_BASE_URL,
             timeout=settings.J2_REQUEST_TIMEOUT,
-            headers={
-                "Authorization": f"Bearer {settings.J2_SECRET_TOKEN}",
-                "Content-Type": "application/json",
-            },
+            headers=headers,
         )
         logger.info("J2 client connected to %s", settings.J2_BASE_URL)
 

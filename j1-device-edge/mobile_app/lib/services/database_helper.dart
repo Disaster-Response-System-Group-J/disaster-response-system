@@ -756,6 +756,13 @@ class DatabaseHelper {
     final stored = await _readMetaValue(db, _apiBaseUrlMetaKey);
     final normalized = _normalizeApiBaseUrl(stored);
 
+    // If a build-time override is provided (e.g. for a physical device build),
+    // prefer it over any stored value. This prevents the app from getting stuck
+    // offline when a previous LAN IP was saved in SQLite.
+    if (AppConstants.apiBaseUrl != AppConstants.emulatorApiBaseUrl) {
+      return AppConstants.apiBaseUrl;
+    }
+
     return normalized ?? AppConstants.apiBaseUrl;
   }
 

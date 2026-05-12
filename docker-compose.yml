@@ -96,9 +96,19 @@ services:
       MQTT_TOPICS: j1/disaster/#
       J1_BASE_URL: http://j1-bridge-api:8000
       J1_TIMEOUT_SECONDS: "8"
+      DATABASE_URL: ${DATABASE_URL}
+      DB_SSLMODE: require
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      SUPABASE_SCHEMA: public
+      SUPABASE_REST_TIMEOUT_SECONDS: "8"
     depends_on:
       j1-bridge-api:
         condition: service_started
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     networks:
       - disaster-net
 
@@ -112,7 +122,7 @@ services:
     ports:
       - "8082:8082"
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATABASE_URL: ${DATABASE_URL}
       J1_INTERNAL_TOKEN: ${INTERNAL_SERVICE_TOKEN}
       KAFKA_BROKER: kafka:29092
       KAFKA_ALERT_THRESHOLD: "0.0"

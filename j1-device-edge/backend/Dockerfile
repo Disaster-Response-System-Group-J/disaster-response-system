@@ -15,6 +15,7 @@ FROM python:3.12.10-slim-bookworm AS runtime
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         librdkafka1 \
+    ca-certificates \
         curl \
     && rm -rf /var/lib/apt/lists/* \
     && useradd -r --no-create-home -u 1000 appuser

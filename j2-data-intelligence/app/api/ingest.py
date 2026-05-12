@@ -8,6 +8,7 @@ These endpoints write to Postgres with idempotency constraints.
 Replaces Kafka consumer with direct HTTP ingestion.
 """
 
+import json as _json
 import logging
 import os
 from typing import Any, Dict, List, Optional
@@ -68,6 +69,12 @@ class SensorIngestRequest(BaseModel):
     temp: Optional[float] = None
     hum: Optional[float] = None
     moist: Optional[float] = None
+    ax: Optional[float] = None
+    ay: Optional[float] = None
+    az: Optional[float] = None
+    gx: Optional[float] = None
+    gy: Optional[float] = None
+    gz: Optional[float] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     division_id: Optional[int] = None
@@ -239,22 +246,26 @@ async def ingest_sensor(
         409 Conflict: Duplicate reading
         503 Service Unavailable: transient DB failure
     """
+    hazard = (payload.type or "").upper()
+    if hazard == "LANDSLIDE":
+        target_table = "iot_landslide"
+    else:
+        target_table = "iot_flood"
+
     try:
         duplicate_check = db.execute(
             text(
-                """
-                SELECT row_id
-                FROM public."iot_rainfall_data"
-                WHERE id = :device_id
+                f"""
+                SELECT id
+                FROM public.{target_table}
+                WHERE device_id = :device_id
                   AND recorded_at = :recorded_at
-                  AND type = :hazard_type
                 LIMIT 1;
                 """
             ),
             {
                 "device_id": payload.deviceId,
                 "recorded_at": payload.recorded_at,
-                "hazard_type": payload.type,
             },
         ).fetchone()
 
@@ -271,25 +282,74 @@ async def ingest_sensor(
                 ).model_dump(),
             )
 
-        query = text("""
-            INSERT INTO public."iot_rainfall_data"
-            (id, type, temp, hum, depth, recorded_at)
-            VALUES
-            (:id, :type, :temp, :hum, :depth, :recorded_at)
-            RETURNING row_id;
-        """)
-
-        result = db.execute(
-            query,
-            {
-                "id": payload.deviceId,
-                "type": payload.type,
-                "temp": payload.temp,
-                "hum": payload.hum,
-                "depth": payload.depth,
-                "recorded_at": payload.recorded_at,
-            },
-        )
+        if target_table == "iot_flood":
+            query = text("""
+                INSERT INTO public.iot_flood
+                (id, device_id, topic, type, temp, hum, depth, raw_payload, recorded_at)
+                VALUES
+                (:id, :device_id, :topic, :type, :temp, :hum, :depth, CAST(:raw_payload AS jsonb), :recorded_at)
+                RETURNING id;
+            """)
+            result = db.execute(
+                query,
+                {
+                    "id": str(uuid4()),
+                    "device_id": payload.deviceId,
+                    "topic": "j1/disaster/flood",
+                    "type": payload.type,
+                    "temp": payload.temp,
+                    "hum": payload.hum,
+                    "depth": payload.depth,
+                    "raw_payload": _json.dumps({
+                        "id": payload.deviceId,
+                        "type": payload.type,
+                        "temp": payload.temp,
+                        "hum": payload.hum,
+                        "depth": payload.depth,
+                    }),
+                    "recorded_at": payload.recorded_at,
+                },
+            )
+        else:
+            query = text("""
+                INSERT INTO public.iot_landslide
+                (id, device_id, topic, type, temp, hum, moist, ax, ay, az, gx, gy, gz, raw_payload, recorded_at)
+                VALUES
+                (:id, :device_id, :topic, :type, :temp, :hum, :moist, :ax, :ay, :az, :gx, :gy, :gz, CAST(:raw_payload AS jsonb), :recorded_at)
+                RETURNING id;
+            """)
+            result = db.execute(
+                query,
+                {
+                    "id": str(uuid4()),
+                    "device_id": payload.deviceId,
+                    "topic": "j1/disaster/landslide",
+                    "type": payload.type,
+                    "temp": payload.temp,
+                    "hum": payload.hum,
+                    "moist": payload.moist,
+                    "ax": payload.ax,
+                    "ay": payload.ay,
+                    "az": payload.az,
+                    "gx": payload.gx,
+                    "gy": payload.gy,
+                    "gz": payload.gz,
+                    "raw_payload": _json.dumps({
+                        "id": payload.deviceId,
+                        "type": payload.type,
+                        "temp": payload.temp,
+                        "hum": payload.hum,
+                        "moist": payload.moist,
+                        "ax": payload.ax,
+                        "ay": payload.ay,
+                        "az": payload.az,
+                        "gx": payload.gx,
+                        "gy": payload.gy,
+                        "gz": payload.gz,
+                    }),
+                    "recorded_at": payload.recorded_at,
+                },
+            )
 
         db.commit()
 
@@ -318,7 +378,8 @@ async def ingest_sensor(
             )
 
         logger.info(
-            "Sensor reading ingested: row_id=%d eventId=%s deviceId=%s depth=%s alert=%s",
+            "Sensor reading ingested: table=%s id=%s eventId=%s deviceId=%s depth=%s alert=%s",
+            target_table,
             row_id,
             payload.eventId,
             payload.deviceId,
