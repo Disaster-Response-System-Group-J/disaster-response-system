@@ -58,6 +58,25 @@ class DatabaseHelper {
       await _createAuthTables(db);
     }
 
+    // Migration: Add missing columns to users table
+    if (oldVersion < 3) {
+      try {
+        await db.execute('ALTER TABLE $usersTable ADD COLUMN token TEXT');
+      } catch (e) {
+        print('Column token already exists: $e');
+      }
+      try {
+        await db.execute('ALTER TABLE $usersTable ADD COLUMN service_id TEXT');
+      } catch (e) {
+        print('Column service_id already exists: $e');
+      }
+      try {
+        await db.execute('ALTER TABLE $usersTable ADD COLUMN zone TEXT');
+      } catch (e) {
+        print('Column zone already exists: $e');
+      }
+    }
+
     await _ensureEventsSchema(db);
     await _ensureResourcesSchema(db);
 
@@ -407,7 +426,10 @@ class DatabaseHelper {
         role TEXT NOT NULL DEFAULT 'PUBLIC_USER',
         is_mock INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL,
-        last_login_at TEXT
+        last_login_at TEXT,
+        token TEXT,
+        service_id TEXT,
+        zone TEXT
       )
     ''');
 
@@ -689,9 +711,7 @@ class DatabaseHelper {
     final db = await database;
     return db.update(
       usersTable,
-      {
-        'last_login_at': user.lastLoginAt,
-      },
+      user.toMap(),
       where: 'id = ?',
       whereArgs: [user.id],
     );

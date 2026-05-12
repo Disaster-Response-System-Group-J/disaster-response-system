@@ -7,6 +7,9 @@ class AppUser {
   final bool isMock;
   final String createdAt;
   final String? lastLoginAt;
+  final String? token;
+  final String? serviceId;
+  final String? zone;
 
   const AppUser({
     required this.id,
@@ -17,6 +20,9 @@ class AppUser {
     required this.isMock,
     required this.createdAt,
     this.lastLoginAt,
+    this.token,
+    this.serviceId,
+    this.zone,
   });
 
   Map<String, dynamic> toMap() {
@@ -29,6 +35,9 @@ class AppUser {
       'is_mock': isMock ? 1 : 0,
       'created_at': createdAt,
       'last_login_at': lastLoginAt,
+      'token': token,
+      'service_id': serviceId,
+      'zone': zone,
     };
   }
 
@@ -42,6 +51,9 @@ class AppUser {
       isMock: (map['is_mock'] ?? 0) == 1,
       createdAt: map['created_at']?.toString() ?? '',
       lastLoginAt: map['last_login_at']?.toString(),
+      token: map['token']?.toString(),
+      serviceId: map['service_id']?.toString(),
+      zone: map['zone']?.toString(),
     );
   }
 }

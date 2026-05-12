@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:command_mobile/screens/dashboard_screen.dart';
 import 'package:command_mobile/screens/login_screen.dart';
 import 'package:command_mobile/screens/alerts_screen.dart';
@@ -6,13 +7,23 @@ import 'package:command_mobile/screens/reports_screen.dart';
 import 'package:command_mobile/screens/map_screen.dart';
 import 'package:command_mobile/screens/resources_screen.dart';
 import 'package:command_mobile/theme/app_theme.dart';
+import 'package:command_mobile/services/auth_service.dart';
 
-void main() {
-  runApp(const MyApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: '.env');
+  await AuthService.initializeSession();
+
+  final hasToken = await AuthService.hasValidToken();
+  final initialRoute = hasToken ? '/dashboard' : '/login';
+
+  runApp(MyApp(initialRoute: initialRoute));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final String initialRoute;
+
+  const MyApp({super.key, required this.initialRoute});
 
   @override
   Widget build(BuildContext context) {
@@ -20,7 +31,7 @@ class MyApp extends StatelessWidget {
       title: 'Disaster Response',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
-      initialRoute: '/login',
+      initialRoute: initialRoute,
       routes: {
         '/login': (context) => const LoginScreen(),
         '/dashboard': (context) => const DashboardScreen(),

@@ -1,16 +1,22 @@
-import {supabase} from "@/lib/supabase";
+import { NextRequest, NextResponse } from 'next/server'
+import { authenticateFieldOfficer } from '@/lib/auth'
+import { jsonServerError } from '@/lib/response'
+import { getAssignmentSummary } from '@/services/assignment.service'
 
-export async function GET() {
-  const {data, error} = await supabase
-  .from("PersonnelAssignment")
-  .select("*");
+export async function GET(req: NextRequest) {
+  try {
+    const auth = authenticateFieldOfficer(req)
 
-  if (error) {
-    return Response.json(
-      {error: error.message},
-      {status: 500}
-    )
+    if (!auth.ok) {
+      return auth.response
+    }
+
+    const summary = await getAssignmentSummary(auth.context.userId)
+
+    return NextResponse.json(summary)
+  } catch (error) {
+    console.error(error)
+
+    return jsonServerError('Failed to retrieve assignments')
   }
-
-  return Response.json(data);
 }

@@ -1,6 +1,6 @@
 class AppConstants {
   static const String databaseName = 'j1_disaster_response.db';
-  static const int databaseVersion = 2;
+  static const int databaseVersion = 3;
 
   static const String eventsTable = 'events';
 
@@ -19,6 +19,7 @@ class AppConstants {
     defaultValue: 'http://10.0.2.2:8000',
   );
   static const String apiHealthEndpoint = '/health';
+  static const String apiLoginEndpoint = '/api/auth/login';
   static const String apiIngestEndpoint = '/api/v1/events/ingest';
   static const String apiUploadEndpoint = apiIngestEndpoint;
   static const String apiResourcesEndpoint = '/api/v1/resources';

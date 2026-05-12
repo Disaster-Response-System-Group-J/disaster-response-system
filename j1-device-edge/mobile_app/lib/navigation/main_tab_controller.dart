@@ -9,6 +9,7 @@ import '../screens/resources_screen.dart';
 import '../screens/settings_screen.dart';
 import '../services/auth_service.dart';
 import '../services/database_helper.dart';
+import '../widgets/user_profile_drawer.dart';
 
 class MainTabController extends StatefulWidget {
   const MainTabController({super.key});
@@ -90,6 +91,7 @@ class _MainTabControllerState extends State<MainTabController> {
               ),
             ],
           ),
+          drawer: user != null ? UserProfileDrawer(user: user) : null,
           body: IndexedStack(
             index: _selectedIndex,
             children: _screens,

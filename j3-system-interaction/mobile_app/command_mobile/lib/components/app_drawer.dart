@@ -110,33 +110,51 @@ class AppDrawer extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'COMMAND',
+            user?.name ?? 'COMMAND',
             style: GoogleFonts.inter(
               color: AppColors.primary,
               fontSize: 18,
               fontWeight: FontWeight.w900,
-              letterSpacing: 3,
+              letterSpacing: 1.5,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
-            user?.serviceId ?? 'ACTIVE SESSION',
+            user?.email ?? user?.serviceId ?? 'ACTIVE SESSION',
             style: GoogleFonts.spaceGrotesk(
               color: AppColors.onSurface,
               fontSize: 13,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.8,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.4,
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            user == null ? 'Authenticated operator' : '${user.role} / ${user.zone}',
-            style: GoogleFonts.spaceGrotesk(
-              color: AppColors.onSurfaceVariant,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              letterSpacing: 0.6,
-            ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  user?.role ?? 'Role: —',
+                  style: GoogleFonts.spaceGrotesk(
+                    color: AppColors.onSurfaceVariant,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  user?.zone ?? 'Zone: —',
+                  textAlign: TextAlign.end,
+                  style: GoogleFonts.spaceGrotesk(
+                    color: AppColors.onSurfaceVariant,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

@@ -6,10 +6,13 @@ import 'package:latlong2/latlong.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../components/app_drawer.dart';
+import '../components/notification_button.dart';
 import '../components/nav_bar.dart';
 import '../services/incident_service.dart';
+import '../services/assignment_service.dart';
 import '../services/auth_service.dart';
 import '../models/incident.dart';
+import '../models/assignment.dart';
 
 /// Tactical Map screen.
 ///
@@ -30,9 +33,16 @@ class MapScreen extends StatefulWidget {
 class _MapScreenState extends State<MapScreen> {
   int _currentNavIndex = 2; // Map tab
   final MapController _mapController = MapController();
-  final LatLng _center = const LatLng(34.0522, -118.2437); // Los Angeles, CA
+  // Default to Sri Lanka geographic center; updated when shelters load
+  final LatLng _center = const LatLng(7.8731, 80.7718);
   List<Incident> _incidents = [];
+  List<ShelterData> _shelters = [];
+  List<ReportData> _reports = [];
   StreamSubscription<Incident>? _updatesSub;
+  bool _showShelters = true;
+  bool _showReports = true;
+  bool _showIncidents = true;
+  String _baseLayer = 'osm';
   // Track current center and zoom to avoid depending on MapController internals
   late LatLng _mapCenter;
   double _currentZoom = 13.0;
@@ -42,6 +52,84 @@ class _MapScreenState extends State<MapScreen> {
     _mapController.dispose();
     _updatesSub?.cancel();
     super.dispose();
+  }
+
+  void _showLayersMenu() {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(builder: (context, setStState) {
+          return Container(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Layers', style: TextStyle(fontWeight: FontWeight.bold)),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ListTile(
+                  title: const Text('Base layer: OpenStreetMap'),
+                  leading: Radio<String>(
+                    value: 'osm',
+                    groupValue: _baseLayer,
+                    onChanged: (v) {
+                      if (v == null) return;
+                      setState(() => _baseLayer = v);
+                      setStState(() {});
+                    },
+                  ),
+                ),
+                ListTile(
+                  title: const Text('Base layer: Satellite'),
+                  leading: Radio<String>(
+                    value: 'sat',
+                    groupValue: _baseLayer,
+                    onChanged: (v) {
+                      if (v == null) return;
+                      setState(() => _baseLayer = v);
+                      setStState(() {});
+                    },
+                  ),
+                ),
+                SwitchListTile(
+                  title: const Text('Show incidents'),
+                  value: _showIncidents,
+                  onChanged: (v) {
+                    setState(() => _showIncidents = v);
+                    setStState(() {});
+                  },
+                ),
+                SwitchListTile(
+                  title: const Text('Show shelters'),
+                  value: _showShelters,
+                  onChanged: (v) {
+                    setState(() => _showShelters = v);
+                    setStState(() {});
+                  },
+                ),
+                SwitchListTile(
+                  title: const Text('Show reports'),
+                  value: _showReports,
+                  onChanged: (v) {
+                    setState(() => _showReports = v);
+                    setStState(() {});
+                  },
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          );
+        });
+      },
+    );
   }
 
   @override
@@ -55,6 +143,7 @@ class _MapScreenState extends State<MapScreen> {
       }
     });
     _mapCenter = _center;
+    _loadSheltersAndReports();
   }
 
   Future<void> _loadIncidents() async {
@@ -62,6 +151,48 @@ class _MapScreenState extends State<MapScreen> {
     final list = await IncidentService.getIncidentsForZone(zone);
     if (!mounted) return;
     setState(() => _incidents = list);
+  }
+
+  Future<void> _loadSheltersAndReports() async {
+    try {
+      final zoneStr = AuthService.currentUser?.zone;
+      final zoneId = AssignmentService.getZoneIdByDistrict(zoneStr);
+      if (zoneId != null) {
+        try {
+          final shelters = await AssignmentService.fetchNearbyShelters(zoneId);
+          if (!mounted) return;
+          setState(() => _shelters = shelters);
+
+          // If we have at least one shelter with coordinates, center map there
+          ShelterData? firstWithCoords;
+          for (final shelter in shelters) {
+            if (shelter.latitude != null && shelter.longitude != null) {
+              firstWithCoords = shelter;
+              break;
+            }
+          }
+
+          if (firstWithCoords != null && firstWithCoords.latitude != null && firstWithCoords.longitude != null) {
+            final newCenter = LatLng(firstWithCoords.latitude!, firstWithCoords.longitude!);
+            _mapCenter = newCenter;
+            _mapController.move(newCenter, _currentZoom);
+          }
+        } catch (e) {
+          print('[Map] Warning: failed to fetch shelters: $e');
+        }
+      }
+    } catch (e) {
+      print('[Map] Error mapping zone to shelters: $e');
+    }
+
+    try {
+      final reportsResp = await AssignmentService.fetchReports();
+      if (reportsResp != null && mounted) {
+        setState(() => _reports = reportsResp.reports);
+      }
+    } catch (e) {
+      print('[Map] Warning: failed to fetch reports: $e');
+    }
   }
 
   void _zoomIn() {
@@ -107,10 +238,7 @@ class _MapScreenState extends State<MapScreen> {
           ),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications, color: Color(0xFF4D8EFF)),
-            onPressed: () {},
-          ),
+          const NotificationButton(),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
@@ -140,29 +268,96 @@ class _MapScreenState extends State<MapScreen> {
               ),
               children: [
                 TileLayer(
-                  urlTemplate: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-                  subdomains: const ['a', 'b', 'c', 'd'],
+                  urlTemplate: _baseLayer == 'osm'
+                      ? 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+                      : 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                  subdomains: _baseLayer == 'osm' ? const ['a', 'b', 'c'] : const ['server'],
+                  userAgentPackageName: 'command_mobile',
                 ),
-                MarkerLayer(
-                  markers: _incidents.map((inc) {
-                    return Marker(
-                      point: LatLng(inc.latitude, inc.longitude),
-                      width: 72,
-                      height: 72,
-                      child: GestureDetector(
-                        onTap: () => _showIncidentSheet(inc),
-                        child: _buildMapMarker(
-                          icon: Icons.report,
-                          bgColor: inc.priority == 'HIGH' ? AppColors.error : AppColors.primary,
-                          fgColor: AppColors.onSurface,
-                          label: inc.id,
-                          labelColor: AppColors.onSurface,
-                          glowColor: inc.priority == 'HIGH' ? const Color(0x33EF4444) : const Color(0x333B82F6),
+
+                if (_showIncidents)
+                  MarkerLayer(
+                    markers: _incidents.map((inc) {
+                      return Marker(
+                        point: LatLng(inc.latitude, inc.longitude),
+                        width: 72,
+                        height: 72,
+                        child: GestureDetector(
+                          onTap: () => _showIncidentSheet(inc),
+                          child: _buildMapMarker(
+                            icon: Icons.report,
+                            bgColor: inc.priority == 'HIGH' ? AppColors.error : AppColors.primary,
+                            fgColor: AppColors.onSurface,
+                            label: inc.id,
+                            labelColor: AppColors.onSurface,
+                            glowColor: inc.priority == 'HIGH' ? const Color(0x33EF4444) : const Color(0x333B82F6),
+                          ),
                         ),
-                      ),
-                    );
-                  }).toList(),
-                ),
+                      );
+                    }).toList(),
+                  ),
+
+                if (_showShelters)
+                  MarkerLayer(
+                    markers: _shelters
+                        .where((s) => s.latitude != null && s.longitude != null)
+                        .map((s) {
+                      final lat = s.latitude!;
+                      final lon = s.longitude!;
+                      return Marker(
+                        point: LatLng(lat, lon),
+                        width: 44,
+                        height: 44,
+                        child: GestureDetector(
+                          onTap: () => _showShelterSheet(s),
+                          child: _buildMapMarkerIconOnly(
+                            icon: Icons.home_work,
+                            bgColor: AppColors.secondary,
+                            fgColor: AppColors.onSurface,
+                            glowColor: const Color(0x3333CC99),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+
+                if (_showReports)
+                  MarkerLayer(
+                    markers: _reports.map((r) {
+                      final lat = r.location.latitude;
+                      final lon = r.location.longitude;
+                      return Marker(
+                        point: LatLng(lat, lon),
+                        width: 44,
+                        height: 44,
+                        child: GestureDetector(
+                          onTap: () => showModalBottomSheet(
+                            context: context,
+                            builder: (_) => Container(
+                              padding: const EdgeInsets.all(12),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(r.title, style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+                                  const SizedBox(height: 8),
+                                  Text('Type: ${r.disasterType} • Severity: ${r.severity}'),
+                                  const SizedBox(height: 8),
+                                  Text(r.description ?? ''),
+                                ],
+                              ),
+                            ),
+                          ),
+                          child: _buildMapMarkerIconOnly(
+                            icon: Icons.report,
+                            bgColor: AppColors.tertiaryContainer,
+                            fgColor: AppColors.onSurface,
+                            glowColor: const Color(0x333B82F6),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
               ],
             ),
           ),
@@ -210,11 +405,7 @@ class _MapScreenState extends State<MapScreen> {
                       Icons.layers,
                       key: const Key('map-layers-button'),
                       tooltip: 'Layers',
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Layers menu coming soon')),
-                        );
-                      },
+                      onTap: _showLayersMenu,
                     ),
                   ],
                 ),
@@ -229,16 +420,6 @@ class _MapScreenState extends State<MapScreen> {
             top: 12,
             left: 16,
             child: _buildLegendPanel(),
-          ),
-
-          // ═══════════════════════════════════════
-          //  BOTTOM SHEET — Active AO Summary
-          // ═══════════════════════════════════════
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 64, // above the BottomNav
-            child: _buildBottomSheet(),
           ),
 
           // ═══════════════════════════════════════
@@ -583,6 +764,133 @@ class _MapScreenState extends State<MapScreen> {
           },
         );
       },
+    );
+  }
+
+  void _showShelterSheet(ShelterData shelter) {
+    final occupancyPercent = shelter.capacity > 0
+        ? ((shelter.occupancy / shelter.capacity) * 100).clamp(0, 100).toDouble()
+        : 0.0;
+
+    final occupancyColor = occupancyPercent >= 90
+        ? AppColors.error
+        : occupancyPercent >= 70
+            ? AppColors.tertiaryContainer
+            : AppColors.secondary;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => Container(
+        decoration: BoxDecoration(
+          color: AppColors.surfaceContainerHighest,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppColors.secondary.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.home_work, color: AppColors.secondary),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    shelter.name,
+                    style: GoogleFonts.inter(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.onSurface,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: occupancyColor.withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    shelter.status,
+                    style: GoogleFonts.spaceGrotesk(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: occupancyColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Occupancy',
+              style: GoogleFonts.spaceGrotesk(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppColors.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(
+                minHeight: 10,
+                value: occupancyPercent / 100,
+                backgroundColor: Colors.white12,
+                valueColor: AlwaysStoppedAnimation<Color>(occupancyColor),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${shelter.occupancy}/${shelter.capacity} (${occupancyPercent.toStringAsFixed(0)}%)',
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.onSurface,
+              ),
+            ),
+            const SizedBox(height: 14),
+            if (shelter.distanceKm != null)
+              Text(
+                'Distance: ${shelter.distanceKm!.toStringAsFixed(1)} km',
+                style: GoogleFonts.inter(fontSize: 13, color: AppColors.onSurfaceVariant),
+              ),
+            if (shelter.contactPerson != null && shelter.contactPerson!.isNotEmpty)
+              Text(
+                'Contact: ${shelter.contactPerson}',
+                style: GoogleFonts.inter(fontSize: 13, color: AppColors.onSurfaceVariant),
+              ),
+            if (shelter.contactPhone != null && shelter.contactPhone!.isNotEmpty)
+              Text(
+                'Phone: ${shelter.contactPhone}',
+                style: GoogleFonts.inter(fontSize: 13, color: AppColors.onSurfaceVariant),
+              ),
+            const SizedBox(height: 6),
+          ],
+        ),
+      ),
     );
   }
   Widget _buildMapMarker({

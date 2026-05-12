@@ -16,13 +16,10 @@ class _LoginScreenState extends State<LoginScreen>
   final _serviceIdController = TextEditingController();
   final _passkeyController = TextEditingController();
   bool _obscurePasskey = true;
-  int _selectedRoleIndex = 0; // 0=Officer, 1=Logistics, 2=Response Officer
   bool _isLoading = false;
 
   late AnimationController _glowController;
   late Animation<double> _glowAnimation;
-
-  final List<String> _roles = ['OFFICER', 'LOGISTICS', 'RESPONSE OFFICER'];
 
   @override
   void initState() {
@@ -49,39 +46,35 @@ class _LoginScreenState extends State<LoginScreen>
     super.dispose();
   }
 
-  void _handleLogin() {
-    final serviceId = _serviceIdController.text.trim();
-    final passkey = _passkeyController.text.trim();
+  Future<void> _handleLogin() async {
+    final email = _serviceIdController.text.trim();
+    final password = _passkeyController.text.trim();
 
-    if (serviceId.isEmpty || passkey.isEmpty) {
-      _showError('Please enter both Service ID and Passkey');
+    if (email.isEmpty || password.isEmpty) {
+      _showError('Please enter both email and password');
       return;
     }
 
     setState(() => _isLoading = true);
 
-    // Simulate a brief network delay and authenticate
-    Future.delayed(const Duration(milliseconds: 600), () {
-      if (!mounted) return;
+    final User? user = await AuthService.login(email, password);
+    if (!mounted) return;
 
-      final User? user = AuthService.authenticate(serviceId, passkey);
+    setState(() => _isLoading = false);
 
-      setState(() => _isLoading = false);
-
-      if (user != null) {
-        Navigator.pushReplacementNamed(
-          context,
-          '/dashboard',
-          arguments: {
-            'serviceId': user.serviceId,
-            'role': user.role,
-            'zone': user.zone,
-          },
-        );
-      } else {
-        _showError('Invalid credentials. Access denied.');
-      }
-    });
+    if (user != null) {
+      Navigator.pushReplacementNamed(
+        context,
+        '/dashboard',
+        arguments: {
+          'serviceId': user.serviceId,
+          'role': user.role,
+          'zone': user.zone,
+        },
+      );
+    } else {
+      _showError(AuthService.lastErrorMessage ?? 'Invalid credentials. Access denied.');
+    }
   }
 
   void _showError(String message) {
@@ -244,20 +237,14 @@ class _LoginScreenState extends State<LoginScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // ── Role Selection ──
-                _buildSectionLabel('DESIGNATION'),
-                const SizedBox(height: 8),
-                _buildRoleSelector(),
-                const SizedBox(height: 24),
-
                 // ── Service ID ──
-                _buildSectionLabel('SERVICE ID'),
+                _buildSectionLabel('EMAIL'),
                 const SizedBox(height: 8),
                 _buildServiceIdField(),
                 const SizedBox(height: 24),
 
                 // ── Secure Passkey ──
-                _buildSectionLabel('SECURE PASSKEY'),
+                _buildSectionLabel('PASSWORD'),
                 const SizedBox(height: 8),
                 _buildPasskeyField(),
                 const SizedBox(height: 28),
@@ -284,65 +271,7 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  // ─── Role Selector (3 buttons) ───
-  Widget _buildRoleSelector() {
-    return Row(
-      children: List.generate(_roles.length, (index) {
-        final isSelected = _selectedRoleIndex == index;
-        return Expanded(
-          child: GestureDetector(
-            onTap: () => setState(() => _selectedRoleIndex = index),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              margin: EdgeInsets.only(
-                left: index == 0 ? 0 : 4,
-                right: index == 2 ? 0 : 4,
-              ),
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? AppColors.surface
-                    : AppColors.surfaceVariant,
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(
-                  color: isSelected
-                      ? AppColors.primary.withValues(alpha: 0.3)
-                      : Colors.white.withValues(alpha: 0.05),
-                ),
-                boxShadow: isSelected
-                    ? [
-                        BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.1),
-                          blurRadius: 15,
-                        ),
-                      ]
-                    : null,
-              ),
-              child: Center(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    _roles[index],
-                    maxLines: 1,
-                    style: GoogleFonts.spaceGrotesk(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: 0.7,
-                      color: isSelected
-                          ? AppColors.primary
-                          : AppColors.onSurfaceVariant.withValues(alpha: 0.6),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      }),
-    );
-  }
-
-  // ─── Service ID Field ───
+  // ─── Email Field ───
   Widget _buildServiceIdField() {
     return Container(
       decoration: const BoxDecoration(
@@ -363,7 +292,7 @@ class _LoginScreenState extends State<LoginScreen>
             color: AppColors.outlineVariant,
             size: 20,
           ),
-          hintText: 'Enter ID (e.g., CMD-049)',
+          hintText: 'Enter email address',
           hintStyle: GoogleFonts.spaceGrotesk(
             fontSize: 14,
             fontWeight: FontWeight.w500,
@@ -380,7 +309,7 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  // ─── Passkey Field ───
+  // ─── Password Field ───
   Widget _buildPasskeyField() {
     return Container(
       decoration: const BoxDecoration(

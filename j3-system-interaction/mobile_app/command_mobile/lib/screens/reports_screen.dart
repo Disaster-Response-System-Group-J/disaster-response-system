@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../components/app_drawer.dart';
+import '../components/notification_button.dart';
 import '../components/nav_bar.dart';
 import 'dart:async';
 import '../services/incident_service.dart';
@@ -85,10 +86,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           ),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications, color: Color(0xFF4D8EFF)),
-            onPressed: () {},
-          ),
+          const NotificationButton(),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
