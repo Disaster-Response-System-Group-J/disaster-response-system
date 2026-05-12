@@ -8,7 +8,6 @@ import {
 } from 'lucide-react';
 import { AdminAuditDashboard } from '@/components/admin/admin-audit-dashboard';
 import { UserRole, DISASTER_TYPES, User } from '@/types';
-import { createClient } from '@supabase/supabase-js';
 
 type AdminUser = User & { status: 'ACTIVE' | 'SUSPENDED' };
 type AdminTab = 'users' | 'disasters' | 'config' | 'audit';
@@ -48,23 +47,17 @@ export default function AdminPanelPage() {
 
   const [activeTab, setActiveTab] = useState<AdminTab>('users');
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-
   useEffect(() => {
-    const fetchUsers = async () => {
-      const { data, error } = await supabase.from('User').select('*');
-      if (data && !error) {
-        setUsers(data.map((u: any) => ({ ...u, status: 'ACTIVE' })));
-      }
-    };
-
-    if (activeTab === 'users') {
-      fetchUsers();
-    }
-  }, [activeTab, supabase]);
+    if (activeTab !== 'users') return;
+    fetch('/api/users')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setUsers(data.map((u: any) => ({ ...u, status: 'ACTIVE' })));
+        }
+      })
+      .catch(err => console.error('Failed to fetch users:', err));
+  }, [activeTab]);
 
   const [disasterTypes, setDisasterTypes] = useState<string[]>([
     DISASTER_TYPES.FLOOD, DISASTER_TYPES.LANDSLIDE, DISASTER_TYPES.DROUGHT, DISASTER_TYPES.OTHER, 'CYCLONE'
@@ -101,12 +94,12 @@ export default function AdminPanelPage() {
       setUsers([...users, newUser]);
       showMessage('User created successfully');
     } else if (selectedUser) {
-      const { error } = await supabase
-        .from('User')
-        .update({ name: formData.name, role: formData.role })
-        .eq('id', selectedUser.id);
-
-      if (!error) {
+      const res = await fetch(`/api/users/${selectedUser.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: formData.name, role: formData.role }),
+      });
+      if (res.ok) {
         setUsers(users.map(u => u.id === selectedUser.id ? { ...u, ...formData } : u));
         setSelectedUser({ ...selectedUser, ...formData });
         showMessage('User updated successfully');

@@ -335,28 +335,28 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
     'dispatch:field-officers', 'dispatch:response-teams',
   ],
   [UserRole.OPERATIONS_OFFICER_NATIONAL]: [
-    'view:dashboard', 'view:incoming-reports', 'view:incident-map', 'view:sensors',
-    'verify:reports', 'reject:reports', 'update:incident-status', 'request:resources'
+    'view:dashboard', 'view:incoming-reports', 'view:incident-map', 'view:sensors', 'view:alerts',
+    'verify:reports', 'reject:reports', 'update:incident-status', 'request:resources',
   ],
   [UserRole.OPERATIONS_OFFICER_ZONAL]: [
-    'view:dashboard', 'view:incoming-reports', 'view:incident-map', 'view:sensors',
-    'verify:reports', 'reject:reports', 'update:incident-status', 'request:resources'
+    'view:dashboard', 'view:incoming-reports', 'view:incident-map', 'view:sensors', 'view:alerts',
+    'verify:reports', 'reject:reports', 'update:incident-status', 'request:resources',
   ],
   [UserRole.RESOURCE_MANAGER_NATIONAL]: [
-    'view:dashboard', 'view:incident-map', 'view:resources', 'view:predictions',
+    'view:dashboard', 'view:incident-map', 'view:resources', 'view:predictions', 'view:alerts',
     'dispatch:resources', 'update:resource-status', 'manage:shelters', 'dispatch:logistics',
   ],
   [UserRole.RESOURCE_MANAGER_ZONAL]: [
-    'view:dashboard', 'view:incident-map', 'view:resources', 'view:predictions',
+    'view:dashboard', 'view:incident-map', 'view:resources', 'view:predictions', 'view:alerts',
     'dispatch:resources', 'update:resource-status', 'manage:shelters', 'dispatch:logistics',
   ],
   [UserRole.SYSTEM_ADMIN]: [
-    'view:dashboard', 'manage:users', 'manage:settings', 'view:audit-logs',
+    'view:dashboard', 'manage:users', 'manage:settings', 'view:audit-logs', 'view:alerts',
     'view:blockchain-audit',
   ],
   [UserRole.AUDITOR]: [
-    'view:dashboard', 'view:audit-logs', 'view:blockchain-audit',
-    'view:incident-map',
+    'view:blockchain-audit',
+    'view:audit-logs',
   ],
   // ── Mobile App Roles ────────────────────────────────────────
   [UserRole.FIELD_OFFICER]: [

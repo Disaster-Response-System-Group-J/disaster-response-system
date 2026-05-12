@@ -10,6 +10,12 @@ import { useAuth } from '@/context/AuthContext';
 import { createClient } from '@supabase/supabase-js';
 import { useSocket } from '@/context/SocketContext';
 
+// Module-level singleton — avoids creating a new GoTrueClient on every render
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
 const SEVERITY_COLORS: Record<string, string> = {
   CRITICAL: '#ef4444',
   HIGH: '#f97316',
@@ -28,12 +34,6 @@ export default function IncidentMapPage() {
 
   // 1. Add this state to hold the real users
   const [activeUsers, setActiveUsers] = useState<any[]>([]);
-
-  // 2. Initialize the Supabase client
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
 
   // Track dispatched personnel per incident: { [incidentId]: { fieldOfficers: User[], responseTeams: User[], logistics: User[] } }
   const [dispatched, setDispatched] = useState<Record<string, { fieldOfficers: any[], responseTeams: any[], logistics: any[] }>>({});

@@ -3,6 +3,7 @@
 import { ReactNode, useMemo, useState, useEffect } from 'react';
 import { AlertTriangle, BrainCircuit, Clock3, RefreshCcw, ShieldAlert, Waves } from 'lucide-react';
 import { useSocket } from '@/context/SocketContext';
+import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
 
 type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
@@ -27,6 +28,7 @@ const LEVEL_STYLES: Record<RiskLevel, string> = {
 
 export default function PredictionsPage() {
   const socket = useSocket();
+  const { hasPermission } = useAuth();
   const [zones, setZones] = useState<PredictionZone[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [riskFilter, setRiskFilter] = useState<'ALL' | RiskLevel>('ALL');
@@ -56,7 +58,7 @@ export default function PredictionsPage() {
 
         return {
           zone: row.division_name || 'Unknown Zone',
-          district: 'Assigned Region',
+          district: row.district || row.division_name || 'Unknown District',
           riskScore: Math.round((severity / 3) * 100),
           riskLevel,
           confidence,
@@ -206,12 +208,14 @@ export default function PredictionsPage() {
                   <span className={`px-2.5 py-1 rounded text-[9px] font-bold tracking-widest border ${LEVEL_STYLES[zone.riskLevel]}`}>
                     {zone.riskLevel}
                   </span>
-                  <button 
-                    onClick={() => handleIssueAlert(zone)}
-                    className="px-2.5 py-1 ml-2 rounded text-[9px] font-bold tracking-widest border bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20 transition-colors"
-                  >
-                    ISSUE ALERT
-                  </button>
+                  {hasPermission('issue:alerts') && (
+                    <button
+                      onClick={() => handleIssueAlert(zone)}
+                      className="px-2.5 py-1 ml-2 rounded text-[9px] font-bold tracking-widest border bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20 transition-colors"
+                    >
+                      ISSUE ALERT
+                    </button>
+                  )}
                 </div>
               </div>
 
