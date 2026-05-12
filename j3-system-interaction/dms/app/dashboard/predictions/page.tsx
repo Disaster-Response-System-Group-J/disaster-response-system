@@ -44,7 +44,7 @@ export default function PredictionsPage() {
       // Map database rows to the UI format
       const mappedZones: PredictionZone[] = data.map((row: any) => ({
         zone: row.division_name || 'Unknown Zone',
-        district: 'Assigned Region', // Fallback, since district isn't directly in DisasterRisk table
+        district: row.district || row.division_name || 'Assigned Region',
         // Convert score to a 0-100 scale if it's a probability (0-1), otherwise use directly
         riskScore: row.score > 1 ? Math.round(row.score) : Math.round((row.score || 0) * 100),
         riskLevel: (row.risk_level as RiskLevel) || 'LOW',

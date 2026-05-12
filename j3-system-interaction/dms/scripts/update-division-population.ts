@@ -8,7 +8,7 @@
 import { PrismaClient } from "@prisma/client";
 import * as fs from "fs";
 import * as path from "path";
-import csv from "csv-parser";
+import * as csv from "csv-parser";
 
 const prisma = new PrismaClient();
 
@@ -30,7 +30,7 @@ function readPopulationCSV(filePath: string): Promise<Map<string, number>> {
       .on("end", () => {
         resolve(populationMap);
       })
-      .on("error", (error: any) => {
+      .on("error", (error) => {
         reject(error);
       });
   });

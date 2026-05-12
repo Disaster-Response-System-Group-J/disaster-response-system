@@ -9,6 +9,8 @@
     "lint": "eslint",
     "test": "node ./scripts/run-tests.js",
     "test:run": "vitest run",
+    "pipeline:run": "ts-node ./scripts/run-iot-risk-pipeline.ts",
+    "pipeline:test": "ts-node ./scripts/run-iot-risk-pipeline.ts --synthetic --device DEV-001 --rows 3",
     "synthetic:risk-alert": "node ./scripts/send-synthetic-risk-alert.js"
   },
   "dependencies": {
