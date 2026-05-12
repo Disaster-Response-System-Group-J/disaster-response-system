@@ -12,6 +12,8 @@ import { useSocket } from '@/context/SocketContext';
 import ResourcePlanView from './ResourcePlanView';
 
 const STATUS_STYLES: Record<string, string> = {
+  ACTIVE: 'bg-green-500/10 text-green-400 border-green-500/20', // New
+  STANDBY: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
   AVAILABLE: 'bg-green-500/10 text-green-400 border-green-500/20',
   ASSIGNED: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
   BUSY: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
@@ -34,7 +36,7 @@ export default function ResourcesPage() {
   const [resources, setResources] = useState<any[]>([]);
   const [activeIncidents, setActiveIncidents] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
@@ -50,14 +52,14 @@ export default function ResourcesPage() {
   const [resourceRequests, setResourceRequests] = useState<any[]>([]);
   const [requestsLoading, setRequestsLoading] = useState(false);
   const [requestFilter, setRequestFilter] = useState<string>('ALL');
-  
+
   const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.includes('NATIONAL')) ? 'ALL' : (user as any)?.assignedDistrict || 'ALL';
 
   // State for modals
   const [assignModal, setAssignModal] = useState<string | null>(null);
   const [selectedIncidentId, setSelectedIncidentId] = useState<string>('');
   const [shelterModal, setShelterModal] = useState<string | null>(null);
-  const [shelterForm, setShelterForm] = useState({ capacity: 0, currentLoad: 0 });
+  const [shelterForm, setShelterForm] = useState({ capacity: 0, currentLoad: 0, status: 'STANDBY' });
 
   useEffect(() => {
     const fetchAllData = async () => {
@@ -86,7 +88,7 @@ export default function ResourcesPage() {
           dbId: s.shelter_id,
           name: s.name,
           type: ResourceType.SHELTER,
-          status: s.status === 'OPEN' ? ResourceStatus.AVAILABLE : ResourceStatus.OUT_OF_SERVICE,
+          status: s.status,
           district: 'Unassigned',
           capacity: s.max_capacity,
           currentLoad: s.current_occupancy,
@@ -161,10 +163,12 @@ export default function ResourcesPage() {
   useEffect(() => {
     if (!socket) return;
     const handleResourceUpdated = (data: any) => {
-      setResources(prev => prev.map(r => 
-        r.resourceId === data.resourceId 
-          ? { ...r, status: data.status, lastUpdated: data.lastUpdated,
-              ...(data.capacity !== undefined && { capacity: data.capacity, currentLoad: data.currentLoad }) } 
+      setResources(prev => prev.map(r =>
+        r.resourceId === data.resourceId
+          ? {
+            ...r, status: data.status, lastUpdated: data.lastUpdated,
+            ...(data.capacity !== undefined && { capacity: data.capacity, currentLoad: data.currentLoad })
+          }
           : r
       ));
     };
@@ -186,28 +190,45 @@ export default function ResourcesPage() {
   const availableCount = filtered.filter(r => r.status === ResourceStatus.AVAILABLE).length;
   const assignedCount = filtered.filter(r => r.status === ResourceStatus.ASSIGNED || r.status === ResourceStatus.BUSY).length;
 
-  const handleStatusUpdate = async (id: string, newStatus: ResourceStatus) => {
+  const handleStatusUpdate = async (id: string, newStatus: string) => {
     const timestamp = new Date().toISOString();
-    
+    const dbId = id.split('-')[1];
+    const isAsset = id.startsWith('ASSET-');
+
     try {
-      const isAsset = id.startsWith('ASSET-');
       if (isAsset) {
-        const dbId = id.split('-')[1];
         await fetch('/api/resources/list', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ assetId: dbId, status: newStatus }),
         });
       } else {
-        // Shelter status logic if needed
+        // Logic for Shelter status updates
+        await fetch('/api/relief/shelter', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            shelterId: dbId,
+            status: newStatus
+          }),
+        });
+      }
+
+      // Update local UI state
+      setResources(prev => prev.map(r =>
+        r.resourceId === id ? { ...r, status: newStatus, lastUpdated: timestamp } : r
+      ));
+
+      // Broadcast update via WebSockets
+      if (socket) {
+        socket.emit('client:update-resource-status', {
+          resourceId: id,
+          status: newStatus,
+          lastUpdated: timestamp
+        });
       }
     } catch (err) {
-      console.error('Failed to update DB', err);
-    }
-
-    setResources(prev => prev.map(r => r.resourceId === id ? { ...r, status: newStatus, lastUpdated: timestamp } : r));
-    if (socket) {
-      socket.emit('client:update-resource-status', { resourceId: id, status: newStatus, lastUpdated: timestamp });
+      console.error('Failed to update status:', err);
     }
   };
 
@@ -223,55 +244,57 @@ export default function ResourcesPage() {
 
   const openShelterModal = (resource: any) => {
     setShelterModal(resource.resourceId);
-    setShelterForm({ capacity: resource.capacity || 0, currentLoad: resource.currentLoad || 0 });
+    setShelterForm({
+      capacity: resource.capacity || 0,
+      currentLoad: resource.currentLoad || 0,
+      status: resource.status || 'OPEN'
+    });
   };
 
   const handleShelterUpdate = async (e: React.FormEvent) => {
-  e.preventDefault();
-  if (!shelterModal) return;
+    e.preventDefault();
+    if (!shelterModal) return;
 
-  // Extract the raw numeric ID from "SHELTER-123"
-  const dbId = shelterModal.split('-')[1];
-  const timestamp = new Date().toISOString();
+    const dbId = shelterModal.split('-')[1];
+    const timestamp = new Date().toISOString();
 
-  try {
-    // 1. PERSIST TO DATABASE
-    const response = await fetch('/api/relief/shelter', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        shelterId: dbId, 
-        max_capacity: shelterForm.capacity,      // Matches API key
-        current_occupancy: shelterForm.currentLoad // Matches API key
-      }),
-    });
+    try {
+      const response = await fetch('/api/relief/shelter', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          shelterId: dbId,
+          max_capacity: shelterForm.capacity,
+          current_occupancy: shelterForm.currentLoad,
+          status: shelterForm.status // Included status in update
+        }),
+      });
 
-    if (!response.ok) throw new Error('Failed to update database');
+      if (!response.ok) throw new Error('Failed to update database');
 
-    // 2. UPDATE LOCAL UI[cite: 5]
-    setResources(prev => prev.map(r => r.resourceId === shelterModal ? {
-      ...r,
-      capacity: shelterForm.capacity,
-      currentLoad: shelterForm.currentLoad,
-      lastUpdated: timestamp
-    } : r));
-
-    // 3. BROADCAST VIA SOCKET[cite: 5]
-    if (socket) {
-      socket.emit('client:update-resource-status', {
-        resourceId: shelterModal,
+      setResources(prev => prev.map(r => r.resourceId === shelterModal ? {
+        ...r,
         capacity: shelterForm.capacity,
         currentLoad: shelterForm.currentLoad,
+        status: shelterForm.status, // Update local UI
         lastUpdated: timestamp
-      });
-    }
+      } : r));
 
-    setShelterModal(null);
-  } catch (err) {
-    console.error(err);
-    alert('Critical Error: Could not save shelter data to database.');
-  }
-};
+      if (socket) {
+        socket.emit('client:update-resource-status', {
+          resourceId: shelterModal,
+          status: shelterForm.status, // Broadcast via socket
+          capacity: shelterForm.capacity,
+          currentLoad: shelterForm.currentLoad,
+          lastUpdated: timestamp
+        });
+      }
+
+      setShelterModal(null);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   if (isLoading) {
     return <div className="flex-1 overflow-y-auto bg-[#0a0f16] text-white flex items-center justify-center">
@@ -383,9 +406,19 @@ export default function ResourcesPage() {
               {Object.values(ResourceType).filter(t => t !== ResourceType.SHELTER).map(t => <option key={t} value={t}>{t.replace('_', ' ')}</option>)}
             </select>
           )}
-          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="bg-[#0a0f16] border border-slate-800 rounded-lg px-4 py-2 text-sm text-slate-300 focus:outline-none min-w-[150px]">
+          <select
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value)}
+            className="bg-[#0a0f16] border border-slate-800 rounded-lg px-4 py-2 text-sm text-slate-300 focus:outline-none min-w-[150px]"
+          >
             <option value="ALL">All Statuses</option>
-            {Object.values(ResourceStatus).map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+            {/* Standard Asset Statuses */}
+            {Object.values(ResourceStatus).map(s => (
+              <option key={s} value={s}>{s.replace('_', ' ')}</option>
+            ))}
+            {/* Add Shelter-specific statuses to the filter */}
+            <option value="ACTIVE">ACTIVE</option>
+            <option value="STANDBY">STANDBY</option>
           </select>
         </div>
 
@@ -410,7 +443,7 @@ export default function ResourcesPage() {
                       <div>
                         <p className="text-sm font-bold text-slate-200">{r.name}</p>
                         <p className="text-[10px] text-slate-500 font-mono mt-0.5">
-                          {r.resourceId} 
+                          {r.resourceId}
                           {r.type === ResourceType.SHELTER && r.capacity !== undefined && (
                             <span className="ml-2 text-blue-400">({r.currentLoad}/{r.capacity} full)</span>
                           )}
@@ -432,21 +465,41 @@ export default function ResourcesPage() {
                       <button className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-xs font-semibold text-slate-300 flex items-center gap-1">
                         Update <ChevronDown size={12} />
                       </button>
+
                       <div className="absolute right-0 top-full mt-1 w-48 bg-[#181f2c] border border-slate-700 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10 p-1">
-                        {Object.values(ResourceStatus).map(s => (
-                          <button key={s} onClick={() => handleStatusUpdate(r.resourceId, s as ResourceStatus)}
-                            className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white rounded transition-colors">
-                            Mark {s.replace('_', ' ')}
-                          </button>
-                        ))}
-                        {hasPermission('dispatch:resources') && r.status === ResourceStatus.AVAILABLE && (
+                        {r.type === ResourceType.SHELTER ? (
+                          <>
+                            {/* Shelter specific actions */}
+                            <button onClick={() => handleStatusUpdate(r.resourceId, 'ACTIVE')}
+                              className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white rounded transition-colors">
+                              Mark ACTIVE
+                            </button>
+                            <button onClick={() => handleStatusUpdate(r.resourceId, 'STANDBY')}
+                              className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white rounded transition-colors">
+                              Mark STANDBY
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            {/* Asset specific actions */}
+                            {Object.values(ResourceStatus).map(s => (
+                              <button key={s} onClick={() => handleStatusUpdate(r.resourceId, s)}
+                                className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white rounded transition-colors">
+                                Mark {s.replace('_', ' ')}
+                              </button>
+                            ))}
+                          </>
+                        )}
+
+                        {/* Common specialized actions */}
+                        {hasPermission('dispatch:resources') && r.status === 'AVAILABLE' && (
                           <button onClick={() => setAssignModal(r.resourceId)} className="w-full text-left px-3 py-2 text-xs font-bold text-blue-400 hover:bg-slate-800 border-t border-slate-700 mt-1 rounded transition-colors">
                             Dispatch to Incident...
                           </button>
                         )}
                         {r.type === ResourceType.SHELTER && (
                           <button onClick={() => openShelterModal(r)} className="w-full text-left px-3 py-2 text-xs font-bold text-teal-400 hover:bg-slate-800 border-t border-slate-700 mt-1 rounded transition-colors">
-                            Manage Shelter...
+                            Manage Capacity...
                           </button>
                         )}
                       </div>
@@ -468,7 +521,7 @@ export default function ResourcesPage() {
                 onChange={e => setRequestFilter(e.target.value)}
                 className="bg-[#0a0f16] border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none">
                 <option value="ALL">All Statuses</option>
-                {['PENDING','APPROVED','DISPATCHED','FULFILLED','REJECTED'].map(s => (
+                {['PENDING', 'APPROVED', 'DISPATCHED', 'FULFILLED', 'REJECTED'].map(s => (
                   <option key={s} value={s}>{s}</option>
                 ))}
               </select>
@@ -540,25 +593,39 @@ export default function ResourcesPage() {
         </div>
       )}
 
-      {/* Shelter Modal */}
+      {/* Shelter Modal Update */}
       {shelterModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#131924] border border-slate-700 rounded-xl w-full max-w-md shadow-2xl p-6">
             <div className="flex justify-between mb-6">
               <h3 className="font-bold text-white">Manage Shelter Data</h3>
-              <button onClick={() => setShelterModal(null)} className="text-slate-400"><X size={18}/></button>
+              <button onClick={() => setShelterModal(null)} className="text-slate-400"><X size={18} /></button>
             </div>
             <form onSubmit={handleShelterUpdate}>
-              <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="text-[10px] font-bold text-slate-500 block mb-2 uppercase">Max Capacity</label>
-                  <input type="number" value={shelterForm.capacity} onChange={e => setShelterForm({...shelterForm, capacity: parseInt(e.target.value)})} className="w-full bg-[#0a0f16] border border-slate-700 rounded-lg px-3 py-2 text-sm text-white" />
+                  <input type="number" value={shelterForm.capacity} onChange={e => setShelterForm({ ...shelterForm, capacity: parseInt(e.target.value) })} className="w-full bg-[#0a0f16] border border-slate-700 rounded-lg px-3 py-2 text-sm text-white" />
                 </div>
                 <div>
                   <label className="text-[10px] font-bold text-slate-500 block mb-2 uppercase">Current Occupancy</label>
-                  <input type="number" value={shelterForm.currentLoad} onChange={e => setShelterForm({...shelterForm, currentLoad: parseInt(e.target.value)})} className="w-full bg-[#0a0f16] border border-slate-700 rounded-lg px-3 py-2 text-sm text-white" />
+                  <input type="number" value={shelterForm.currentLoad} onChange={e => setShelterForm({ ...shelterForm, currentLoad: parseInt(e.target.value) })} className="w-full bg-[#0a0f16] border border-slate-700 rounded-lg px-3 py-2 text-sm text-white" />
                 </div>
               </div>
+
+              {/* New Status Selection Field */}
+              <div className="mb-6">
+                <label className="text-[10px] font-bold text-slate-500 block mb-2 uppercase">Operational Status</label>
+                <select
+                  value={shelterForm.status}
+                  onChange={e => setShelterForm({ ...shelterForm, status: e.target.value })}
+                  className="w-full bg-[#0a0f16] border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                >
+                  <option value="ACTIVE">ACTIVE (Operational)</option>
+                  <option value="STANDBY">STANDBY (Offline/Ready)</option>
+                </select>
+              </div>
+
               <button type="submit" className="w-full py-2.5 bg-teal-600 rounded-lg text-xs font-bold text-white">Save Updates</button>
             </form>
           </div>
@@ -571,18 +638,18 @@ export default function ResourcesPage() {
 // ── Resource Request Card ─────────────────────────────────────────────────────
 
 const REQUEST_STATUS_STYLES: Record<string, string> = {
-  PENDING:    'bg-amber-500/10 text-amber-400 border-amber-500/30',
-  APPROVED:   'bg-green-500/10 text-green-400 border-green-500/30',
+  PENDING: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+  APPROVED: 'bg-green-500/10 text-green-400 border-green-500/30',
   DISPATCHED: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
-  FULFILLED:  'bg-teal-500/10 text-teal-400 border-teal-500/30',
-  REJECTED:   'bg-red-500/10 text-red-400 border-red-500/30',
+  FULFILLED: 'bg-teal-500/10 text-teal-400 border-teal-500/30',
+  REJECTED: 'bg-red-500/10 text-red-400 border-red-500/30',
 };
 
 const URGENCY_STYLES: Record<string, string> = {
   CRITICAL: 'text-red-400 bg-red-500/10 border-red-500/20',
-  HIGH:     'text-orange-400 bg-orange-500/10 border-orange-500/20',
-  MEDIUM:   'text-yellow-400 bg-yellow-500/10 border-yellow-500/20',
-  LOW:      'text-blue-400 bg-blue-500/10 border-blue-500/20',
+  HIGH: 'text-orange-400 bg-orange-500/10 border-orange-500/20',
+  MEDIUM: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20',
+  LOW: 'text-blue-400 bg-blue-500/10 border-blue-500/20',
 };
 
 function ResourceRequestCard({
@@ -597,9 +664,8 @@ function ResourceRequestCard({
   const items: any[] = typeof req.items === 'string' ? JSON.parse(req.items) : (req.items ?? []);
 
   return (
-    <div className={`bg-[#131924] border rounded-xl p-5 transition-all ${
-      req.status === 'PENDING' ? 'border-amber-500/20' : 'border-slate-800/80'
-    }`}>
+    <div className={`bg-[#131924] border rounded-xl p-5 transition-all ${req.status === 'PENDING' ? 'border-amber-500/20' : 'border-slate-800/80'
+      }`}>
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div>
@@ -694,4 +760,4 @@ function ResourceRequestCard({
       )}
     </div>
   );
-}
+}
