@@ -1,5 +1,7 @@
 FROM node:22.16.0-alpine3.21 AS builder
 
+RUN apk upgrade --no-cache
+
 WORKDIR /app
 
 COPY package.json package-lock.json ./
@@ -14,6 +16,8 @@ RUN mkdir -p dist/blockchain \
 
 
 FROM node:22.16.0-alpine3.21 AS runtime
+
+RUN apk upgrade --no-cache
 
 WORKDIR /app
 

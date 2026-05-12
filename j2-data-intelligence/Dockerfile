@@ -2,7 +2,8 @@ FROM python:3.11.12-slim-bookworm AS builder
 
 WORKDIR /build
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get upgrade -y --no-install-recommends \
+    && apt-get install -y --no-install-recommends \
         build-essential \
         librdkafka-dev \
         gcc \
@@ -17,7 +18,8 @@ FROM python:3.11.12-slim-bookworm AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get upgrade -y --no-install-recommends \
+    && apt-get install -y --no-install-recommends \
         librdkafka1 \
         libgomp1 \
         curl \
