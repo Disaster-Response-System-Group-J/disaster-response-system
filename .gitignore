@@ -69,3 +69,5 @@ terraform/terraform.tfstate.backup
 kube/config
 ~/.kube/
 k8s/secrets.yaml
+
+.claude/
