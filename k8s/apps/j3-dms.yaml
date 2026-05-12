@@ -71,7 +71,7 @@ spec:
               memory: 64Mi
       containers:
         - name: j3-dms
-          image: dehanns/disaster-j3-dms:v1.7
+          image: dehanns/disaster-j3-dms:sha-047cf9d
           imagePullPolicy: Always
           ports:
             - containerPort: 3000
