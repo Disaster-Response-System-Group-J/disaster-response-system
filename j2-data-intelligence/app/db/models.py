@@ -148,6 +148,7 @@ class IoTPrediction(Base):
     source_id = Column(String, nullable=False, index=True)
     disaster_type = Column(String, nullable=False)
     predicted_status = Column(String, nullable=False)
+    horizon = Column(Integer, nullable=False, default=0)   # 0=now 1=Day+1 2=Day+2 3=Day+3
     temp = Column(Numeric)
     hum = Column(Integer)
     depth_prev = Column(Numeric)
@@ -160,4 +161,5 @@ class IoTPrediction(Base):
     gy = Column(Integer)
     gz = Column(Integer)
     predicted_at = Column(DateTime)
-    __table_args__ = (UniqueConstraint('source_id', 'disaster_type', name='iot_predictions_source_type_unique'),)
+    __table_args__ = (UniqueConstraint('source_id', 'disaster_type', 'horizon',
+                                       name='iot_predictions_source_type_horizon_unique'),)

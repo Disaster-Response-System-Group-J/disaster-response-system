@@ -1,20 +1,37 @@
 """
 IoT Event Handler — polls iot_flood and iot_landslide for unprocessed rows
-and writes ML predictions to the iot_predictions table every 30 seconds.
+and writes 4 ML predictions per row to iot_predictions:
 
-"Unprocessed" means there is no row in iot_predictions with the same
-(source_id, disaster_type) pair, so each IoT reading is predicted exactly once.
+  horizon=0  current status  (sensor values as-is)
+  horizon=1  Day+1 forecast  (features extrapolated forward)
+  horizon=2  Day+2 forecast
+  horizon=3  Day+3 forecast
 
-Flood model features (in order): temp, hum, depth_prev, depth
-  depth_prev is derived by looking up the immediately preceding iot_flood row.
+Extrapolation design (natural forecasting)
+──────────────────────────────────────────
+  • Trend source  : only the last TREND_HOURS hours of readings for the same
+                    sensor type.  Older data is irrelevant and pollutes the slope.
+  • Dampened rate : each successive day applies a smaller increment — the trend
+                    contribution follows a geometric series with ratio DAMPING.
+                    This means the forecast converges rather than diverging.
+  • Rate caps     : physical maximums prevent impossible daily changes.
+  • Vibration     : ax/ay/az/gx/gy/gz are instantaneous ground-motion snapshots
+                    and are held constant across all horizons.
+  • depth_prev    : chained — depth_prev at horizon H is the projected depth at H-1.
 
-Landslide model features (in order): temp, hum, moist, ax, ay, az, gx, gy, gz
+Clamping
+────────
+  hum   → [0, 100]
+  moist → [0, 4095]
+  depth → [0, ∞)
+  temp  → unclamped
 """
 
 import uuid
 import logging
 from datetime import datetime, timezone
 
+import numpy as np
 import sqlalchemy as sa
 
 from app.db.database import SessionLocal
@@ -22,139 +39,268 @@ from app.services.iot_predictor import predict_flood, predict_landslide
 
 logger = logging.getLogger(__name__)
 
-# Raw SQL queries — avoids ORM overhead for the polling loop and lets us use
-# a NOT EXISTS subquery cleanly without loading whole tables.
+HORIZONS     = [0, 1, 2, 3]
+TREND_WINDOW = 20      # max readings to use for slope estimation
+TREND_HOURS  = 6       # only use readings within the last 6 hours
+
+# Damping ratio: each day's increment = previous day's increment × DAMPING
+# 0.5 → series converges to 2× the single-day rate (sum of 1+0.5+0.25+…= 2)
+DAMPING = 0.5
+
+# Maximum physically plausible daily change for each variable
+_MAX_RATE = {
+    "depth": 5.0,    # cm/day  — heavy-rain flooding
+    "hum":   10.0,   # %/day
+    "temp":   3.0,   # °C/day
+    "moist": 300.0,  # raw moisture units/day
+}
+
+
+# ── SQL ───────────────────────────────────────────────────────────────────────
 
 _UNPROCESSED_FLOOD_SQL = sa.text("""
     SELECT f.id, f.temp, f.hum, f.depth, f.created_at
     FROM iot_flood f
     WHERE NOT EXISTS (
         SELECT 1 FROM iot_predictions p
-        WHERE p.source_id = f.id AND p.disaster_type = 'flood'
+        WHERE p.source_id = f.id
+          AND p.disaster_type = 'flood'
+          AND p.horizon = 0
     )
     ORDER BY f.created_at ASC
 """)
 
+_FLOOD_HISTORY_SQL = sa.text("""
+    SELECT temp, hum, depth, created_at
+    FROM iot_flood
+    WHERE created_at <= :ts
+      AND created_at >= :ts - INTERVAL '6 hours'
+      AND temp IS NOT NULL
+      AND depth IS NOT NULL
+    ORDER BY created_at DESC
+    LIMIT :n
+""")
+
 _PREV_FLOOD_DEPTH_SQL = sa.text("""
     SELECT depth FROM iot_flood
-    WHERE created_at < :ts
+    WHERE created_at < :ts AND depth IS NOT NULL
     ORDER BY created_at DESC
     LIMIT 1
 """)
 
 _UNPROCESSED_LANDSLIDE_SQL = sa.text("""
     SELECT l.id, l.temp, l.hum, l.moist,
-           l.ax, l.ay, l.az, l.gx, l.gy, l.gz
+           l.ax, l.ay, l.az, l.gx, l.gy, l.gz, l.created_at
     FROM iot_landslide l
     WHERE NOT EXISTS (
         SELECT 1 FROM iot_predictions p
-        WHERE p.source_id = l.id AND p.disaster_type = 'landslide'
+        WHERE p.source_id = l.id
+          AND p.disaster_type = 'landslide'
+          AND p.horizon = 0
     )
     ORDER BY l.created_at ASC
 """)
 
-_INSERT_PREDICTION_SQL = sa.text("""
+_LANDSLIDE_HISTORY_SQL = sa.text("""
+    SELECT temp, hum, moist, created_at
+    FROM iot_landslide
+    WHERE created_at <= :ts
+      AND created_at >= :ts - INTERVAL '6 hours'
+      AND temp IS NOT NULL
+      AND moist IS NOT NULL
+    ORDER BY created_at DESC
+    LIMIT :n
+""")
+
+_INSERT_SQL = sa.text("""
     INSERT INTO iot_predictions (
         id, source_id, disaster_type, predicted_status,
         temp, hum, depth_prev, depth,
         moist, ax, ay, az, gx, gy, gz,
-        predicted_at
+        predicted_at, horizon
     ) VALUES (
         :id, :source_id, :disaster_type, :predicted_status,
         :temp, :hum, :depth_prev, :depth,
         :moist, :ax, :ay, :az, :gx, :gy, :gz,
-        :predicted_at
+        :predicted_at, :horizon
     )
-    ON CONFLICT (source_id, disaster_type) DO NOTHING
+    ON CONFLICT (source_id, disaster_type, horizon) DO NOTHING
 """)
 
 
-def _process_flood_rows(db):
+# ── Trend & projection helpers ────────────────────────────────────────────────
+
+def _daily_rate(values: list, timestamps: list, max_rate: float) -> float:
+    """
+    Estimate linear slope (units/day) via polyfit, then clamp to ±max_rate.
+    Returns 0.0 if fewer than 2 data points or the time span is under 6 minutes.
+    """
+    if len(values) < 2:
+        return 0.0
+    t0    = timestamps[0].timestamp()
+    hours = [(t.timestamp() - t0) / 3600.0 for t in timestamps]
+    if max(hours) - min(hours) < 0.1:
+        return 0.0
+    raw = float(np.polyfit(hours, values, 1)[0]) * 24.0   # per-day rate
+    return float(np.clip(raw, -max_rate, max_rate))
+
+
+def _project_damped(base: float, rate: float, h: int,
+                    lo: float = None, hi: float = None) -> float:
+    """
+    Dampened projection using a geometric series.
+
+    Each successive day contributes rate × DAMPING^(day-1), so the total
+    extrapolation converges instead of growing without bound:
+      H=1: base + rate
+      H=2: base + rate + rate×0.5     = base + 1.5×rate
+      H=3: base + rate + rate×0.5 + rate×0.25 = base + 1.75×rate
+      H=∞: base + rate/(1-DAMPING)    = base + 2×rate  (for DAMPING=0.5)
+    """
+    if h == 0:
+        return base
+    total = rate * (1.0 - DAMPING ** h) / (1.0 - DAMPING)
+    v = base + total
+    if lo is not None: v = max(lo, v)
+    if hi is not None: v = min(hi, v)
+    return v
+
+
+# ── Flood ─────────────────────────────────────────────────────────────────────
+
+def _process_flood_rows(db) -> None:
     rows = db.execute(_UNPROCESSED_FLOOD_SQL).fetchall()
     if not rows:
         return
 
-    logger.info(f"[IoT] Processing {len(rows)} unprocessed flood row(s)...")
+    logger.info(f"[IoT-Flood] {len(rows)} new row(s), generating horizons {HORIZONS}")
+
     for row in rows:
         try:
-            prev = db.execute(_PREV_FLOOD_DEPTH_SQL, {"ts": row.created_at}).fetchone()
-            depth_prev = float(prev.depth) if (prev and prev.depth is not None) else 0.0
+            history = list(reversed(
+                db.execute(_FLOOD_HISTORY_SQL,
+                           {"ts": row.created_at, "n": TREND_WINDOW}).fetchall()
+            ))
 
-            temp  = float(row.temp  or 0.0)
-            hum   = float(row.hum   or 0.0)
-            depth = float(row.depth or 0.0)
+            if len(history) >= 2:
+                hts        = [h.created_at for h in history]
+                rate_temp  = _daily_rate([float(h.temp)  for h in history], hts, _MAX_RATE["temp"])
+                rate_hum   = _daily_rate([float(h.hum)   for h in history], hts, _MAX_RATE["hum"])
+                rate_depth = _daily_rate([float(h.depth) for h in history], hts, _MAX_RATE["depth"])
+            else:
+                rate_temp = rate_hum = rate_depth = 0.0
 
-            status = predict_flood(temp, hum, depth_prev, depth)
+            base_temp  = float(row.temp  or 0.0)
+            base_hum   = float(row.hum   or 0.0)
+            base_depth = float(row.depth or 0.0)
 
-            db.execute(_INSERT_PREDICTION_SQL, {
-                "id":               str(uuid.uuid4()),
-                "source_id":        row.id,
-                "disaster_type":    "flood",
-                "predicted_status": status,
-                "temp":             row.temp,
-                "hum":              row.hum,
-                "depth_prev":       depth_prev,
-                "depth":            row.depth,
-                "moist":            None,
-                "ax": None, "ay": None, "az": None,
-                "gx": None, "gy": None, "gz": None,
-                "predicted_at":     datetime.now(timezone.utc),
-            })
+            prev         = db.execute(_PREV_FLOOD_DEPTH_SQL, {"ts": row.created_at}).fetchone()
+            depth_prev_0 = float(prev.depth) if (prev and prev.depth is not None) else 0.0
+
+            now = datetime.now(timezone.utc)
+
+            for h in HORIZONS:
+                p_temp  = _project_damped(base_temp,  rate_temp,  h)
+                p_hum   = _project_damped(base_hum,   rate_hum,   h, lo=0.0, hi=100.0)
+                p_depth = _project_damped(base_depth, rate_depth, h, lo=0.0)
+                p_dprev = depth_prev_0 if h == 0 else _project_damped(base_depth, rate_depth, h - 1, lo=0.0)
+
+                status = predict_flood(p_temp, p_hum, p_dprev, p_depth)
+
+                db.execute(_INSERT_SQL, {
+                    "id":               str(uuid.uuid4()),
+                    "source_id":        row.id,
+                    "disaster_type":    "flood",
+                    "predicted_status": status,
+                    "temp":             round(p_temp, 2),
+                    "hum":              round(p_hum),
+                    "depth_prev":       round(p_dprev, 2),
+                    "depth":            round(p_depth, 2),
+                    "moist":            None,
+                    "ax": None, "ay": None, "az": None,
+                    "gx": None, "gy": None, "gz": None,
+                    "predicted_at":     now,
+                    "horizon":          h,
+                })
+
             db.commit()
-            logger.info(f"[IoT] Flood {row.id} → {status}")
+            logger.info(f"[IoT-Flood] {row.id} capped rates: "
+                        f"temp={rate_temp:+.2f} hum={rate_hum:+.2f} depth={rate_depth:+.2f} /day")
 
         except Exception as exc:
             db.rollback()
-            logger.error(f"[IoT] Failed to predict flood row {row.id}: {exc}")
+            logger.error(f"[IoT-Flood] Failed for {row.id}: {exc}")
 
 
-def _process_landslide_rows(db):
+# ── Landslide ─────────────────────────────────────────────────────────────────
+
+def _process_landslide_rows(db) -> None:
     rows = db.execute(_UNPROCESSED_LANDSLIDE_SQL).fetchall()
     if not rows:
         return
 
-    logger.info(f"[IoT] Processing {len(rows)} unprocessed landslide row(s)...")
+    logger.info(f"[IoT-Landslide] {len(rows)} new row(s), generating horizons {HORIZONS}")
+
     for row in rows:
         try:
-            temp  = float(row.temp  or 0.0)
-            hum   = float(row.hum   or 0.0)
-            moist = float(row.moist or 0.0)
-            ax    = float(row.ax    or 0.0)
-            ay    = float(row.ay    or 0.0)
-            az    = float(row.az    or 0.0)
-            gx    = float(row.gx    or 0.0)
-            gy    = float(row.gy    or 0.0)
-            gz    = float(row.gz    or 0.0)
+            history = list(reversed(
+                db.execute(_LANDSLIDE_HISTORY_SQL,
+                           {"ts": row.created_at, "n": TREND_WINDOW}).fetchall()
+            ))
 
-            status = predict_landslide(temp, hum, moist, ax, ay, az, gx, gy, gz)
+            if len(history) >= 2:
+                hts        = [h.created_at for h in history]
+                rate_temp  = _daily_rate([float(h.temp)  for h in history], hts, _MAX_RATE["temp"])
+                rate_hum   = _daily_rate([float(h.hum)   for h in history], hts, _MAX_RATE["hum"])
+                rate_moist = _daily_rate([float(h.moist) for h in history], hts, _MAX_RATE["moist"])
+            else:
+                rate_temp = rate_hum = rate_moist = 0.0
 
-            db.execute(_INSERT_PREDICTION_SQL, {
-                "id":               str(uuid.uuid4()),
-                "source_id":        row.id,
-                "disaster_type":    "landslide",
-                "predicted_status": status,
-                "temp":             row.temp,
-                "hum":              row.hum,
-                "depth_prev":       None,
-                "depth":            None,
-                "moist":            row.moist,
-                "ax": row.ax, "ay": row.ay, "az": row.az,
-                "gx": row.gx, "gy": row.gy, "gz": row.gz,
-                "predicted_at":     datetime.now(timezone.utc),
-            })
+            base_temp  = float(row.temp  or 0.0)
+            base_hum   = float(row.hum   or 0.0)
+            base_moist = float(row.moist or 0.0)
+
+            ax = float(row.ax or 0.0); ay = float(row.ay or 0.0); az = float(row.az or 0.0)
+            gx = float(row.gx or 0.0); gy = float(row.gy or 0.0); gz = float(row.gz or 0.0)
+
+            now = datetime.now(timezone.utc)
+
+            for h in HORIZONS:
+                p_temp  = _project_damped(base_temp,  rate_temp,  h)
+                p_hum   = _project_damped(base_hum,   rate_hum,   h, lo=0.0,   hi=100.0)
+                p_moist = _project_damped(base_moist, rate_moist, h, lo=0.0, hi=4095.0)
+
+                status = predict_landslide(p_temp, p_hum, p_moist, ax, ay, az, gx, gy, gz)
+
+                db.execute(_INSERT_SQL, {
+                    "id":               str(uuid.uuid4()),
+                    "source_id":        row.id,
+                    "disaster_type":    "landslide",
+                    "predicted_status": status,
+                    "temp":             round(p_temp, 2),
+                    "hum":              round(p_hum),
+                    "depth_prev":       None,
+                    "depth":            None,
+                    "moist":            round(p_moist),
+                    "ax": row.ax, "ay": row.ay, "az": row.az,
+                    "gx": row.gx, "gy": row.gy, "gz": row.gz,
+                    "predicted_at":     now,
+                    "horizon":          h,
+                })
+
             db.commit()
-            logger.info(f"[IoT] Landslide {row.id} → {status}")
+            logger.info(f"[IoT-Landslide] {row.id} capped rates: "
+                        f"temp={rate_temp:+.2f} hum={rate_hum:+.2f} moist={rate_moist:+.2f} /day")
 
         except Exception as exc:
             db.rollback()
-            logger.error(f"[IoT] Failed to predict landslide row {row.id}: {exc}")
+            logger.error(f"[IoT-Landslide] Failed for {row.id}: {exc}")
 
 
-def run_iot_prediction_cycle():
-    """
-    Entry point called by APScheduler every 30 seconds.
-    Opens its own session so it never blocks the request-handling sessions.
-    """
+# ── Entry point ───────────────────────────────────────────────────────────────
+
+def run_iot_prediction_cycle() -> None:
+    """Called by APScheduler every 30 seconds."""
     db = SessionLocal()
     try:
         _process_flood_rows(db)
