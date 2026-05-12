@@ -78,6 +78,7 @@ async def ingest_report(
         )
 
     # Forward to J2
+    normalized_payload["eventId"] = payload.eventId
     normalized_payload["source"] = "J1_SOS_APP"
     normalized_payload["createdAt"] = datetime.now(timezone.utc).isoformat()
 

@@ -103,6 +103,8 @@ services:
       SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
       SUPABASE_SCHEMA: public
       SUPABASE_REST_TIMEOUT_SECONDS: "8"
+    healthcheck:
+      disable: true
     depends_on:
       j1-bridge-api:
         condition: service_started
