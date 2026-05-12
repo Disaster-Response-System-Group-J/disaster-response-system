@@ -25,18 +25,33 @@ def _load_models():
     if _flood_model is not None:
         return
 
-    for attr, filename in [
-        ("_flood_model",       "flood_ensemble_model.pkl"),
-        ("_flood_encoder",     "flood_label_encoder.pkl"),
-        ("_landslide_model",   "landslide_ensemble_model.pkl"),
-        ("_landslide_encoder", "landslide_label_encoder.pkl"),
-    ]:
-        path = os.path.join(MODELS_DIR, filename)
-        if os.path.exists(path):
-            globals()[attr] = joblib.load(path)
-            logger.info(f"Loaded {filename}")
-        else:
-            logger.error(f"Model file not found: {path}")
+    p = os.path.join(MODELS_DIR, "flood_ensemble_model.pkl")
+    if os.path.exists(p):
+        _flood_model = joblib.load(p)
+        logger.info("Loaded flood_ensemble_model.pkl")
+    else:
+        logger.error(f"Model file not found: {p}")
+
+    p = os.path.join(MODELS_DIR, "flood_label_encoder.pkl")
+    if os.path.exists(p):
+        _flood_encoder = joblib.load(p)
+        logger.info("Loaded flood_label_encoder.pkl")
+    else:
+        logger.error(f"Model file not found: {p}")
+
+    p = os.path.join(MODELS_DIR, "landslide_ensemble_model.pkl")
+    if os.path.exists(p):
+        _landslide_model = joblib.load(p)
+        logger.info("Loaded landslide_ensemble_model.pkl")
+    else:
+        logger.error(f"Model file not found: {p}")
+
+    p = os.path.join(MODELS_DIR, "landslide_label_encoder.pkl")
+    if os.path.exists(p):
+        _landslide_encoder = joblib.load(p)
+        logger.info("Loaded landslide_label_encoder.pkl")
+    else:
+        logger.error(f"Model file not found: {p}")
 
 
 def predict_flood(temp: float, hum: float, depth_prev: float, depth: float) -> str:
