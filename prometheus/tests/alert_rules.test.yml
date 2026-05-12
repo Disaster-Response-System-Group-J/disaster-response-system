@@ -1,0 +1,47 @@
+rule_files:
+  - ../alert_rules.yml
+
+evaluation_interval: 1m
+
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'up{job="j3-dms",instance="j3-dms:3000"}'
+        values: '0 0 0 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: ServiceDown
+        exp_alerts:
+          - exp_labels:
+              alertname: ServiceDown
+              severity: critical
+              job: j3-dms
+              instance: j3-dms:3000
+
+  - interval: 1m
+    input_series:
+      - series: 'prometheus_config_last_reload_successful{job="prometheus",instance="prometheus:9090"}'
+        values: '0 0 0 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: PrometheusConfigReloadFailed
+        exp_alerts:
+          - exp_labels:
+              alertname: PrometheusConfigReloadFailed
+              severity: warning
+              job: prometheus
+              instance: prometheus:9090
+
+  - interval: 1m
+    input_series:
+      - series: 'process_resident_memory_bytes{job="j3-dms",instance="j3-dms:3000"}'
+        values: '600000000 600000000 600000000 600000000 600000000 600000000 600000000'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: J3DMSHighMemoryUsage
+        exp_alerts:
+          - exp_labels:
+              alertname: J3DMSHighMemoryUsage
+              severity: warning
+              job: j3-dms
+              instance: j3-dms:3000

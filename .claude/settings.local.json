@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Januli\\\\OneDrive\\\\Desktop\\\\disaster-response-system\" -Force)",
+      "Bash(Select-Object Name, Mode)",
+      "Bash(git *)"
+    ]
+  }
+}

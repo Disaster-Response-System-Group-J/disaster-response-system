@@ -14,6 +14,9 @@ RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 FROM python:3.11.12-slim-bookworm AS runtime
 
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
         librdkafka1 \
         libgomp1 \
@@ -25,7 +28,6 @@ WORKDIR /app
 
 COPY --from=builder /install /usr/local
 
-# Remove test dirs, Cython sources, and cached bytecode from installed packages
 RUN find /usr/local/lib/python3.11 \
         \( -type d -name "tests" -o -type d -name "test" \) \
         -exec rm -rf {} + 2>/dev/null; true \
@@ -34,6 +36,8 @@ RUN find /usr/local/lib/python3.11 \
         -exec rm -rf {} + 2>/dev/null; true
 
 COPY app/ ./app/
+COPY migrations/ ./migrations/
+COPY alembic.ini ./
 
 USER appuser
 
@@ -42,4 +46,4 @@ EXPOSE 8082
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://127.0.0.1:8082/api/v1/health || exit 1
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8082"]
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${APP_PORT:-8082}"]
