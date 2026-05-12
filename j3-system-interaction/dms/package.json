@@ -12,6 +12,8 @@
     "synthetic:risk-alert": "node ./scripts/send-synthetic-risk-alert.js"
   },
   "dependencies": {
+    "@emnapi/core": "^1.10.0",
+    "@emnapi/runtime": "^1.10.0",
     "@supabase/supabase-js": "^2.105.4",
     "bcryptjs": "^3.0.3",
     "csv-parser": "^3.2.0",
