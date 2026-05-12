@@ -5,7 +5,7 @@ export async function GET() {
   try {
     // Run multiple count queries concurrently
     const [incidents, resources, shelters] = await Promise.all([
-      pool.query('SELECT COUNT(*) as count FROM public."ActiveIncident" WHERE status = $1', ['ACTIVE']),
+      pool.query('SELECT COUNT(*) as count FROM public."ConfirmedIncident" WHERE status = $1', ['ACTIVE']),
       pool.query('SELECT COUNT(*) as count FROM public."DeployableAsset" WHERE status = $1', ['AVAILABLE']),
       pool.query('SELECT COUNT(*) as count FROM public."Shelter" WHERE status != $1', ['CLOSED'])
     ]);
@@ -16,7 +16,7 @@ export async function GET() {
       availableResources: parseInt(resources.rows[0].count, 10),
       openShelters: parseInt(shelters.rows[0].count, 10),
     };
-    
+
     return NextResponse.json(stats);
   } catch (error) {
     console.error('Database Error fetching overview stats:', error);

@@ -4,7 +4,7 @@ import { pool } from '@/lib/db';
 export async function GET() {
   try {
     const query = `
-      SELECT dp.*, d.division_name
+      SELECT dp.*, d.division_name, d.district
       FROM disaster_predictions dp
       LEFT JOIN "Division" d ON dp.division_id = d.division_id
       WHERE dp.predicted_for_date >= CURRENT_DATE
