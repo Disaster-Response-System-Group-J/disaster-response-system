@@ -85,6 +85,7 @@ def ingest_and_predict(payload: J1ReadingIn, db: Session = Depends(get_db)) -> D
             "division_encoded": feature_row.division_encoded,
             "level_difference": feature_row.level_difference,
         },
+        telemetry=telemetry,
     )
     db.commit()
 
