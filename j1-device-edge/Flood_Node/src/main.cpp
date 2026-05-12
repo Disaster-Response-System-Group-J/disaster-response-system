@@ -48,7 +48,9 @@ void setup() {
         while (1);
     }
 
-    // LoRa.enableCrc(); // Disabled: CRC drops packets corrupted by RF saturation before the Gateway's JSON recovery can fix them
+    // Enable CRC to detect and reject corrupted packets before transmission
+    // This prevents RF-corrupted data from being sent
+    LoRa.enableCrc();
     
     // 🔥 CRITICAL FIX: Lowered TX Power from 20 to 2
     // 20dBm causes extreme RF interference at close range, which physically corrupts 
@@ -87,7 +89,7 @@ float hum = NAN;
 void loop() {
     lastWatchdogFeed = millis(); // Feed the safe watchdog
 
-    if (millis() - lastDHTReadTime >= 6200 || lastDHTReadTime == 0) {
+    if (millis() - lastDHTReadTime >= 1200 || lastDHTReadTime == 0) {
         if (millis() > 3600000) {
             Serial.println("Scheduled hourly reboot...");
             delay(1000);
@@ -109,7 +111,7 @@ void loop() {
             doc["temp"] = round(temp * 10.0) / 10.0;
             doc["hum"] = round(hum * 10.0) / 10.0;
         }
-        doc["depth"] = std::max(0.0f, 19.0f - static_cast<float>(round(depth * 10.0) / 10.0));
+        doc["depth"] = std::max(0.0f, 19.0f - (depth > 0 ? depth : 0));
 
         String jsonString;
         serializeJson(doc, jsonString);
@@ -118,7 +120,26 @@ void loop() {
         Serial.print("JSON Output: "); Serial.println(jsonString);
 
         Serial.println("Initiating LoRa transmission...");
-        delay(random(10, 800));
+        
+        // ✅ FIXED: Use absolute system time for collision avoidance
+        // Landslide transmits at: 0ms, 3700ms, 7400ms, 11100ms, etc.
+        // Flood transmits at: 0ms, 1200ms, 2400ms, 3600ms, 4800ms, 6000ms, 7200ms, etc.
+        // Check current position in Landslide's 3700ms cycle
+        unsigned long positionInLandslideCycle = millis() % 3700;
+        
+        // Landslide is transmitting during the last 100ms of its cycle (3600-3700ms)
+        // If we're in danger zone (past 3300ms), wait for Landslide to finish transmitting
+        if (positionInLandslideCycle > 3300) {
+            unsigned long waitTime = (3700 - positionInLandslideCycle) + 100;  // Wait until Landslide completes + 100ms buffer
+            Serial.print("   ⚠️ Collision danger detected (in Landslide window). Waiting ");
+            Serial.print(waitTime);
+            Serial.println("ms...");
+            delay(waitTime);
+        } else {
+            // Safe to transmit - add small jitter for robustness
+            delay(50 + random(0, 50));
+        }
+        
         LoRa.beginPacket();
         LoRa.print(jsonString);
         int txResult = LoRa.endPacket();
