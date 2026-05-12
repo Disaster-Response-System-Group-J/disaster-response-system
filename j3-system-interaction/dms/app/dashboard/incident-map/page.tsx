@@ -4,28 +4,41 @@ import { useState, useEffect } from 'react';
 import Map, { Marker, NavigationControl, Popup, ViewStateChangeEvent } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Shield, Filter, MapPin, AlertTriangle, X, ChevronDown, CheckCircle2, Clock } from 'lucide-react';
-import { IncidentSeverity, IncidentStatus, DISASTER_TYPES, ConfirmedIncident, UserRole } from '@/types';
+import { IncidentSeverity, IncidentStatus, DISASTER_TYPES, ConfirmedIncident, UserRole, User } from '@/types';
 import { SRI_LANKA_CENTER, DISTRICT_NAMES } from '@/data/districts';
 import { useAuth } from '@/context/AuthContext';
+import { createClient } from '@supabase/supabase-js';
 import { useSocket } from '@/context/SocketContext';
+import Link from 'next/link';
+
+// Module-level singleton — avoids creating a new GoTrueClient on every render
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 const SEVERITY_COLORS: Record<string, string> = {
-  CRITICAL: '#ef4444', 
-  HIGH: '#f97316', 
-  MEDIUM: '#eab308', 
-  LOW: '#3b82f6', 
+  CRITICAL: '#ef4444',
+  HIGH: '#f97316',
+  MEDIUM: '#eab308',
+  LOW: '#3b82f6',
   PENDING: '#a855f7', // Add a purple color for unverified incoming reports
 };
 
 export default function IncidentMapPage() {
-  const { user, hasPermission} = useAuth();
+  const { user, hasPermission } = useAuth();
   const socket = useSocket();
 
   const [viewState, setViewState] = useState(SRI_LANKA_CENTER);
   const [selectedIncident, setSelectedIncident] = useState<any | null>(null);
-  
-  // Start with an empty array instead of mock data
   const [mapPins, setMapPins] = useState<any[]>([]);
+
+  // 1. Add this state to hold the real users
+  const [activeUsers, setActiveUsers] = useState<any[]>([]);
+
+  // Track dispatched personnel per incident: { [incidentId]: { fieldOfficers: User[], responseTeams: User[], logistics: User[] } }
+  const [dispatched, setDispatched] = useState<Record<string, { fieldOfficers: any[], responseTeams: any[], logistics: any[] }>>({});
+  const [dispatchTarget, setDispatchTarget] = useState<string>(''); // selected user id to dispatch
 
   // Filters
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
@@ -41,15 +54,15 @@ export default function IncidentMapPage() {
       try {
         const response = await fetch('/api/incidents');
         if (!response.ok) throw new Error('Failed to fetch incidents');
-        
+
         const data = await response.json();
-        
+
         // Map database schema to the UI's expected format
         const mappedPins = data.map((inc: any) => ({
           incidentId: inc.incident_id.toString(),
           title: inc.title,
-          disasterType: inc.title?.toUpperCase().includes('FLOOD') ? 'FLOOD' : 
-                        inc.title?.toUpperCase().includes('LANDSLIDE') ? 'LANDSLIDE' : 'UNKNOWN',
+          disasterType: inc.title?.toUpperCase().includes('FLOOD') ? 'FLOOD' :
+            inc.title?.toUpperCase().includes('LANDSLIDE') ? 'LANDSLIDE' : 'UNKNOWN',
           severity: inc.severity || 'LOW',
           status: inc.status || 'ACTIVE',
           latitude: Number(inc.latitude) || 0,
@@ -68,21 +81,91 @@ export default function IncidentMapPage() {
     fetchIncidents();
   }, []);
 
-  const handleStatusUpdate = (incidentId: string, newStatus: IncidentStatus) => {
-    // Optimistic UI update
-    setMapPins(prev => prev.map(inc => 
-      inc.incidentId === incidentId ? { ...inc, status: newStatus } : inc
-    ));
-    
-    if (selectedIncident?.incidentId === incidentId) {
-      setSelectedIncident({ ...selectedIncident, status: newStatus });
+  const handleStatusUpdate = async (incidentId: string, newStatus: IncidentStatus) => {
+    try {
+      await fetch('/api/incidents', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ incidentId, status: newStatus }),
+      });
+    } catch (err) {
+      console.error('Failed to update DB', err);
     }
+    setMapPins(prev => prev.map(inc => inc.incidentId === incidentId ? { ...inc, status: newStatus } : inc));
+    if (selectedIncident?.incidentId === incidentId) setSelectedIncident({ ...selectedIncident, status: newStatus });
+    if (socket) socket.emit('client:update-incident-status', { incidentId, status: newStatus, timestamp: new Date().toISOString() });
+  };
 
-    // Emit to backend
-    if (socket) {
-      socket.emit('client:update-incident-status', { incidentId, status: newStatus, timestamp: new Date().toISOString() });
+  const handleDispatch = async (type: 'fieldOfficer' | 'responseTeam' | 'logistics') => {
+    if (!selectedIncident || !dispatchTarget) return;
+    const person = activeUsers.find(u => u.id === dispatchTarget);
+    if (!person) return;
+
+    const incidentId = selectedIncident.incidentId;
+
+    try {
+      // 1. Save to Database via API
+      const response = await fetch('/api/incidents/dispatch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          incidentId,
+          personnelId: person.id,
+          role: person.role,
+          dispatchedBy: user?.id,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to persist dispatch');
+      }
+
+      // 2. Update Local UI State
+      setDispatched(prev => {
+        const current = prev[incidentId] || { fieldOfficers: [], responseTeams: [], logistics: [] };
+        return {
+          ...prev,
+          [incidentId]: {
+            ...current,
+            fieldOfficers: type === 'fieldOfficer' ? [...current.fieldOfficers.filter(u => u.id !== person.id), person] : current.fieldOfficers,
+            responseTeams: type === 'responseTeam' ? [...current.responseTeams.filter(u => u.id !== person.id), person] : current.responseTeams,
+            logistics: type === 'logistics' ? [...current.logistics.filter(u => u.id !== person.id), person] : current.logistics,
+          }
+        };
+      });
+      setDispatchTarget('');
+
+      // 3. Broadcast Real-time Event
+      if (socket) {
+        socket.emit('client:dispatch-personnel', {
+          incidentId,
+          personnelId: person.id,
+          role: person.role,
+          type,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert(`Dispatch Failed: ${err.message}`);
     }
   };
+
+  useEffect(() => {
+    const fetchMapData = async () => {
+      // Fetch users from Supabase
+      const { data: userData, error: userError } = await supabase
+        .from('User')
+        .select('*');
+
+      if (!userError && userData) {
+        setActiveUsers(userData);
+      }
+      // (If you also fetch incidents here, keep that logic intact)
+    };
+    fetchMapData();
+  }, [supabase]);
 
   // Listen for incoming reports to drop new pins
   useEffect(() => {
@@ -102,7 +185,7 @@ export default function IncidentMapPage() {
           district: report.district,
           description: report.description
         };
-        
+
         setMapPins(prev => [...prev, newPin]);
       }
     };
@@ -140,6 +223,7 @@ export default function IncidentMapPage() {
               longitude={inc.longitude}
               latitude={inc.latitude}
               anchor="center"
+              style={{ background: 'transparent', border: 'none', padding: 0 }}
               onClick={(e) => {
                 e.originalEvent.stopPropagation();
                 setSelectedIncident(inc);
@@ -190,7 +274,7 @@ export default function IncidentMapPage() {
                   <div className="flex justify-between items-center text-slate-300">
                     <span className="text-slate-500">Status</span>
                     {hasPermission('update:incident-status') ? (
-                      <select 
+                      <select
                         value={selectedIncident.status}
                         onChange={(e) => handleStatusUpdate(selectedIncident.incidentId, e.target.value as IncidentStatus)}
                         className="bg-[#0a0f16] border border-slate-700 text-xs font-semibold text-slate-200 rounded px-2 py-1 outline-none focus:border-blue-500 cursor-pointer"
@@ -208,9 +292,92 @@ export default function IncidentMapPage() {
                     <span className="font-semibold">{selectedIncident.affectedPeople?.toLocaleString() || 'Unknown'}</span>
                   </div>
                 </div>
-                <button className="w-full py-2 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 rounded-lg text-xs font-semibold text-blue-400 transition-colors">
+
+                {/* Personnel Dispatch Panel — Commanders only */}
+                {(hasPermission('dispatch:field-officers') || hasPermission('dispatch:response-teams') || hasPermission('dispatch:logistics')) && (() => {
+                  const incDispatched = dispatched[selectedIncident.incidentId] || { fieldOfficers: [], responseTeams: [], logistics: [] };
+                  const availableFieldOfficers = activeUsers.filter(u => u.role === UserRole.FIELD_OFFICER);
+                  const availableResponseTeams = activeUsers.filter(u => u.role === UserRole.RESPONSE_TEAM_MEMBER);
+                  const availableLogistics = activeUsers.filter(u => u.role === UserRole.LOGISTICS_STAFF);
+                  return (
+                    <div className="border-t border-slate-700/50 pt-3 mt-1 space-y-3">
+                      <p className="text-[9px] font-bold text-slate-400 tracking-widest uppercase">Personnel Dispatch</p>
+
+                      {/* Dispatched badges */}
+                      {(incDispatched.fieldOfficers.length > 0 || incDispatched.responseTeams.length > 0 || incDispatched.logistics.length > 0) && (
+                        <div className="space-y-1">
+                          {incDispatched.fieldOfficers.map(p => (
+                            <div key={p.id} className="flex items-center gap-1.5 px-2 py-1 bg-blue-500/10 border border-blue-500/20 rounded text-[9px] font-bold text-blue-400">
+                              <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />{p.name} · Field Officer
+                            </div>
+                          ))}
+                          {incDispatched.responseTeams.map(p => (
+                            <div key={p.id} className="flex items-center gap-1.5 px-2 py-1 bg-purple-500/10 border border-purple-500/20 rounded text-[9px] font-bold text-purple-400">
+                              <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />{p.name} · Response Team
+                            </div>
+                          ))}
+                          {incDispatched.logistics.map(p => (
+                            <div key={p.id} className="flex items-center gap-1.5 px-2 py-1 bg-teal-500/10 border border-teal-500/20 rounded text-[9px] font-bold text-teal-400">
+                              <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />{p.name} · Logistics
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Dispatch Field Officers */}
+                      {hasPermission('dispatch:field-officers') && (
+                        <div className="flex gap-1.5">
+                          <select value={dispatchTarget} onChange={e => setDispatchTarget(e.target.value)}
+                            className="flex-1 bg-[#0a0f16] border border-slate-700 rounded px-2 py-1 text-[9px] text-slate-300 outline-none">
+                            <option value="">Field Officer...</option>
+                            {availableFieldOfficers.map(u => <option key={u.id} value={u.id}>{u.name} ({(u as any).assignedDistrict})</option>)}
+                          </select>
+                          <button onClick={() => handleDispatch('fieldOfficer')}
+                            className="px-2 py-1 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded text-[9px] font-bold text-blue-400 transition-colors whitespace-nowrap">
+                            Dispatch
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Dispatch Response Teams */}
+                      {hasPermission('dispatch:response-teams') && (
+                        <div className="flex gap-1.5">
+                          <select value={dispatchTarget} onChange={e => setDispatchTarget(e.target.value)}
+                            className="flex-1 bg-[#0a0f16] border border-slate-700 rounded px-2 py-1 text-[9px] text-slate-300 outline-none">
+                            <option value="">Response Team...</option>
+                            {availableResponseTeams.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                          </select>
+                          <button onClick={() => handleDispatch('responseTeam')}
+                            className="px-2 py-1 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 rounded text-[9px] font-bold text-purple-400 transition-colors whitespace-nowrap">
+                            Dispatch
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Dispatch Logistics Staff */}
+                      {hasPermission('dispatch:logistics') && (
+                        <div className="flex gap-1.5">
+                          <select value={dispatchTarget} onChange={e => setDispatchTarget(e.target.value)}
+                            className="flex-1 bg-[#0a0f16] border border-slate-700 rounded px-2 py-1 text-[9px] text-slate-300 outline-none">
+                            <option value="">Logistics Staff...</option>
+                            {availableLogistics.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                          </select>
+                          <button onClick={() => handleDispatch('logistics')}
+                            className="px-2 py-1 bg-teal-500/20 hover:bg-teal-500/30 border border-teal-500/30 rounded text-[9px] font-bold text-teal-400 transition-colors whitespace-nowrap">
+                            Dispatch
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                <Link 
+                  href={`/dashboard/incidents/${selectedIncident.incidentId}`}
+                  className="w-full mt-3 py-2 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 rounded-lg text-xs font-semibold text-blue-400 transition-colors block text-center"
+                >
                   View Full Details
-                </button>
+                </Link>
               </div>
             </Popup>
           )}
@@ -231,7 +398,7 @@ export default function IncidentMapPage() {
               <ChevronDown size={14} className={`transition-transform ${showFilters ? 'rotate-180' : ''}`} />
             </div>
           </div>
-          
+
           {/* Add the restriction badge right below the Map Controls header if restricted */}
           {enforcedDistrict !== 'ALL' && (
             <div className="bg-blue-500/10 border-b border-blue-500/20 px-4 py-2 flex items-center justify-center gap-2 text-[10px] font-bold text-blue-400 tracking-widest uppercase">

@@ -100,6 +100,14 @@ async function startBridge() {
       const payload = { resourceId: data.resourceId, status: data.status, lastUpdated: data.lastUpdated };
       await producer.send({ topic: 'j3.dashboard.resource-updates', messages: [{ value: JSON.stringify(payload) }] });
     });
+
+    socket.on('client:create-alert', async (data) => {
+      console.log(`[UI -> Kafka] Publishing manual alert to j2.engine.risk-alerts`);
+      await producer.send({ 
+        topic: 'j2.engine.risk-alerts', 
+        messages: [{ value: JSON.stringify(data) }] 
+      });
+    });
   });
 }
 

@@ -5,13 +5,20 @@ import {
 } from '@/types';
 
 // ── Mock Users ───────────────────────────────────────────────
-export const MOCK_USERS: (User & { password: string, assignedDistrict?: string })[] = [
-  { id: 'ADM-001', email: 'admin@dmc.gov.lk', name: 'Kamal Perera', role: UserRole.SYSTEM_ADMIN, password: 'admin123', assignedDistrict: 'ALL' },
-  { id: 'OFF-001', email: 'officer@dmc.gov.lk', name: 'Nimal Silva', role: UserRole.OPERATIONS_OFFICER_ZONAL, password: 'officer123', assignedDistrict: 'Colombo' },
-  { id: 'RM-001', email: 'resource@dmc.gov.lk', name: 'Sunil Fernando', role: UserRole.RESOURCE_MANAGER_NATIONAL, password: 'resource123', assignedDistrict: 'ALL' },
-  { id: 'IC-001', email: 'commander@dmc.gov.lk', name: 'Incident Commander', role: UserRole.INCIDENT_COMMANDER_NATIONAL, password: 'admin123', assignedDistrict: 'ALL' },
-  { id: 'AUD-001', email: 'auditor@dmc.gov.lk', name: 'Priya Jayawardena', role: UserRole.AUDITOR, password: 'auditor123', assignedDistrict: 'ALL' },
-];
+// export const MOCK_USERS: (User & { password: string, assignedDistrict?: string })[] = [
+//   { id: 'ADM-001', email: 'admin@dmc.gov.lk', name: 'Kamal Perera', role: UserRole.SYSTEM_ADMIN, password: 'admin123', assignedDistrict: 'ALL' },
+//   { id: 'OFF-001', email: 'officer@dmc.gov.lk', name: 'Nimal Silva', role: UserRole.OPERATIONS_OFFICER_ZONAL, password: 'officer123', assignedDistrict: 'Colombo' },
+//   { id: 'RM-001', email: 'resource@dmc.gov.lk', name: 'Sunil Fernando', role: UserRole.RESOURCE_MANAGER_NATIONAL, password: 'resource123', assignedDistrict: 'ALL' },
+//   { id: 'IC-001', email: 'commander@dmc.gov.lk', name: 'Incident Commander', role: UserRole.INCIDENT_COMMANDER_NATIONAL, password: 'admin123', assignedDistrict: 'ALL' },
+//   // Mobile App Role Users
+//   { id: 'FO-001', email: 'fieldofficer@dmc.gov.lk', name: 'Asanka Rathnayake', role: UserRole.FIELD_OFFICER, password: 'field123', assignedDistrict: 'Colombo' },
+//   { id: 'FO-002', email: 'fieldofficer2@dmc.gov.lk', name: 'Ruwan Jayasena', role: UserRole.FIELD_OFFICER, password: 'field123', assignedDistrict: 'Ratnapura' },
+//   { id: 'LS-001', email: 'logistics@dmc.gov.lk', name: 'Chaminda Jayawardena', role: UserRole.LOGISTICS_STAFF, password: 'logistics123', assignedDistrict: 'ALL' },
+//   { id: 'LS-002', email: 'logistics2@dmc.gov.lk', name: 'Pathum Senanayake', role: UserRole.LOGISTICS_STAFF, password: 'logistics123', assignedDistrict: 'ALL' },
+//   { id: 'RT-001', email: 'response@dmc.gov.lk', name: 'Priya Bandara', role: UserRole.RESPONSE_TEAM_MEMBER, password: 'response123', assignedDistrict: 'ALL' },
+//   { id: 'RT-002', email: 'response2@dmc.gov.lk', name: 'Dilshan Perera', role: UserRole.RESPONSE_TEAM_MEMBER, password: 'response123', assignedDistrict: 'ALL' },
+//   { id: 'AUD-001', email: 'auditor@dmc.gov.lk', name: 'Priya Jayawardena', role: UserRole.AUDITOR, password: 'auditor123', assignedDistrict: 'ALL' },
+// ];
 // ── Mock Incoming Reports ────────────────────────────────────
 export const MOCK_INCOMING_REPORTS: IncomingReport[] = [
   {
@@ -211,16 +218,16 @@ export const MOCK_RESOURCES: Resource[] = [
 
 // ── Mock Alerts ──────────────────────────────────────────────
 export const MOCK_ALERTS: Alert[] = [
-  { 
-    alertId: 'ALT-001', 
-    type: AlertType.RISK_ALERT, 
-    severity: IncidentSeverity.CRITICAL, 
-    title: 'Level 3 Flood Warning — Kelani River Basin', 
-    description: 'Kelani River water levels exceeding danger mark. Colombo & Gampaha districts under evacuation orders.', 
-    district: 'Colombo', 
-    isPublic: true, 
-    isActive: true, 
-    createdAt: '2026-04-27T06:00:00Z', 
+  {
+    alertId: 'ALT-001',
+    type: AlertType.RISK_ALERT,
+    severity: IncidentSeverity.CRITICAL,
+    title: 'Level 3 Flood Warning — Kelani River Basin',
+    description: 'Kelani River water levels exceeding danger mark. Colombo & Gampaha districts under evacuation orders.',
+    district: 'Colombo',
+    isPublic: true,
+    isActive: true,
+    createdAt: '2026-04-27T06:00:00Z',
     source: 'J2 Risk Engine',
     predictionProbability: 0.87,
     considerationScore: 0.92,
@@ -233,16 +240,16 @@ export const MOCK_ALERTS: Alert[] = [
       by_type: { shelter: { total: 12, available: 2 }, water_supply: { total: 8, available: 1 }, medical: { total: 15, available: 4 }, transport: { total: 10, available: 3 } }
     }
   },
-  { 
-    alertId: 'ALT-002', 
-    type: AlertType.RISK_ALERT, 
-    severity: IncidentSeverity.HIGH, 
-    title: 'Landslide Warning — Central Highlands', 
-    description: 'Heavy rainfall triggering landslide risk in Nuwara Eliya, Kandy, and Kegalle districts.', 
-    district: 'Nuwara Eliya', 
-    isPublic: true, 
-    isActive: true, 
-    createdAt: '2026-04-27T07:00:00Z', 
+  {
+    alertId: 'ALT-002',
+    type: AlertType.RISK_ALERT,
+    severity: IncidentSeverity.HIGH,
+    title: 'Landslide Warning — Central Highlands',
+    description: 'Heavy rainfall triggering landslide risk in Nuwara Eliya, Kandy, and Kegalle districts.',
+    district: 'Nuwara Eliya',
+    isPublic: true,
+    isActive: true,
+    createdAt: '2026-04-27T07:00:00Z',
     source: 'J2 Risk Engine',
     predictionProbability: 0.73,
     considerationScore: 0.81,
@@ -255,37 +262,37 @@ export const MOCK_ALERTS: Alert[] = [
       by_type: { shelter: { total: 10, available: 7 }, water_supply: { total: 6, available: 4 }, medical: { total: 12, available: 7 }, transport: { total: 10, available: 4 } }
     }
   },
-  { 
-    alertId: 'ALT-003', 
-    type: AlertType.SHELTER_CAPACITY, 
-    severity: IncidentSeverity.HIGH, 
-    title: 'Shelter Over Capacity — Ratnapura Central', 
-    description: 'Ratnapura Central School shelter at 96% capacity. Overflow arrangements needed.', 
-    district: 'Ratnapura', 
-    isPublic: false, 
-    isActive: true, 
-    createdAt: '2026-04-27T10:00:00Z' 
+  {
+    alertId: 'ALT-003',
+    type: AlertType.SHELTER_CAPACITY,
+    severity: IncidentSeverity.HIGH,
+    title: 'Shelter Over Capacity — Ratnapura Central',
+    description: 'Ratnapura Central School shelter at 96% capacity. Overflow arrangements needed.',
+    district: 'Ratnapura',
+    isPublic: false,
+    isActive: true,
+    createdAt: '2026-04-27T10:00:00Z'
   },
-  { 
-    alertId: 'ALT-004', 
-    type: AlertType.RESOURCE_SHORTAGE, 
-    severity: IncidentSeverity.MEDIUM, 
-    title: 'Medical Supply Shortage — Galle Zone', 
-    description: 'Medical supplies running low in Galle district shelters. Resupply within 12 hours.', 
-    district: 'Galle', 
-    isPublic: false, 
-    isActive: true, 
-    createdAt: '2026-04-27T09:00:00Z' 
+  {
+    alertId: 'ALT-004',
+    type: AlertType.RESOURCE_SHORTAGE,
+    severity: IncidentSeverity.MEDIUM,
+    title: 'Medical Supply Shortage — Galle Zone',
+    description: 'Medical supplies running low in Galle district shelters. Resupply within 12 hours.',
+    district: 'Galle',
+    isPublic: false,
+    isActive: true,
+    createdAt: '2026-04-27T09:00:00Z'
   },
-  { 
-    alertId: 'ALT-005', 
-    type: AlertType.PUBLIC_ALERT, 
-    severity: IncidentSeverity.CRITICAL, 
-    title: 'Evacuation Order — Kaduwela Division', 
-    description: 'All residents in Kaduwela low-lying areas must evacuate immediately. Report to nearest shelter.', 
-    district: 'Colombo', 
-    isPublic: true, 
-    isActive: true, 
+  {
+    alertId: 'ALT-005',
+    type: AlertType.PUBLIC_ALERT,
+    severity: IncidentSeverity.CRITICAL,
+    title: 'Evacuation Order — Kaduwela Division',
+    description: 'All residents in Kaduwela low-lying areas must evacuate immediately. Report to nearest shelter.',
+    district: 'Colombo',
+    isPublic: true,
+    isActive: true,
     createdAt: '2026-04-27T08:30:00Z',
     predictionProbability: 0.91,
     considerationScore: 0.84,
@@ -298,27 +305,27 @@ export const MOCK_ALERTS: Alert[] = [
       by_type: { shelter: { total: 12, available: 4 }, water_supply: { total: 8, available: 3 }, medical: { total: 15, available: 6 }, transport: { total: 10, available: 5 } }
     }
   },
-  { 
-    alertId: 'ALT-006', 
-    type: AlertType.INCIDENT_STATUS, 
-    severity: IncidentSeverity.LOW, 
-    title: 'Road Reopened — Haputale', 
-    description: 'Haputale road cleared of debris. Normal traffic resumed.', 
-    district: 'Badulla', 
-    isPublic: true, 
-    isActive: false, 
-    createdAt: '2026-04-27T06:30:00Z' 
+  {
+    alertId: 'ALT-006',
+    type: AlertType.INCIDENT_STATUS,
+    severity: IncidentSeverity.LOW,
+    title: 'Road Reopened — Haputale',
+    description: 'Haputale road cleared of debris. Normal traffic resumed.',
+    district: 'Badulla',
+    isPublic: true,
+    isActive: false,
+    createdAt: '2026-04-27T06:30:00Z'
   },
-  { 
-    alertId: 'ALT-007', 
-    type: AlertType.PUBLIC_ALERT, 
-    severity: IncidentSeverity.HIGH, 
-    title: 'Heavy Rainfall Expected — SW Monsoon', 
-    description: '150mm rainfall expected in next 24h across Western & Sabaragamuwa provinces.', 
-    district: 'Ratnapura', 
-    isPublic: true, 
-    isActive: true, 
-    createdAt: '2026-04-27T05:00:00Z', 
+  {
+    alertId: 'ALT-007',
+    type: AlertType.PUBLIC_ALERT,
+    severity: IncidentSeverity.HIGH,
+    title: 'Heavy Rainfall Expected — SW Monsoon',
+    description: '150mm rainfall expected in next 24h across Western & Sabaragamuwa provinces.',
+    district: 'Ratnapura',
+    isPublic: true,
+    isActive: true,
+    createdAt: '2026-04-27T05:00:00Z',
     source: 'Meteorological Dept',
     predictionProbability: 0.68,
     considerationScore: 0.76,
@@ -331,27 +338,27 @@ export const MOCK_ALERTS: Alert[] = [
       by_type: { shelter: { total: 14, available: 3 }, water_supply: { total: 7, available: 2 }, medical: { total: 13, available: 4 }, transport: { total: 8, available: 3 } }
     }
   },
-  { 
-    alertId: 'ALT-008', 
-    type: AlertType.RESOURCE_SHORTAGE, 
-    severity: IncidentSeverity.HIGH, 
-    title: 'Potable Water Critical — Ratnapura', 
-    description: 'Water purification supplies running critically low in Ratnapura shelters.', 
-    district: 'Ratnapura', 
-    isPublic: false, 
-    isActive: true, 
-    createdAt: '2026-04-27T11:00:00Z' 
+  {
+    alertId: 'ALT-008',
+    type: AlertType.RESOURCE_SHORTAGE,
+    severity: IncidentSeverity.HIGH,
+    title: 'Potable Water Critical — Ratnapura',
+    description: 'Water purification supplies running critically low in Ratnapura shelters.',
+    district: 'Ratnapura',
+    isPublic: false,
+    isActive: true,
+    createdAt: '2026-04-27T11:00:00Z'
   },
-  { 
-    alertId: 'ALT-SYN-1715169688637', 
-    type: AlertType.RISK_ALERT, 
-    severity: IncidentSeverity.HIGH, 
-    title: 'Synthetic Flood Watch for Colombo', 
-    description: 'Risk alert', 
-    district: 'Colombo', 
-    isPublic: true, 
-    isActive: true, 
-    createdAt: '2026-05-08T15:01:28.637Z', 
+  {
+    alertId: 'ALT-SYN-1715169688637',
+    type: AlertType.RISK_ALERT,
+    severity: IncidentSeverity.HIGH,
+    title: 'Synthetic Flood Watch for Colombo',
+    description: 'Risk alert',
+    district: 'Colombo',
+    isPublic: true,
+    isActive: true,
+    createdAt: '2026-05-08T15:01:28.637Z',
     source: 'Synthetic Test Producer',
     predictionProbability: 0.91,
     considerationScore: 0.84,

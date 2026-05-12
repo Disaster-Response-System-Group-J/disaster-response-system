@@ -8,7 +8,7 @@ export async function GET() {
       SELECT 
         TO_CHAR(created_at, 'YYYY-MM-DD') as date,
         COUNT(*) as count
-      FROM public."ActiveIncident"
+      FROM public."ConfirmedIncident"
       WHERE created_at > NOW() - INTERVAL '7 days'
       GROUP BY date
       ORDER BY date ASC
@@ -19,7 +19,7 @@ export async function GET() {
       SELECT 
         severity,
         COUNT(*) as count
-      FROM public."ActiveIncident"
+      FROM public."ConfirmedIncident"
       GROUP BY severity
     `;
 
