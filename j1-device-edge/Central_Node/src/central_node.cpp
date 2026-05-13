@@ -67,7 +67,7 @@ void bufferPacket(const String& data, const String& topic, bool isMainTopic) {
     // Validate filesystem is available
     if (!LittleFS.exists(BUFFER_DIR)) {
         if (!LittleFS.mkdir(BUFFER_DIR)) {
-            Serial.println("   ⚠️ Buffer directory unavailable - skipping buffer");
+            Serial.println("⚠️ Buffer directory unavailable - skipping buffer");
             return;
         }
     }
