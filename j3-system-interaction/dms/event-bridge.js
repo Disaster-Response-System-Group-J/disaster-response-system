@@ -108,6 +108,14 @@ async function startBridge() {
         messages: [{ value: JSON.stringify(data) }] 
       });
     });
+
+    socket.on('client:create-incident', async (data) => {
+      console.log(`[UI -> Kafka] Publishing manual incident to j2.engine.incidents`);
+      await producer.send({ 
+        topic: 'j2.engine.incidents', 
+        messages: [{ value: JSON.stringify(data) }] 
+      });
+    });
   });
 }
 

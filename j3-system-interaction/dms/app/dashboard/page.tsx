@@ -164,12 +164,37 @@ export default function DashboardPage() {
       }
     };
 
+    const handleReportUpdated = (data: any) => {
+      if (data.verificationStatus !== 'PENDING_REVIEW') {
+        setPendingCount(prev => Math.max(0, prev - 1));
+        setMapPins(prev => prev.filter(p => p.incidentId !== data.reportId));
+      }
+    };
+
+    const handleNewIncident = (incident: any) => {
+      setData(prev => ({
+        ...prev,
+        activeIncidents: prev.activeIncidents + 1
+      }));
+      setMapPins(prev => [...prev, {
+        incidentId: (incident.incident_id || incident.id).toString(),
+        severity: incident.severity || 'LOW',
+        status: incident.status || 'ACTIVE',
+        latitude: Number(incident.latitude),
+        longitude: Number(incident.longitude),
+      }]);
+    };
+
     socket.on('dashboard:new-report', handleNewReport);
     socket.on('dashboard:risk-alert', handleNewAlert);
+    socket.on('dashboard:report-updated', handleReportUpdated);
+    socket.on('dashboard:new-incident', handleNewIncident);
 
     return () => {
       socket.off('dashboard:new-report', handleNewReport);
       socket.off('dashboard:risk-alert', handleNewAlert);
+      socket.off('dashboard:report-updated', handleReportUpdated);
+      socket.off('dashboard:new-incident', handleNewIncident);
     };
   }, [socket]);
 
