@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, Float, String, Date, DateTime, ForeignKey, UniqueConstraint, Text, Numeric, JSON
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from app.db.database import Base
 
@@ -6,12 +7,10 @@ from app.db.database import Base
 class Division(Base):
     __tablename__ = "Division"
     division_id = Column(Integer, primary_key=True, index=True)
-    division_name = Column(String)
-    district = Column(String)
+    name = Column(String)
     latitude = Column(Float)
     longitude = Column(Float)
-    province = Column(String)
-    division_population = Column(Integer)
+    population = Column(Integer)
 
 
 class Resource(Base):
@@ -120,26 +119,34 @@ class IoTFlood(Base):
     __tablename__ = "iot_flood"
     id = Column(String, primary_key=True, index=True)
     type = Column(String, nullable=False)
-    temp = Column(Numeric)
-    hum = Column(Integer)
-    depth = Column(Numeric)
-    created_at = Column(DateTime)
+    temp = Column(Float)
+    hum = Column(Float)
+    depth = Column(Float)
+    created_at = Column(DateTime(timezone=True))
+    device_id = Column(String, nullable=False, default="")
+    topic = Column(String, nullable=False, default="")
+    raw_payload = Column(JSONB, nullable=False, default=dict)
+    recorded_at = Column(DateTime(timezone=True), nullable=False)
 
 
 class IoTLandslide(Base):
     __tablename__ = "iot_landslide"
     id = Column(String, primary_key=True, index=True)
     type = Column(String, nullable=False)
-    temp = Column(Numeric)
-    hum = Column(Integer)
-    moist = Column(Integer)
-    ax = Column(Integer)
-    ay = Column(Integer)
-    az = Column(Integer)
-    gx = Column(Integer)
-    gy = Column(Integer)
-    gz = Column(Integer)
-    created_at = Column(DateTime)
+    temp = Column(Float)
+    hum = Column(Float)
+    moist = Column(Float)
+    ax = Column(Float)
+    ay = Column(Float)
+    az = Column(Float)
+    gx = Column(Float)
+    gy = Column(Float)
+    gz = Column(Float)
+    created_at = Column(DateTime(timezone=True))
+    device_id = Column(String, nullable=False, default="")
+    topic = Column(String, nullable=False, default="")
+    raw_payload = Column(JSONB, nullable=False, default=dict)
+    recorded_at = Column(DateTime(timezone=True), nullable=False)
 
 
 class IoTPrediction(Base):
