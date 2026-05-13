@@ -18,9 +18,10 @@ interface PredictionZone {
   likelyImpact: string;
   recommendedAction: string;
   // 3-day horizon forecast
-  forecastH1: RiskLevel;
-  forecastH2: RiskLevel;
-  forecastH3: RiskLevel;
+  forecastH1: string;
+  forecastH2: string;
+  forecastH3: string;
+  predictedStatus: string;
   disasterType: string;
   predictedAt: string;
   telemetry?: {
@@ -94,12 +95,13 @@ export default function PredictionsPage() {
           riskScore: RISK_SCORE[riskLevel] ?? 10,
           riskLevel,
           confidence: LEVEL_CONFIDENCE[riskLevel] ?? 85,
-          leadTimeHours: 0,   // H=0 = current reading; forecast shown separately
+          leadTimeHours: 0,
           likelyImpact: `${row.disaster_type ? row.disaster_type.charAt(0).toUpperCase() + row.disaster_type.slice(1) : 'Hazard'} risk currently ${row.predicted_status ?? riskLevel}. Forecast: Day+1 ${row.status_h1 ?? '—'}, Day+2 ${row.status_h2 ?? '—'}, Day+3 ${row.status_h3 ?? '—'}.`,
           recommendedAction: `Initiate ${riskLevel} monitoring protocols. ${riskLevel === 'CRITICAL' || riskLevel === 'HIGH' ? 'Pre-position emergency resources and alert response teams.' : 'Continue routine monitoring and review resource availability.'}`,
-          forecastH1,
-          forecastH2,
-          forecastH3,
+          forecastH1: row.status_h1 ?? 'Normal',
+          forecastH2: row.status_h2 ?? 'Normal',
+          forecastH3: row.status_h3 ?? 'Normal',
+          predictedStatus: row.predicted_status ?? 'Normal',
           disasterType: row.disaster_type ?? 'unknown',
           predictedAt: row.predicted_at,
           telemetry: {
@@ -236,10 +238,10 @@ export default function PredictionsPage() {
             className="bg-[#0a0f16] border border-slate-800 rounded-lg px-4 py-2 text-sm text-slate-300 focus:outline-none min-w-[180px]"
           >
             <option value="ALL">Risk: All</option>
-            <option value="CRITICAL">Critical</option>
-            <option value="HIGH">High</option>
-            <option value="MEDIUM">Medium</option>
-            <option value="LOW">Low</option>
+            <option value="CRITICAL">Extreme</option>
+            <option value="HIGH">Severe</option>
+            <option value="MEDIUM">Moderate</option>
+            <option value="LOW">Normal</option>
           </select>
         </div>
 
@@ -256,7 +258,7 @@ export default function PredictionsPage() {
                     SCORE {zone.riskScore}
                   </span>
                   <span className={`px-2.5 py-1 rounded text-[9px] font-bold tracking-widest border ${LEVEL_STYLES[zone.riskLevel]}`}>
-                    {zone.riskLevel}
+                    {zone.predictedStatus}
                   </span>
                   {hasPermission('issue:alerts') && (
                     <button
