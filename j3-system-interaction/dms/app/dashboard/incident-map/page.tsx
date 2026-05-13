@@ -192,8 +192,43 @@ export default function IncidentMapPage() {
 
     socket.on('dashboard:new-report', handleNewReport);
 
+    const handleReportUpdated = (data: any) => {
+      if (data.verificationStatus === 'REJECTED' || data.verificationStatus === 'DUPLICATE' || data.verificationStatus === 'CONVERTED_TO_INCIDENT') {
+        // Remove the report pin if it's no longer a "pending" report on the map
+        setMapPins(prev => prev.filter(inc => inc.incidentId !== data.reportId));
+      } else {
+        // Update the status/severity if needed
+        setMapPins(prev => prev.map(inc => 
+          inc.incidentId === data.reportId 
+            ? { ...inc, status: data.verificationStatus, reviewedAt: data.reviewedAt } 
+            : inc
+        ));
+      }
+    };
+
+    const handleNewIncident = (incident: any) => {
+      const newPin = {
+        incidentId: (incident.incident_id || incident.id).toString(),
+        title: incident.title,
+        disasterType: incident.disaster_type || (incident.title?.toUpperCase().includes('FLOOD') ? 'FLOOD' : 'UNKNOWN'),
+        severity: incident.severity || 'LOW',
+        status: incident.status || 'ACTIVE',
+        latitude: Number(incident.latitude),
+        longitude: Number(incident.longitude),
+        affectedPeople: incident.affected_population || 0,
+        district: incident.district || 'UNASSIGNED',
+        description: `Incident created at ${new Date().toLocaleString()}`
+      };
+      setMapPins(prev => [...prev, newPin]);
+    };
+
+    socket.on('dashboard:report-updated', handleReportUpdated);
+    socket.on('dashboard:new-incident', handleNewIncident);
+
     return () => {
       socket.off('dashboard:new-report', handleNewReport);
+      socket.off('dashboard:report-updated', handleReportUpdated);
+      socket.off('dashboard:new-incident', handleNewIncident);
     };
   }, [socket]);
 
