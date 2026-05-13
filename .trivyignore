@@ -1,3 +1,11 @@
+# Python build-tool CVEs in node:alpine base image
+# jaraco.context and wheel are bundled for node-gyp; not executed in the
+# production Next.js runtime and not exploitable in a containerised web server.
+# Fix blocked by Alpine 3.21 repos not yet shipping the patched versions;
+# pip cannot update the apk package database so apk-reported versions persist.
+CVE-2026-23949
+CVE-2026-24049
+
 # Vulnerabilities in npm's own bundled dependencies
 # These exist in the Node base image's internal npm installation
 # npm is a build-time tool and not present in production runtime

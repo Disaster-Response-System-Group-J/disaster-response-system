@@ -89,6 +89,10 @@ kind: Job
 metadata:
   name: kong-migration
   namespace: disaster-response
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+    argocd.argoproj.io/sync-wave: "-1"
 spec:
   backoffLimit: 3
   template:
@@ -252,6 +256,9 @@ kind: Job
 metadata:
   name: kong-setup
   namespace: disaster-response
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
 spec:
   backoffLimit: 3
   template:
