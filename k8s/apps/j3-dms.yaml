@@ -29,21 +29,6 @@ spec:
         app: j3-dms
     spec:
       initContainers:
-        - name: wait-for-postgres
-          image: busybox:1.37
-          command:
-            [
-              "sh",
-              "-c",
-              "until nc -w1 postgres 5432 >/dev/null 2>&1; do echo 'waiting for postgres...'; sleep 3; done",
-            ]
-          resources:
-            requests:
-              cpu: 50m
-              memory: 32Mi
-            limits:
-              cpu: 100m
-              memory: 64Mi
         - name: wait-for-kafka
           image: busybox:1.37
           command:
@@ -71,7 +56,8 @@ spec:
               memory: 64Mi
       containers:
         - name: j3-dms
-          image: dehanns/disaster-j3-dms:sha-7e39958
+
+          image: dehanns/disaster-j3-dms:v2.0
           imagePullPolicy: Always
           ports:
             - containerPort: 3000

@@ -7,9 +7,7 @@ from app.services.weather_fetcher import fetch_weather_all_divisions
 from app.services.feature_engineering import engineer_features
 from app.services.model_predictor import generate_predictions
 from app.services.event_manager import event_manager
-from app.services.iot_event_handler import run_iot_prediction_cycle
-from app.api.routes import router as intelligence_router
-from app.api.agent_routes import router as agent_router
+from app.api.ingest import router as ingest_router
 from apscheduler.schedulers.background import BackgroundScheduler
 import uvicorn
 import logging
@@ -21,9 +19,8 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="J2 Data & Intelligence Microservice")
 
-app.include_router(intelligence_router)
-app.include_router(agent_router)
-
+# Include ingest router
+app.include_router(ingest_router)
 
 async def handle_data_fetched(start_date: date, end_date: date):
     logger.info(f"DATA_FETCHED event received for {start_date} to {end_date}. Running computations...")
@@ -69,7 +66,6 @@ def scheduled_weather_job():
 
 
 scheduler.add_job(scheduled_weather_job, "cron", hour=2, minute=0, timezone="UTC")
-scheduler.add_job(run_iot_prediction_cycle, "interval", seconds=30, id="iot_prediction_poll")
 
 
 @app.on_event("startup")

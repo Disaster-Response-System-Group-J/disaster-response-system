@@ -14,9 +14,10 @@ class AppConstants {
   // Android emulator default: http://10.0.2.2:8000 maps to host localhost.
   // Physical device: run with --dart-define=J1_API_BASE_URL=http://<PC_LAN_IP>:8000
   // iOS simulator: run with --dart-define=J1_API_BASE_URL=http://localhost:8000
+  static const String emulatorApiBaseUrl = 'http://10.0.2.2:8000';
   static const String apiBaseUrl = String.fromEnvironment(
     'J1_API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:8000',
+    defaultValue: emulatorApiBaseUrl,
   );
   static const String apiHealthEndpoint = '/health';
   static const String apiIngestEndpoint = '/api/v1/events/ingest';

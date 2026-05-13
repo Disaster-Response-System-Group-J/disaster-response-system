@@ -224,6 +224,9 @@ kind: Job
 metadata:
   name: keycloak-setup
   namespace: disaster-response
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
 spec:
   backoffLimit: 5
   template:

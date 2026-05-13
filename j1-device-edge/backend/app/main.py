@@ -1,7 +1,7 @@
 """
 J1 Bridge API - FastAPI application entry point.
 
-Data flow: Flutter mobile app -> FastAPI bridge -> Kafka topic j1.events.
+Data flow: Flutter mobile app -> FastAPI bridge -> J2 HTTP ingestion API.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
-from .kafka_producer import kafka_producer
+from .j2_client import j2_client
 from .routes import events, health, resources
 
 logging.basicConfig(
@@ -28,25 +28,24 @@ logger = logging.getLogger("j1.main")
 async def lifespan(app: FastAPI):
     """Startup and shutdown lifecycle for the FastAPI application."""
     logger.info("Starting J1 Bridge API")
-    logger.info("Kafka broker: %s", settings.KAFKA_BOOTSTRAP_SERVERS)
-    logger.info("Kafka topic: %s", settings.KAFKA_TOPIC_EVENTS)
+    logger.info("J2 service: %s", settings.J2_BASE_URL)
 
     try:
-        kafka_producer.connect()
-        logger.info("Kafka producer connected")
+        await j2_client.connect()
+        logger.info("J2 client connected")
     except Exception as exc:
-        logger.warning("Kafka producer failed to connect: %s", exc)
+        logger.warning("J2 client failed to connect: %s", exc)
 
     yield
 
     logger.info("Shutting down J1 Bridge API")
-    kafka_producer.disconnect()
+    await j2_client.disconnect()
     logger.info("Shutdown complete")
 
 
 app = FastAPI(
     title="J1 Device-Edge Bridge API",
-    description="Bridge between the J1 Flutter mobile app and Kafka event stream.",
+    description="Bridge between the J1 Flutter mobile app and J2 core service.",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -72,8 +71,8 @@ async def root():
         "docs": "/docs",
         "health": "/health",
         "endpoints": {
-            "ingest": "POST /api/v1/events/ingest",
-            "events": "GET /api/v1/events",
+            "ingest_report": "POST /api/v1/ingest/report",
+            "ingest_sensor": "POST /api/v1/ingest/sensor",
             "resources": "GET /api/v1/resources",
             "health": "GET /health",
         },

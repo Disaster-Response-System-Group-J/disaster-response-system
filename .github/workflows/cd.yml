@@ -25,8 +25,8 @@ jobs:
       matrix:
         include:
           - service: j1-bridge-api
-            context: j1-device-edge/mqtt-kafka-bridge
-            dockerfile: j1-device-edge/mqtt-kafka-bridge/Dockerfile
+            context: j1-device-edge/backend
+            dockerfile: j1-device-edge/backend/Dockerfile
             image-name: disaster-j1-bridge-api
 
           - service: j2-data-intelligence
