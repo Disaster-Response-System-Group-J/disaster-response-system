@@ -26,7 +26,7 @@ const RISK_STYLES: Record<string, string> = {
 };
 
 export default function ResourcePlanView({ plan }: ResourcePlanViewProps) {
-  const data = plan.plan_data?.allocation_plan ?? plan.plan_data;
+  const data = plan.plan_json?.allocation_plan ?? plan.plan_json ?? plan.plan_data?.allocation_plan ?? plan.plan_data;
   const [activeSection, setActiveSection] = useState<string>('summary');
   const [expandedTier1, setExpandedTier1] = useState<string | null>(null);
 

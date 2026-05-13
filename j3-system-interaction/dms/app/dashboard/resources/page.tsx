@@ -441,13 +441,13 @@ export default function ResourcesPage() {
                 <p className="text-sm font-semibold text-slate-400 mb-2">No plan generated yet</p>
                 <p className="text-xs text-slate-500 mb-6">Click "Generate New Plan" to request an AI allocation plan from the J2 engine.</p>
               </div>
-            ) : currentPlan.status === 'PENDING' ? (
+            ) : currentPlan.status === 'DRAFT' ? (
               <div className="text-center py-24 bg-[#131924] border border-purple-500/20 rounded-xl">
                 <Loader2 size={32} className="mx-auto mb-4 text-purple-400 animate-spin" />
                 <p className="text-sm font-semibold text-slate-300 mb-2">Plan generation in progress</p>
                 <p className="text-xs text-slate-500">Waiting for J2 AI engine response via Kafka. This may take a moment.</p>
               </div>
-            ) : currentPlan.status === 'READY' ? (
+            ) : currentPlan.status === 'APPROVED' ? (
               <ResourcePlanView plan={currentPlan} />
             ) : null}
           </div>

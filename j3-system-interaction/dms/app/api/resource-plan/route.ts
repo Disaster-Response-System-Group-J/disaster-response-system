@@ -7,9 +7,9 @@ export async function GET(request: Request) {
     const incidentId = searchParams.get('incidentId');
 
     const { rows } = await pool.query(
-      `SELECT * FROM resource_plans
+      `SELECT * FROM public."ResourcePlan"
        ${incidentId ? 'WHERE incident_id = $1' : ''}
-       ORDER BY triggered_at DESC
+       ORDER BY generated_at DESC
        LIMIT 1`,
       incidentId ? [incidentId] : []
     );
@@ -27,7 +27,7 @@ export async function PATCH(request: Request) {
   try {
     const { planId, planData } = await request.json();
     const { rows } = await pool.query(
-      `UPDATE resource_plans SET status = 'READY', plan_data = $1 WHERE plan_id = $2 RETURNING *`,
+      `UPDATE public."ResourcePlan" SET status = 'APPROVED', plan_json = $1 WHERE plan_id = $2 RETURNING *`,
       [JSON.stringify(planData), planId]
     );
     return NextResponse.json(rows[0]);

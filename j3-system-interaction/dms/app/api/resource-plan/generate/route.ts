@@ -6,11 +6,11 @@ export async function POST(request: Request) {
   try {
     const { incidentId, triggeredBy } = await request.json();
 
-    // 1. Save PENDING plan record to DB
+    // 1. Save DRAFT plan record to DB
     const { rows } = await pool.query(
-      `INSERT INTO resource_plans (incident_id, triggered_by, status)
-       VALUES ($1, $2, 'PENDING')
-       RETURNING plan_id, triggered_at`,
+      `INSERT INTO public."ResourcePlan" (incident_id, requested_by, status, plan_json)
+       VALUES ($1, $2, 'DRAFT', '{}'::jsonb)
+       RETURNING plan_id, generated_at`,
       [incidentId ?? null, triggeredBy ?? null]
     );
     const plan = rows[0];
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
       payload: { planId: plan.plan_id, incidentId: incidentId ?? null },
     });
 
-    return NextResponse.json({ planId: plan.plan_id, status: 'PENDING', triggeredAt: plan.triggered_at });
+    return NextResponse.json({ planId: plan.plan_id, status: 'DRAFT', generatedAt: plan.generated_at });
   } catch (error) {
     console.error('Resource plan generate error:', error);
     return NextResponse.json({ error: 'Failed to trigger resource plan' }, { status: 500 });
