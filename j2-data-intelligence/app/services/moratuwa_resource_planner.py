@@ -16,6 +16,7 @@ are therefore mapped to this division.
 
 import json
 import logging
+import time
 from typing import Any
 
 from google import genai
@@ -96,7 +97,7 @@ def trigger_moratuwa_resource_plan(
             .filter(Division.division_id == MORATUWA_DIVISION_ID)
             .first()
         )
-        population = int(getattr(division, "division_population", None) or 0)
+        population = int(getattr(division, "population", None) or 0)
 
         resources = (
             db.query(DivisionResources)
@@ -108,7 +109,7 @@ def trigger_moratuwa_resource_plan(
         population_factor = min(population / 1_000_000.0, 1.0)
         consideration_score = round(prob * population_factor, 4)
 
-        division_name = getattr(division, "division_name", None) or getattr(division, "name", "Moratuwa")
+        division_name = getattr(division, "name", "Moratuwa")
 
         user_message = (
             f"Division: {division_name} (division_id={MORATUWA_DIVISION_ID})\n"
@@ -129,15 +130,29 @@ def trigger_moratuwa_resource_plan(
         )
 
         client = genai.Client(api_key=GEMINI_API_KEY)
-        response = client.models.generate_content(
-            model=GEMINI_MODEL,
-            config=types.GenerateContentConfig(
-                system_instruction=_SYSTEM_PROMPT,
-                temperature=0.2,
-                response_mime_type="application/json",
-            ),
-            contents=user_message,
-        )
+        _RETRY_DELAYS = [4, 10, 20]
+        response = None
+        for attempt, delay in enumerate([0] + _RETRY_DELAYS):
+            if delay:
+                logger.info(f"[MoratuwaPlanner] Retrying Gemini in {delay}s (attempt {attempt + 1})")
+                time.sleep(delay)
+            try:
+                response = client.models.generate_content(
+                    model=GEMINI_MODEL,
+                    config=types.GenerateContentConfig(
+                        system_instruction=_SYSTEM_PROMPT,
+                        temperature=0.2,
+                        response_mime_type="application/json",
+                    ),
+                    contents=user_message,
+                )
+                break
+            except Exception as exc:
+                is_rate_limit = "429" in str(exc) or "RESOURCE_EXHAUSTED" in str(exc)
+                if is_rate_limit and attempt < len(_RETRY_DELAYS):
+                    logger.warning(f"[MoratuwaPlanner] Gemini rate limited: {exc}")
+                    continue
+                raise
 
         try:
             plan_json = json.loads(response.text)
