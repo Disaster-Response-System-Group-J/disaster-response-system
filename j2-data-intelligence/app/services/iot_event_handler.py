@@ -62,7 +62,10 @@ _MAX_RATE = {
 _UNPROCESSED_FLOOD_SQL = sa.text("""
     SELECT f.id, f.temp, f.hum, f.depth, f.recorded_at AS created_at
     FROM iot_flood f
-    WHERE NOT EXISTS (
+    WHERE f.temp IS NOT NULL
+      AND f.hum IS NOT NULL
+      AND f.depth IS NOT NULL
+      AND NOT EXISTS (
         SELECT 1 FROM iot_predictions p
         WHERE p.source_id = f.id
           AND p.disaster_type = 'flood'
@@ -94,7 +97,10 @@ _UNPROCESSED_LANDSLIDE_SQL = sa.text("""
     SELECT l.id, l.temp, l.hum, l.moist,
            l.ax, l.ay, l.az, l.gx, l.gy, l.gz, l.recorded_at AS created_at
     FROM iot_landslide l
-    WHERE NOT EXISTS (
+    WHERE l.temp IS NOT NULL
+      AND l.hum IS NOT NULL
+      AND l.moist IS NOT NULL
+      AND NOT EXISTS (
         SELECT 1 FROM iot_predictions p
         WHERE p.source_id = l.id
           AND p.disaster_type = 'landslide'
