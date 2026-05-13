@@ -68,8 +68,8 @@ _UNPROCESSED_FLOOD_SQL = sa.text("""
           AND p.disaster_type = 'flood'
           AND p.horizon = 0
     )
-    ORDER BY f.recorded_at DESC
-    LIMIT 1
+    ORDER BY f.recorded_at ASC
+    LIMIT 50
 """)
 
 _FLOOD_HISTORY_SQL = sa.text("""
@@ -100,8 +100,8 @@ _UNPROCESSED_LANDSLIDE_SQL = sa.text("""
           AND p.disaster_type = 'landslide'
           AND p.horizon = 0
     )
-    ORDER BY l.recorded_at DESC
-    LIMIT 1
+    ORDER BY l.recorded_at ASC
+    LIMIT 50
 """)
 
 _LANDSLIDE_HISTORY_SQL = sa.text("""
