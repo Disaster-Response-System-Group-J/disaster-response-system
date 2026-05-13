@@ -36,16 +36,14 @@ void setup() {
     Serial.begin(115200);
     delay(2000);
     while (!Serial);
-    Serial.println("\n====================================");
-    Serial.println("     Starting Landslide Node...");
-    Serial.println("====================================");
+    Serial.println("\nStarting Landslide Node...");
 
     dht.begin();
     Wire.begin();
     Wire.setTimeOut(150);
     
     if (!mpu.begin()) {
-        Serial.println("⚠️ Failed to find MPU6050 chip! Sending NULL values for gyro/accel.");
+        Serial.println("Failed to find MPU6050 chip! Sending NULL values for gyro/accel.");
         mpuInitialized = false;
     } else {
         mpuInitialized = true;
@@ -57,16 +55,14 @@ void setup() {
 
     LoRa.setPins(ss, rst, dio0);
     if (!LoRa.begin(433E6)) {
-        Serial.println("❌ Starting LoRa failed! Check wiring.");
+        Serial.println("Starting LoRa failed! Check wiring.");
         while (1) { delay(10); }
     }
 
     // Enable CRC to detect and reject corrupted packets before transmission
     LoRa.enableCrc();
     
-    // 🔥 CRITICAL FIX: Lowered TX Power from 20 to 2
-    // 20dBm causes extreme RF interference at close range, which physically corrupts 
-    // the SPI data lines and crashes the LoRa chip permanently until power cycled.
+    // Lowered TX Power from 20 to 2 to minimize RF interference
     LoRa.setTxPower(2);
     
     LoRa.setSpreadingFactor(9);
@@ -75,7 +71,7 @@ void setup() {
 
     randomSeed(analogRead(0));
 
-    Serial.println("✅ LoRa Initialized OK!");
+    Serial.println("LoRa Initialized OK!");
     
     // Start the safe background watchdog
     xTaskCreatePinnedToCore(watchdogTask, "Watchdog", 2048, NULL, 1, NULL, 1);
@@ -146,22 +142,17 @@ void loop() {
 
         Serial.println("Initiating LoRa transmission...");
         
-        // ✅ FIXED: Use absolute system time for collision avoidance
-        // Flood transmits at: 0ms, 1200ms, 2400ms, 3600ms, 4800ms, etc.
-        // Landslide transmits at: 0ms, 3700ms, 7400ms, 11100ms, etc.
-        // Check current position in Flood's 1200ms cycle
+        // Use absolute system time for collision avoidance
         unsigned long positionInFloodCycle = millis() % 1200;
         
-        // Flood is transmitting during the last 100ms of its cycle (1100-1200ms)
-        // If we're in danger zone (past 800ms), wait for Flood to finish transmitting
+        // If in danger zone, wait for Flood to finish transmitting
         if (positionInFloodCycle > 800) {
-            unsigned long waitTime = (1200 - positionInFloodCycle) + 100;  // Wait until Flood completes + 100ms buffer
-            Serial.print("   ⚠️ Collision danger detected (in Flood window). Waiting ");
+            unsigned long waitTime = (1200 - positionInFloodCycle) + 100;
+            Serial.print("   Collision detected. Waiting ");
             Serial.print(waitTime);
             Serial.println("ms...");
             delay(waitTime);
         } else {
-            // Safe to transmit - add small jitter for robustness
             delay(50 + random(0, 50));
         }
         
@@ -169,9 +160,9 @@ void loop() {
         LoRa.print(jsonString);
         int txResult = LoRa.endPacket();
         if (txResult) {
-            Serial.println("✅ LoRa packet transmitted successfully!\n");
+            Serial.println("LoRa packet transmitted successfully!\n");
         } else {
-            Serial.println("❌ LoRa transmission FAILED! Check antenna/power.\n");
+            Serial.println("LoRa transmission FAILED! Check antenna/power.\n");
         }
     }
 }

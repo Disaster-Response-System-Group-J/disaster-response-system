@@ -49,13 +49,9 @@ void setup() {
     }
 
     // Enable CRC to detect and reject corrupted packets before transmission
-    // This prevents RF-corrupted data from being sent
     LoRa.enableCrc();
     
-    // 🔥 CRITICAL FIX: Lowered TX Power from 20 to 2
-    // 20dBm causes extreme RF interference at close range, which physically corrupts 
-    // the SPI data lines and crashes the LoRa chip permanently until power cycled.
-    // 2dBm minimizes RF saturation at the receiver.
+    // Lowered TX Power from 20 to 2 to minimize RF interference
     LoRa.setTxPower(2); 
     
     LoRa.setSpreadingFactor(9);
@@ -111,7 +107,7 @@ void loop() {
             doc["temp"] = round(temp * 10.0) / 10.0;
             doc["hum"] = round(hum * 10.0) / 10.0;
         }
-        doc["depth"] = std::max(0.0f, 19.0f - (depth > 0 ? depth : 0));
+        doc["depth"] = round(std::max(0.0f, 19.0f - (depth > 0 ? depth : 0)));
 
         String jsonString;
         serializeJson(doc, jsonString);
@@ -121,22 +117,17 @@ void loop() {
 
         Serial.println("Initiating LoRa transmission...");
         
-        // ✅ FIXED: Use absolute system time for collision avoidance
-        // Landslide transmits at: 0ms, 3700ms, 7400ms, 11100ms, etc.
-        // Flood transmits at: 0ms, 1200ms, 2400ms, 3600ms, 4800ms, 6000ms, 7200ms, etc.
-        // Check current position in Landslide's 3700ms cycle
+        // Use absolute system time for collision avoidance
         unsigned long positionInLandslideCycle = millis() % 3700;
         
-        // Landslide is transmitting during the last 100ms of its cycle (3600-3700ms)
-        // If we're in danger zone (past 3300ms), wait for Landslide to finish transmitting
+        // If in danger zone, wait for Landslide to finish transmitting
         if (positionInLandslideCycle > 3300) {
-            unsigned long waitTime = (3700 - positionInLandslideCycle) + 100;  // Wait until Landslide completes + 100ms buffer
-            Serial.print("   ⚠️ Collision danger detected (in Landslide window). Waiting ");
+            unsigned long waitTime = (3700 - positionInLandslideCycle) + 100;
+            Serial.print("   Collision detected. Waiting ");
             Serial.print(waitTime);
             Serial.println("ms...");
             delay(waitTime);
         } else {
-            // Safe to transmit - add small jitter for robustness
             delay(50 + random(0, 50));
         }
         
@@ -144,9 +135,9 @@ void loop() {
         LoRa.print(jsonString);
         int txResult = LoRa.endPacket();
         if (txResult) {
-            Serial.println("✅ LoRa packet transmitted successfully!\n");
+            Serial.println("LoRa packet transmitted successfully!\n");
         } else {
-            Serial.println("❌ LoRa transmission FAILED! Check antenna/power.\n");
+            Serial.println("LoRa transmission FAILED! Check antenna/power.\n");
         }
 
         lastDHTReadTime = millis();

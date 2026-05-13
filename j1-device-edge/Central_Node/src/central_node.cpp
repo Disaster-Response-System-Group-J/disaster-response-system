@@ -8,8 +8,8 @@
 #include <LittleFS.h>
 
 // Network & MQTT Settings
-const char* ssid = "Sudil's Pixel 7";
-const char* password = "1234567898";
+const char* ssid = "Fiber 2.4GHz";
+const char* password = "salligewwamakiyannam";
 const char* mqtt_server = "8e659da889be4ff7a3d839144a0f8aaa.s1.eu.hivemq.cloud";
 const char* mqtt_user = "j1_gateway"; 
 const char* mqtt_pass = "8797Sudil"; 
@@ -22,28 +22,28 @@ PubSubClient client(espClient);
 #define rst 14
 #define dio0 26
 
-// === OFFLINE BUFFER MANAGEMENT ===
+// Offline buffer management
 #define BUFFER_DIR "/buffer"
 #define BUFFER_INDEX_FILE "/buffer/index.txt"
 #define MAX_BUFFER_FILES 100
-#define MAX_BUFFER_SIZE 1048576  // 1MB max for buffer storage
+#define MAX_BUFFER_SIZE 1048576
 
 bool wifiWasConnected = false;  // Track WiFi state changes
 unsigned long bufferFileCounter = 0;  // Counter for unique buffer file names
 
 // Initialize LittleFS and create buffer directory
 void initializeBuffer() {
-    Serial.println("\n⏳ Initializing LittleFS filesystem...");
+    Serial.println("\nInitializing LittleFS filesystem...");
     
     // Try to mount LittleFS
-    if (!LittleFS.begin(true)) {  // true = format if mount fails
-        Serial.println("⚠️ LittleFS mount failed, attempting format...");
+    if (!LittleFS.begin(true)) {
+        Serial.println("LittleFS mount failed, attempting format...");
         if (!LittleFS.format()) {
-            Serial.println("❌ LittleFS format failed! Buffer system unavailable.");
+            Serial.println("LittleFS format failed! Buffer system unavailable.");
             return;
         }
         if (!LittleFS.begin()) {
-            Serial.println("❌ LittleFS mount still failed after format!");
+            Serial.println("LittleFS mount still failed after format!");
             return;
         }
     }
@@ -51,15 +51,15 @@ void initializeBuffer() {
     // Create buffer directory if it doesn't exist
     if (!LittleFS.exists(BUFFER_DIR)) {
         if (LittleFS.mkdir(BUFFER_DIR)) {
-            Serial.println("📁 Buffer directory created: " BUFFER_DIR);
+            Serial.println("Buffer directory created: " BUFFER_DIR);
         } else {
-            Serial.println("⚠️ Failed to create buffer directory");
+            Serial.println("Failed to create buffer directory");
         }
     } else {
-        Serial.println("📁 Buffer directory already exists: " BUFFER_DIR);
+        Serial.println("Buffer directory already exists: " BUFFER_DIR);
     }
     
-    Serial.println("✅ LittleFS initialized. Buffer ready.");
+    Serial.println("LittleFS initialized. Buffer ready.");
 }
 
 // Save a packet to buffer when WiFi is offline
@@ -67,7 +67,7 @@ void bufferPacket(const String& data, const String& topic, bool isMainTopic) {
     // Validate filesystem is available
     if (!LittleFS.exists(BUFFER_DIR)) {
         if (!LittleFS.mkdir(BUFFER_DIR)) {
-            Serial.println("⚠️ Buffer directory unavailable - skipping buffer");
+            Serial.println("Buffer directory unavailable - skipping buffer");
             return;
         }
     }
@@ -88,14 +88,14 @@ void bufferPacket(const String& data, const String& topic, bool isMainTopic) {
         size_t bytesWritten = serializeJson(bufferDoc, file);
         file.close();
         if (bytesWritten > 0) {
-            Serial.print("   💾 Buffered to: ");
+            Serial.print("   Buffered to: ");
             Serial.println(filename);
         } else {
-            Serial.print("   ⚠️ Failed to write data to: ");
+            Serial.print("   Failed to write data to: ");
             Serial.println(filename);
         }
     } else {
-        Serial.print("   ❌ Cannot open file for writing: ");
+        Serial.print("   Cannot open file for writing: ");
         Serial.println(filename);
     }
 }
@@ -117,11 +117,11 @@ unsigned long getBufferSize() {
 // Sync all buffered packets to MQTT broker
 void syncBufferedData() {
     if (!client.connected()) {
-        Serial.println("⚠️ MQTT not connected - cannot sync yet. Will retry...");
+        Serial.println("MQTT not connected - cannot sync yet. Will retry...");
         return;
     }
     
-    Serial.println("\n🔄 Starting buffer sync to broker...");
+    Serial.println("\nStarting buffer sync to broker...");
     
     File root = LittleFS.open(BUFFER_DIR);
     File file = root.openNextFile();
@@ -146,14 +146,14 @@ void syncBufferedData() {
             
             // Ensure MQTT is still connected before publishing
             if (!client.connected()) {
-                Serial.println("   ⚠️ MQTT disconnected during sync - pausing sync");
+                Serial.println("   MQTT disconnected during sync - pausing sync");
                 break;
             }
             
             if (client.publish(targetTopic, data.c_str())) {
-                Serial.print("   ✅ Synced: ");
+                Serial.print("   Synced: ");
                 Serial.print(filename);
-                Serial.print(" → ");
+                Serial.print(" to ");
                 Serial.println(targetTopic);
                 syncedCount++;
                 
@@ -162,20 +162,20 @@ void syncBufferedData() {
                 LittleFS.remove(filename);
                 file = root.openNextFile();
             } else {
-                Serial.print("   ⚠️ Sync failed: ");
+                Serial.print("   Sync failed: ");
                 Serial.println(filename);
                 failedCount++;
                 file = root.openNextFile();
             }
         } else {
-            Serial.print("   ❌ Parse error in: ");
+            Serial.print("   Parse error in: ");
             Serial.println(filename);
             file = root.openNextFile();
         }
     }
     root.close();
     
-    Serial.print("📊 Sync complete - Synced: ");
+    Serial.print("Sync complete - Synced: ");
     Serial.print(syncedCount);
     Serial.print(" | Failed: ");
     Serial.println(failedCount);
@@ -196,7 +196,7 @@ void clearBuffer() {
     }
     root.close();
     
-    Serial.print("🗑️ Buffer cleared - Deleted ");
+    Serial.print("Buffer cleared - Deleted ");
     Serial.print(deletedCount);
     Serial.println(" files.");
 }
@@ -310,7 +310,7 @@ bool shouldPublishToMainLandslideTopic(const JsonDocument& doc) {
         float moisturePercent = doc["moist"] | 0.0;  // moist field contains percentage (0-100%)
         
         // Don't publish to main topic if soil moisture is below 30% (dry soil = not critical)
-        if (moisturePercent < 30.0) {
+        if (moisturePercent < 40.0) {
             return false;  // Below critical level - monitoring only (still goes to _red)
         }
     }
@@ -331,7 +331,7 @@ void setup_wifi() {
     }
     
     if (WiFi.status() != WL_CONNECTED) {
-        Serial.println("\n❌ WiFi failed to connect. Rebooting...");
+        Serial.println("\nWiFi failed to connect. Rebooting...");
         delay(1000);
         WiFi.disconnect(true);
         WiFi.mode(WIFI_OFF);
@@ -339,7 +339,7 @@ void setup_wifi() {
         ESP.restart();
     }
     
-    Serial.println("\n✅ WiFi connected.");
+    Serial.println("\nWiFi connected.");
     
     // Skip SSL certificate validation
     espClient.setInsecure();
@@ -368,19 +368,17 @@ void reconnect() {
 void setup() {
     Serial.begin(115200);
     delay(2000); 
-    Serial.println("\n====================================");
-    Serial.println("   Starting Central Gateway Node ");
-    Serial.println("====================================");
+    Serial.println("\nStarting Central Gateway Node\n");
     
-    // Initialize LittleFS buffer FIRST
-    Serial.println("\n⏳ Initializing offline buffer system...");
+    // Initialize LittleFS buffer
+    Serial.println("Initializing offline buffer system...");
     initializeBuffer();
     
-    // Initialize LoRa FIRST - before WiFi interference
-    Serial.println("\n⏳ Initializing LoRa module...");
+    // Initialize LoRa
+    Serial.println("\nInitializing LoRa module...");
     LoRa.setPins(ss, rst, dio0);
     if (!LoRa.begin(433E6)) {
-        Serial.println("❌ Starting LoRa failed! Check wiring.");
+        Serial.println("Starting LoRa failed! Check wiring.");
         while (1);
     }
     
@@ -396,34 +394,34 @@ void setup() {
     
     // Explicitly set to receive mode
     LoRa.receive();
-    delay(200);  // Give LoRa time to enter RX mode
-    Serial.println("✅ LoRa Gateway Initialized OK!");
+    delay(200);
+    Serial.println("LoRa Gateway Initialized OK!");
     
     // Now initialize WiFi and MQTT (after LoRa is stable)
     setup_wifi();
     
     client.setServer(mqtt_server, 8883);
-    client.setBufferSize(512); // Increase buffer for HiveMQ TLS packets
+    client.setBufferSize(512);
     
     // Mark that WiFi was initially connected
     wifiWasConnected = (WiFi.status() == WL_CONNECTED);
     
-    Serial.println("✅ Ready! Waiting for LoRa packets...");
+    Serial.println("Ready! Waiting for LoRa packets...");
 }
 
 // Timing control for MQTT publishing
-unsigned long lastPublishToRedTopic = 0;    // For 1s interval to flood_red
-unsigned long lastPublishToMainTopic = 0;   // For 5s interval to flood
-unsigned long lastLoRaSafetyRefresh = 0;    // Track when we last refreshed RX mode for safety
-unsigned long lastBufferSizeCheck = 0;      // Track buffer size periodically
-unsigned long lastSyncAttempt = 0;          // Track last sync attempt time
-bool syncRequired = false;                   // Flag to track if sync is needed
+unsigned long lastPublishToRedTopic = 0;
+unsigned long lastPublishToMainTopic = 0;
+unsigned long lastLoRaSafetyRefresh = 0;
+unsigned long lastBufferSizeCheck = 0;
+unsigned long lastSyncAttempt = 0;
+bool syncRequired = false;
 
 void loop() {
-    // Watchdog: If no packets received for 45 seconds, reboot!
+    // Watchdog: If no packets received for 45 seconds, reboot
     static unsigned long lastPacketTime = millis();
     if (millis() - lastPacketTime > 45000) {
-        Serial.println("\n⚠️ WATCHDOG: No LoRa packets for 45s. Rebooting to clear radio hang...");
+        Serial.println("\nWATCHDOG: No LoRa packets for 45s. Rebooting to clear radio hang...");
         delay(1000);
         WiFi.disconnect(true);
         WiFi.mode(WIFI_OFF);
@@ -431,27 +429,27 @@ void loop() {
         ESP.restart();
     }
 
-    // ✅ NEW: Track WiFi status changes
+    // Track WiFi status changes
     bool wifiNowConnected = (WiFi.status() == WL_CONNECTED);
     
     if (wifiNowConnected && !wifiWasConnected) {
-        // WiFi just came back online - set sync flag
-        Serial.println("\n✅ WiFi reconnected! Will sync buffered data once MQTT connects...");
+        // WiFi just came back online
+        Serial.println("\nWiFi reconnected! Will sync buffered data once MQTT connects...");
         wifiWasConnected = true;
-        syncRequired = true;  // Set flag to sync when MQTT is ready
+        syncRequired = true;
         lastSyncAttempt = millis();
     } else if (!wifiNowConnected && wifiWasConnected) {
         // WiFi just went down - enter offline mode
-        Serial.println("\n⚠️ WiFi disconnected! Entering offline buffering mode...");
+        Serial.println("\nWiFi disconnected! Entering offline buffering mode...");
         wifiWasConnected = false;
-        syncRequired = false;  // Clear sync flag
+        syncRequired = false;
     }
     
     // If WiFi is down, show buffer status periodically
     if (!wifiNowConnected) {
         if (millis() - lastBufferSizeCheck > 5000) {
             unsigned long bufferSize = getBufferSize();
-            Serial.print("📦 Buffer size: ");
+            Serial.print("Buffer size: ");
             Serial.print(bufferSize / 1024);
             Serial.print(" KB | Files: ");
             
@@ -478,17 +476,17 @@ void loop() {
         }
     }
     
-    // ✅ NEW: If sync is required and MQTT is now connected, sync buffered data
+    // If sync is required and MQTT is now connected, sync buffered data
     if (syncRequired && client.connected()) {
-        Serial.println("\n🔄 MQTT connected. Starting sync of buffered data...");
+        Serial.println("\nMQTT connected. Starting sync of buffered data...");
         syncBufferedData();
-        syncRequired = false;  // Clear flag after sync attempt
+        syncRequired = false;
     }
     
-    // ✅ NEW: Periodically retry sync if it was required but MQTT wasn't ready
+    // Periodically retry sync if it was required but MQTT wasn't ready
     if (syncRequired && wifiNowConnected && (millis() - lastSyncAttempt > 10000)) {
         if (client.connected()) {
-            Serial.println("\n🔄 Retrying buffer sync...");
+            Serial.println("\nRetrying buffer sync...");
             syncBufferedData();
             syncRequired = false;
         }
@@ -507,23 +505,22 @@ void loop() {
         lastDebugTime = millis();
     }
 
-    // SAFETY: Very infrequent RX mode refresh (every 30 seconds) to recover from any hangs
-    // Normal operation: parsePacket() handles receiving without this being called frequently
+    // Very infrequent RX mode refresh (every 30 seconds)
     if (millis() - lastLoRaSafetyRefresh > 30000) {
         LoRa.receive();
         lastLoRaSafetyRefresh = millis();
     }
     
-    // Check for incoming LoRa packets - this does NOT interfere with RX mode
+    // Check for incoming LoRa packets
     int packetSize = LoRa.parsePacket();
     if (packetSize) {
-        lastPacketTime = millis(); // Reset watchdog
+        lastPacketTime = millis();
         String receivedData = "";
         while (LoRa.available()) {
             receivedData += (char)LoRa.read();
         }
         
-        Serial.print("\n📥 [LoRa] Received ");
+        Serial.print("\n[LoRa] Received ");
         Serial.print(packetSize);
         Serial.print(" bytes: ");
         Serial.println(receivedData);
@@ -548,7 +545,7 @@ void loop() {
             String type = doc["type"] | "";
             
             if (nodeId.length() == 0 || type.length() == 0) {
-                Serial.println("   ⚠️ Packet missing required fields (id or type) - likely too corrupted, skipping.");
+                Serial.println("   Packet missing required fields (id or type) - likely too corrupted, skipping.");
             } else {
                 String topic = resolveMqttTopic(doc);
 
@@ -567,7 +564,7 @@ void loop() {
                     
                     unsigned long currentTime = millis();
                     
-                    // ✅ NEW: If WiFi is down, buffer all data
+                    // If WiFi is down, buffer all data
                     if (!wifiNowConnected) {
                         String nodeRedTopic = topic + "_red";
                         bufferPacket(normalizedData, nodeRedTopic, false);
@@ -623,11 +620,11 @@ void loop() {
                         }
                     }
                 } else {
-                    Serial.println("   ⚠️ Unknown node or type. Packet ignored.");
+                    Serial.println("   Unknown node or type. Packet ignored.");
                 }
             }
         } else {
-            Serial.print("   ❌ Failed to parse JSON packet: ");
+            Serial.print("   Failed to parse JSON packet: ");
             Serial.println(error.c_str());
         }
     } else {
