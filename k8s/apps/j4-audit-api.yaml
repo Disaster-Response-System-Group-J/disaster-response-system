@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: j4-audit-api
-          image: dehanns/disaster-j4-audit-api:sha-b744329
+          image: dehanns/disaster-j4-audit-api:sha-e169b2e
           imagePullPolicy: Always
           ports:
             - containerPort: 8084
