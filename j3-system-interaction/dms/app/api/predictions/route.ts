@@ -22,7 +22,7 @@ export async function GET() {
       WITH latest AS (
         SELECT DISTINCT ON (source_id, disaster_type, horizon)
           source_id, disaster_type, horizon, predicted_status,
-          temp, hum, depth, moist, predicted_at
+          temp, hum, depth, depth_prev, moist, ax, ay, az, gx, gy, gz, predicted_at
         FROM public.iot_predictions
         ORDER BY source_id, disaster_type, horizon, predicted_at DESC
       )
@@ -37,7 +37,14 @@ export async function GET() {
         MAX(CASE WHEN horizon = 0 THEN temp  END) AS temp,
         MAX(CASE WHEN horizon = 0 THEN hum   END) AS hum,
         MAX(CASE WHEN horizon = 0 THEN depth END) AS depth,
-        MAX(CASE WHEN horizon = 0 THEN moist END) AS moist
+        MAX(CASE WHEN horizon = 0 THEN depth_prev END) AS depth_prev,
+        MAX(CASE WHEN horizon = 0 THEN moist END) AS moist,
+        MAX(CASE WHEN horizon = 0 THEN ax END) AS ax,
+        MAX(CASE WHEN horizon = 0 THEN ay END) AS ay,
+        MAX(CASE WHEN horizon = 0 THEN az END) AS az,
+        MAX(CASE WHEN horizon = 0 THEN gx END) AS gx,
+        MAX(CASE WHEN horizon = 0 THEN gy END) AS gy,
+        MAX(CASE WHEN horizon = 0 THEN gz END) AS gz
       FROM latest
       GROUP BY source_id, disaster_type
       ORDER BY predicted_at DESC
@@ -64,7 +71,14 @@ export async function GET() {
         temp:         row.temp  !== null ? Number(row.temp)  : null,
         hum:          row.hum   !== null ? Number(row.hum)   : null,
         depth:        row.depth !== null ? Number(row.depth) : null,
+        depth_prev:   row.depth_prev !== null ? Number(row.depth_prev) : null,
         moist:        row.moist !== null ? Number(row.moist) : null,
+        ax:           row.ax    !== null ? Number(row.ax)    : null,
+        ay:           row.ay    !== null ? Number(row.ay)    : null,
+        az:           row.az    !== null ? Number(row.az)    : null,
+        gx:           row.gx    !== null ? Number(row.gx)    : null,
+        gy:           row.gy    !== null ? Number(row.gy)    : null,
+        gz:           row.gz    !== null ? Number(row.gz)    : null,
         predicted_at: row.predicted_at,
       };
     });
