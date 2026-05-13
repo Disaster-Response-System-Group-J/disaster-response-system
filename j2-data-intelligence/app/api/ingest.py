@@ -20,7 +20,8 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
-from app.db.database import get_db
+from app.db.database import get_db, SessionLocal
+from app.services.iot_event_handler import _process_flood_rows, _process_landslide_rows
 
 logger = logging.getLogger("j2.ingest")
 
@@ -361,6 +362,18 @@ async def ingest_sensor(
                     success=False, error="Sensor insert failed unexpectedly"
                 ).model_dump(),
             )
+
+        # Trigger ML predictions immediately for the new row using a fresh session
+        pred_db = SessionLocal()
+        try:
+            if target_table == "iot_flood":
+                _process_flood_rows(pred_db)
+            else:
+                _process_landslide_rows(pred_db)
+        except Exception as pred_exc:
+            logger.error("Prediction step failed for %s: %s", row_id, pred_exc)
+        finally:
+            pred_db.close()
 
         # Check thresholds → generate alert if needed
         alert_triggered = False

@@ -60,7 +60,7 @@ _MAX_RATE = {
 # ── SQL ───────────────────────────────────────────────────────────────────────
 
 _UNPROCESSED_FLOOD_SQL = sa.text("""
-    SELECT f.id, f.temp, f.hum, f.depth, f.created_at
+    SELECT f.id, f.temp, f.hum, f.depth, f.recorded_at AS created_at
     FROM iot_flood f
     WHERE NOT EXISTS (
         SELECT 1 FROM iot_predictions p
@@ -68,30 +68,31 @@ _UNPROCESSED_FLOOD_SQL = sa.text("""
           AND p.disaster_type = 'flood'
           AND p.horizon = 0
     )
-    ORDER BY f.created_at ASC
+    ORDER BY f.recorded_at DESC
+    LIMIT 1
 """)
 
 _FLOOD_HISTORY_SQL = sa.text("""
-    SELECT temp, hum, depth, created_at
+    SELECT temp, hum, depth, recorded_at AS created_at
     FROM iot_flood
-    WHERE created_at <= :ts
-      AND created_at >= :ts - INTERVAL '6 hours'
+    WHERE recorded_at <= :ts
+      AND recorded_at >= :ts - INTERVAL '6 hours'
       AND temp IS NOT NULL
       AND depth IS NOT NULL
-    ORDER BY created_at DESC
+    ORDER BY recorded_at DESC
     LIMIT :n
 """)
 
 _PREV_FLOOD_DEPTH_SQL = sa.text("""
     SELECT depth FROM iot_flood
-    WHERE created_at < :ts AND depth IS NOT NULL
-    ORDER BY created_at DESC
+    WHERE recorded_at < :ts AND depth IS NOT NULL
+    ORDER BY recorded_at DESC
     LIMIT 1
 """)
 
 _UNPROCESSED_LANDSLIDE_SQL = sa.text("""
     SELECT l.id, l.temp, l.hum, l.moist,
-           l.ax, l.ay, l.az, l.gx, l.gy, l.gz, l.created_at
+           l.ax, l.ay, l.az, l.gx, l.gy, l.gz, l.recorded_at AS created_at
     FROM iot_landslide l
     WHERE NOT EXISTS (
         SELECT 1 FROM iot_predictions p
@@ -99,17 +100,18 @@ _UNPROCESSED_LANDSLIDE_SQL = sa.text("""
           AND p.disaster_type = 'landslide'
           AND p.horizon = 0
     )
-    ORDER BY l.created_at ASC
+    ORDER BY l.recorded_at DESC
+    LIMIT 1
 """)
 
 _LANDSLIDE_HISTORY_SQL = sa.text("""
-    SELECT temp, hum, moist, created_at
+    SELECT temp, hum, moist, recorded_at AS created_at
     FROM iot_landslide
-    WHERE created_at <= :ts
-      AND created_at >= :ts - INTERVAL '6 hours'
+    WHERE recorded_at <= :ts
+      AND recorded_at >= :ts - INTERVAL '6 hours'
       AND temp IS NOT NULL
       AND moist IS NOT NULL
-    ORDER BY created_at DESC
+    ORDER BY recorded_at DESC
     LIMIT :n
 """)
 
