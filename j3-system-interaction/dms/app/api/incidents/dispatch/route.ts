@@ -15,18 +15,31 @@ export async function POST(req: Request) {
         }
 
         if (role === 'LOGISTICS_STAFF') {
-            // Removed incident_id, as it does not exist in LogisticsDeployment
+            const { resourceId, requestId, items } = body;
+            
             const query = `
-        INSERT INTO public."LogisticsDeployment" (
-          user_id, dispatched_by, status
-        )
-        VALUES ($1, $2, 'EN_ROUTE')
-        RETURNING *
-      `;
+                INSERT INTO public."LogisticsDeployment" (
+                    user_id, dispatched_by, status, incident_id, resource_request_id, items_dispatched, dispatched_at
+                )
+                VALUES ($1, $2, 'EN_ROUTE', $3, $4, $5::jsonb, now())
+                RETURNING *
+            `;
             const { rows } = await pool.query(query, [
                 personnelId,
-                dispatchedBy || null
+                dispatchedBy || null,
+                incidentId || null,
+                requestId || null,
+                items ? JSON.stringify(items) : null
             ]);
+
+            // If a specific resource asset is being dispatched, update its status
+            if (resourceId) {
+                const assetDbId = resourceId.startsWith('ASSET-') ? resourceId.split('-')[1] : resourceId;
+                await pool.query(
+                    'UPDATE public."DeployableAsset" SET status = \'ASSIGNED\' WHERE asset_id = $1',
+                    [assetDbId]
+                );
+            }
 
             return NextResponse.json({ success: true, dispatch: rows[0] }, { status: 201 });
 
