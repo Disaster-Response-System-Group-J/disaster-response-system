@@ -1,10 +1,86 @@
-import pandas as pd
+import math
+from dataclasses import dataclass
+from datetime import date, timedelta
+
 import numpy as np
+import pandas as pd
 import scipy.stats
 from sklearn.preprocessing import LabelEncoder
 from sqlalchemy.orm import Session
-from datetime import date, timedelta
-from app.db.models import RainfallData, SoilMoisture, TemperatureData, Division
+
+from app.db.models import Division, RainfallData, SoilMoisture, TemperatureData
+
+
+@dataclass
+class ComputedFeatures:
+    rain_lag_1: float = 0.0
+    rain_rolling_3d: float = 0.0
+    rain_rolling_7d: float = 0.0
+    month_sin: float = 0.0
+    month_cos: float = 0.0
+    spi: float = 0.0
+    division_encoded: int = 0
+    level_difference: float = 0.0
+
+
+def build_computed_features(db: Session, telemetry, division) -> ComputedFeatures:
+    """
+    Compute weather-based features for a single ingest-and-predict call.
+    Queries the last 30 days of RainfallData for the division and derives
+    rolling/lag features needed by the weather ensemble models.
+    Returns ComputedFeatures with safe defaults when historical data is sparse.
+    """
+    today = date.today()
+    history_start = today - timedelta(days=30)
+
+    try:
+        rain_rows = (
+            db.query(RainfallData.date, RainfallData.rain_sum)
+            .filter(
+                RainfallData.division_id == division.division_id,
+                RainfallData.date >= history_start,
+                RainfallData.date <= today,
+            )
+            .order_by(RainfallData.date)
+            .all()
+        )
+    except Exception:
+        rain_rows = []
+
+    if rain_rows:
+        dates   = [r.date for r in rain_rows]
+        rains   = [float(r.rain_sum or 0.0) for r in rain_rows]
+        series  = pd.Series(rains, index=pd.to_datetime(dates))
+        rain_lag_1     = float(series.shift(1).fillna(0).iloc[-1])
+        rain_rolling_3d = float(series.rolling(3, min_periods=1).sum().iloc[-1])
+        rain_rolling_7d = float(series.rolling(7, min_periods=1).sum().iloc[-1])
+        spi_val = float(compute_spi(series).iloc[-1]) if len(series) > 1 else 0.0
+    else:
+        rain_lag_1 = rain_rolling_3d = rain_rolling_7d = spi_val = 0.0
+
+    recorded_at = getattr(telemetry, "recorded_at", None) or today
+    month = recorded_at.month if hasattr(recorded_at, "month") else today.month
+    month_sin = math.sin(2 * math.pi * month / 12)
+    month_cos = math.cos(2 * math.pi * month / 12)
+
+    # Encode division: use division_id modulo 100 as a lightweight stable encoding
+    division_encoded = int(division.division_id or 0) % 100
+
+    # Level difference: current depth minus previous depth from telemetry
+    depth       = float(getattr(telemetry, "depth", None) or 0.0)
+    depth_prev  = float(getattr(telemetry, "depth_prev", None) or 0.0)
+    level_difference = depth - depth_prev
+
+    return ComputedFeatures(
+        rain_lag_1=rain_lag_1,
+        rain_rolling_3d=rain_rolling_3d,
+        rain_rolling_7d=rain_rolling_7d,
+        month_sin=month_sin,
+        month_cos=month_cos,
+        spi=spi_val,
+        division_encoded=division_encoded,
+        level_difference=level_difference,
+    )
 
 def compute_spi(rain_series, window=30):
     from scipy.stats import gamma

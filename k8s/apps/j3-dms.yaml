@@ -71,7 +71,8 @@ spec:
               memory: 64Mi
       containers:
         - name: j3-dms
-          image: dehanns/disaster-j3-dms:v1.6
+
+          image: dehanns/disaster-j3-dms:v1.8
           imagePullPolicy: Always
           ports:
             - containerPort: 3000
@@ -87,6 +88,28 @@ spec:
               value: "http://j4-audit-api:8084"
             - name: KAFKA_BROKER
               value: "kafka:29092"
+            - name: NODE_OPTIONS
+              value: "--dns-result-order=ipv4first"
+            - name: NEXT_PUBLIC_SUPABASE_URL
+              valueFrom: 
+                secretKeyRef:
+                  name: disaster-secrets
+                  key: NEXT_PUBLIC_SUPABASE_URL
+            - name: SUPABASE_SERVICE_ROLE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: disaster-secrets
+                  key: SUPABASE_SERVICE_ROLE_KEY
+            - name: NEXT_PUBLIC_SUPABASE_ANON_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: disaster-secrets
+                  key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+            - name: NEXT_PUBLIC_API_URL
+              valueFrom:
+                secretKeyRef:
+                  name: disaster-secrets
+                  key: NEXT_PUBLIC_API_URL
           resources:
             requests:
               cpu: 200m

@@ -5,7 +5,7 @@ RUN apk upgrade --no-cache && apk add --no-cache openssl
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci --frozen-lockfile
+RUN npm install
 
 
 FROM node:20.19.2-alpine3.21 AS builder
@@ -20,7 +20,12 @@ COPY . .
 ARG NEXT_PUBLIC_API_URL=http://localhost:3000
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
-RUN npx prisma generate
+ARG NEXT_PUBLIC_SUPABASE_URL
+ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
+
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
+
 RUN npm run build
 
 
