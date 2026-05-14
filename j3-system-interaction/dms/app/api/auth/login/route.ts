@@ -1,24 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import bcrypt from 'bcryptjs';
-
-
+import { pool } from '@/lib/db';
 
 export async function POST(request: NextRequest) {
-  const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
   try {
     const { email, passkey } = await request.json();
 
-    const { data: user, error } = await supabase
-      .from('User')
-      .select('*')
-      .eq('email', email)
-      .single();
+    const { rows } = await pool.query(
+      `SELECT * FROM public."User" WHERE email = $1 LIMIT 1`,
+      [email]
+    );
+    const user = rows[0];
 
-    if (error || !user || !user.password_hash) {
+    if (!user || !user.password_hash) {
       return NextResponse.json(
         { success: false, message: 'Invalid credentials' },
         { status: 401 }

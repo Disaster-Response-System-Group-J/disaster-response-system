@@ -57,10 +57,13 @@ spec:
       containers:
         - name: j3-dms
 
-          image: dehanns/disaster-j3-dms:sha-e169b2e
+          image: dehanns/disaster-j3-dms:sha-a07f86a
           imagePullPolicy: Always
           ports:
             - containerPort: 3000
+          envFrom:
+            - secretRef:
+                name: disaster-secrets
           env:
             - name: DATABASE_URL
               valueFrom:
