@@ -19,6 +19,7 @@ contract IncidentAuditLog {
     string district;
     string notes;
     string correlationId;
+    string metadata;
     uint256 timestamp;
   }
 
@@ -60,6 +61,50 @@ contract IncidentAuditLog {
     string memory notes,
     string memory correlationId
   ) public returns (uint256 caseId, uint256 auditEventId) {
+    return _createManualIncident(
+      eventId,
+      incidentId,
+      performedBy,
+      performedRole,
+      district,
+      notes,
+      correlationId,
+      ""
+    );
+  }
+
+  function createManualIncidentWithMetadata(
+    string memory eventId,
+    string memory incidentId,
+    string memory performedBy,
+    string memory performedRole,
+    string memory district,
+    string memory notes,
+    string memory correlationId,
+    string memory metadata
+  ) public returns (uint256 caseId, uint256 auditEventId) {
+    return _createManualIncident(
+      eventId,
+      incidentId,
+      performedBy,
+      performedRole,
+      district,
+      notes,
+      correlationId,
+      metadata
+    );
+  }
+
+  function _createManualIncident(
+    string memory eventId,
+    string memory incidentId,
+    string memory performedBy,
+    string memory performedRole,
+    string memory district,
+    string memory notes,
+    string memory correlationId,
+    string memory metadata
+  ) private returns (uint256 caseId, uint256 auditEventId) {
     caseId = nextCaseId;
     nextCaseId++;
     caseExists[caseId] = true;
@@ -83,6 +128,7 @@ contract IncidentAuditLog {
       auditEvent.district = district;
       auditEvent.notes = notes;
       auditEvent.correlationId = correlationId;
+      auditEvent.metadata = metadata;
       auditEvent.timestamp = block.timestamp;
     }
 
@@ -121,6 +167,74 @@ contract IncidentAuditLog {
     string memory notes,
     string memory correlationId
   ) public returns (uint256 auditEventId) {
+    return _logAuditEvent(
+      caseId,
+      eventId,
+      eventType,
+      incidentId,
+      resourceId,
+      alertId,
+      performedBy,
+      performedRole,
+      previousStatus,
+      newStatus,
+      district,
+      notes,
+      correlationId,
+      ""
+    );
+  }
+
+  function logAuditEventWithMetadata(
+    uint256 caseId,
+    string memory eventId,
+    string memory eventType,
+    string memory incidentId,
+    string memory resourceId,
+    string memory alertId,
+    string memory performedBy,
+    string memory performedRole,
+    string memory previousStatus,
+    string memory newStatus,
+    string memory district,
+    string memory notes,
+    string memory correlationId,
+    string memory metadata
+  ) public returns (uint256 auditEventId) {
+    return _logAuditEvent(
+      caseId,
+      eventId,
+      eventType,
+      incidentId,
+      resourceId,
+      alertId,
+      performedBy,
+      performedRole,
+      previousStatus,
+      newStatus,
+      district,
+      notes,
+      correlationId,
+      metadata
+    );
+  }
+
+  function _logAuditEvent(
+    uint256 caseId,
+    string memory eventId,
+    string memory eventType,
+    string memory incidentId,
+    string memory resourceId,
+    string memory alertId,
+    string memory performedBy,
+    string memory performedRole,
+    string memory previousStatus,
+    string memory newStatus,
+    string memory district,
+    string memory notes,
+    string memory correlationId,
+    string memory metadata
+  ) private returns (uint256 auditEventId) {
     require(caseExists[caseId], "logAuditEvent: caseId does not exist");
 
     auditEventId = auditEvents.length;
@@ -142,6 +256,7 @@ contract IncidentAuditLog {
       auditEvent.district = district;
       auditEvent.notes = notes;
       auditEvent.correlationId = correlationId;
+      auditEvent.metadata = metadata;
       auditEvent.timestamp = block.timestamp;
     }
 

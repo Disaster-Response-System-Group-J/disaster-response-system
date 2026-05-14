@@ -26,6 +26,7 @@ type AuditCaseRequestBody = Partial<{
   district: string | null;
   notes: string | null;
   correlationId: string | null;
+  metadata: unknown;
   timestamp: string | null;
 }>;
 
@@ -43,6 +44,18 @@ function getOptionalString(value: string | null | undefined): string {
   }
 
   return value.trim();
+}
+
+function getOptionalMetadata(value: unknown): string {
+  if (typeof value === "string") {
+    return value.trim();
+  }
+
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  return JSON.stringify(value);
 }
 
 function getPositiveInteger(
@@ -105,6 +118,7 @@ export async function createAuditCase(request: Request, response: Response) {
     district,
     notes: getOptionalString(body.notes),
     correlationId: getOptionalString(body.correlationId),
+    metadata: getOptionalMetadata(body.metadata),
   };
 
   try {
@@ -262,6 +276,7 @@ export async function logAuditEvent(request: Request, response: Response) {
     district: getOptionalString(body.district),
     notes: getOptionalString(body.notes),
     correlationId: getOptionalString(body.correlationId),
+    metadata: getOptionalMetadata(body.metadata),
   };
 
   try {

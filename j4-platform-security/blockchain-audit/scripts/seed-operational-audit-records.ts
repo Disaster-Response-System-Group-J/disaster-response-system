@@ -28,6 +28,7 @@ type CreateCasePayload = {
   district: string;
   notes: string;
   correlationId: string;
+  metadata: string;
 };
 
 type LogEventPayload = {
@@ -44,6 +45,7 @@ type LogEventPayload = {
   district: string;
   notes: string;
   correlationId: string;
+  metadata: string;
 };
 
 const auditApiBaseUrl =
@@ -58,6 +60,13 @@ function sleep(ms: number): Promise<void> {
 
 function urlFor(path: string): string {
   return `${auditApiBaseUrl.replace(/\/$/, "")}${path}`;
+}
+
+function buildMetadata(table: string, columns: Record<string, unknown>): string {
+  return JSON.stringify({
+    table,
+    columns,
+  });
 }
 
 async function readResponseBody(response: Response): Promise<string> {
@@ -159,6 +168,21 @@ async function seedOperationalAuditRecords(): Promise<void> {
     district: "Colombo",
     notes: "Flood reported by phone call from Wellampitiya area",
     correlationId: "corr-col-flood-001",
+    metadata: buildMetadata("public.ConfirmedIncident", {
+      id: "INC-COL-2026-001",
+      title: "Flood reported in Wellampitiya",
+      disasterType: "FLOOD",
+      district: "Colombo",
+      severity: "HIGH",
+      status: "ACTIVE",
+      latitude: 6.9438,
+      longitude: 79.8989,
+      description: "Flood reported by phone call from Wellampitiya area",
+      publicVisibility: true,
+      affectedPeople: 42,
+      division_id: null,
+      blockchain_case_id: null,
+    }),
   });
 
   console.log("Logging resource assignment...");
@@ -176,6 +200,13 @@ async function seedOperationalAuditRecords(): Promise<void> {
     district: "Colombo",
     notes: "Ambulance AMB-COL-003 assigned to flood response",
     correlationId: "corr-col-flood-001",
+    metadata: buildMetadata("public.ResourceRequest", {
+      incident_id: "INC-COL-2026-001",
+      resource_id: "AMB-COL-003",
+      resource_type: "AMBULANCE",
+      status: "APPROVED",
+      reviewed_by: "dispatcher_01",
+    }),
   });
 
   console.log("Logging rescue dispatch...");
@@ -193,6 +224,12 @@ async function seedOperationalAuditRecords(): Promise<void> {
     district: "Colombo",
     notes: "Ambulance dispatched to Wellampitiya flood affected area",
     correlationId: "corr-col-flood-001",
+    metadata: buildMetadata("public.LogisticsDeployment", {
+      incident_id: "INC-COL-2026-001",
+      resource_id: "AMB-COL-003",
+      deployment_status: "EN_ROUTE",
+      dispatched_by: "dispatcher_01",
+    }),
   });
 
   console.log("Logging resource deallocation...");
@@ -210,6 +247,12 @@ async function seedOperationalAuditRecords(): Promise<void> {
     district: "Colombo",
     notes: "Ambulance released after completing flood response task",
     correlationId: "corr-col-flood-001",
+    metadata: buildMetadata("public.DeployableAsset", {
+      resource_id: "AMB-COL-003",
+      previous_status: "DISPATCHED",
+      new_status: "AVAILABLE",
+      released_by: "supervisor_01",
+    }),
   });
 
   const caseId2 = await createCase({
@@ -220,6 +263,21 @@ async function seedOperationalAuditRecords(): Promise<void> {
     district: "Kandy",
     notes: "Landslide reported by field officer near Kadugannawa",
     correlationId: "corr-kan-landslide-002",
+    metadata: buildMetadata("public.ConfirmedIncident", {
+      id: "INC-KAN-2026-002",
+      title: "Landslide near Kadugannawa",
+      disasterType: "LANDSLIDE",
+      district: "Kandy",
+      severity: "CRITICAL",
+      status: "ACTIVE",
+      latitude: 7.2569,
+      longitude: 80.5271,
+      description: "Landslide reported by field officer near Kadugannawa",
+      publicVisibility: true,
+      affectedPeople: 18,
+      division_id: null,
+      blockchain_case_id: null,
+    }),
   });
 
   console.log("Logging resource assignment...");
@@ -237,6 +295,13 @@ async function seedOperationalAuditRecords(): Promise<void> {
     district: "Kandy",
     notes: "Rescue team TEAM-KAN-RES-002 assigned to landslide incident",
     correlationId: "corr-kan-landslide-002",
+    metadata: buildMetadata("public.PersonnelAssignment", {
+      incident_id: "INC-KAN-2026-002",
+      resource_id: "TEAM-KAN-RES-002",
+      assigned_role: "RESCUE_TEAM",
+      status: "ASSIGNED",
+      assigned_by: "dispatcher_02",
+    }),
   });
 
   console.log("Logging rescue dispatch...");
@@ -254,6 +319,12 @@ async function seedOperationalAuditRecords(): Promise<void> {
     district: "Kandy",
     notes: "Rescue team dispatched to Kadugannawa landslide location",
     correlationId: "corr-kan-landslide-002",
+    metadata: buildMetadata("public.LogisticsDeployment", {
+      incident_id: "INC-KAN-2026-002",
+      resource_id: "TEAM-KAN-RES-002",
+      deployment_status: "EN_ROUTE",
+      dispatched_by: "dispatcher_02",
+    }),
   });
 
   console.log("Logging resource deallocation...");
@@ -271,6 +342,12 @@ async function seedOperationalAuditRecords(): Promise<void> {
     district: "Kandy",
     notes: "Rescue team released after landslide response was completed",
     correlationId: "corr-kan-landslide-002",
+    metadata: buildMetadata("public.DeployableAsset", {
+      resource_id: "TEAM-KAN-RES-002",
+      previous_status: "DISPATCHED",
+      new_status: "AVAILABLE",
+      released_by: "supervisor_02",
+    }),
   });
 
   const caseId3 = await createCase({
@@ -281,6 +358,21 @@ async function seedOperationalAuditRecords(): Promise<void> {
     district: "Galle",
     notes: "Coastal flooding reported near Galle Fort area",
     correlationId: "corr-gal-coastal-003",
+    metadata: buildMetadata("public.ConfirmedIncident", {
+      id: "INC-GAL-2026-003",
+      title: "Coastal flooding near Galle Fort",
+      disasterType: "FLOOD",
+      district: "Galle",
+      severity: "MEDIUM",
+      status: "ACTIVE",
+      latitude: 6.0329,
+      longitude: 80.2168,
+      description: "Coastal flooding reported near Galle Fort area",
+      publicVisibility: true,
+      affectedPeople: 27,
+      division_id: null,
+      blockchain_case_id: null,
+    }),
   });
 
   console.log("Logging resource assignment...");
@@ -298,6 +390,13 @@ async function seedOperationalAuditRecords(): Promise<void> {
     district: "Galle",
     notes: "Rescue boat BOAT-GAL-001 assigned to coastal flooding incident",
     correlationId: "corr-gal-coastal-003",
+    metadata: buildMetadata("public.ResourceRequest", {
+      incident_id: "INC-GAL-2026-003",
+      resource_id: "BOAT-GAL-001",
+      resource_type: "BOAT",
+      status: "APPROVED",
+      reviewed_by: "dispatcher_03",
+    }),
   });
 
   console.log("Logging rescue dispatch...");
@@ -315,6 +414,12 @@ async function seedOperationalAuditRecords(): Promise<void> {
     district: "Galle",
     notes: "Rescue boat dispatched to assist coastal flooding response",
     correlationId: "corr-gal-coastal-003",
+    metadata: buildMetadata("public.LogisticsDeployment", {
+      incident_id: "INC-GAL-2026-003",
+      resource_id: "BOAT-GAL-001",
+      deployment_status: "EN_ROUTE",
+      dispatched_by: "dispatcher_03",
+    }),
   });
 
   console.log("Logging resource assignment...");
@@ -332,6 +437,13 @@ async function seedOperationalAuditRecords(): Promise<void> {
     district: "Galle",
     notes: "Emergency supply unit assigned for temporary relief support",
     correlationId: "corr-gal-coastal-003",
+    metadata: buildMetadata("public.ResourceRequest", {
+      incident_id: "INC-GAL-2026-003",
+      resource_id: "SUP-GAL-004",
+      resource_type: "EMERGENCY_SUPPLY",
+      status: "APPROVED",
+      reviewed_by: "dispatcher_03",
+    }),
   });
 
   console.log("Logging resource deallocation...");
@@ -349,6 +461,12 @@ async function seedOperationalAuditRecords(): Promise<void> {
     district: "Galle",
     notes: "Rescue boat released after coastal flooding response was completed",
     correlationId: "corr-gal-coastal-003",
+    metadata: buildMetadata("public.DeployableAsset", {
+      resource_id: "BOAT-GAL-001",
+      previous_status: "DISPATCHED",
+      new_status: "AVAILABLE",
+      released_by: "supervisor_03",
+    }),
   });
 
   console.log("Operational audit records seeded successfully.");

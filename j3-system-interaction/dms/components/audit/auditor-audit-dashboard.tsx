@@ -75,6 +75,29 @@ function EventTypeBadge({ eventType }: { eventType: string }) {
   );
 }
 
+function readMetadataSummary(metadata: string) {
+  if (!metadata) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(metadata) as {
+      table?: string;
+      columns?: Record<string, unknown>;
+    };
+
+    return {
+      table: parsed.table || 'metadata',
+      columns: parsed.columns || {},
+    };
+  } catch {
+    return {
+      table: 'metadata',
+      columns: { raw: metadata },
+    };
+  }
+}
+
 export function AuditorAuditDashboard() {
   const [isGatewayOnline, setIsGatewayOnline] = useState<boolean | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -214,6 +237,7 @@ export function AuditorAuditDashboard() {
         auditCase.performedRole,
         auditCase.district,
         auditCase.notes,
+        auditCase.metadata,
       ]
         .join(' ')
         .toLowerCase()
@@ -270,6 +294,7 @@ export function AuditorAuditDashboard() {
         event.district,
         event.notes,
         event.correlationId,
+        event.metadata,
       ]
         .join(' ')
         .toLowerCase()
@@ -281,6 +306,11 @@ export function AuditorAuditDashboard() {
     const matchedEvent = filteredEvents.find((event) => event.auditEventId === selectedEventId);
     return matchedEvent || filteredEvents[0] || null;
   }, [filteredEvents, selectedEventId]);
+
+  const selectedEventMetadata = useMemo(
+    () => readMetadataSummary(selectedEvent?.metadata || ''),
+    [selectedEvent]
+  );
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#0a0f16] text-white">
@@ -714,6 +744,24 @@ export function AuditorAuditDashboard() {
                       {selectedEvent.notes || 'No notes were stored for this event.'}
                     </p>
                   </div>
+
+                  {selectedEventMetadata && (
+                    <div className="rounded-lg border border-slate-800 bg-[#0a0f16] p-4">
+                      <p className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                        <Database size={11} /> DB Snapshot
+                      </p>
+                      <p className="mb-3 break-all text-xs font-semibold text-slate-300">
+                        {selectedEventMetadata.table}
+                      </p>
+                      <div className="max-h-56 space-y-1 overflow-y-auto pr-1">
+                        {Object.entries(selectedEventMetadata.columns).map(([key, value]) => (
+                          <p key={key} className="break-all text-[11px] text-slate-500">
+                            <span className="text-slate-400">{key}:</span> {String(value ?? 'null')}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <p className="text-sm text-slate-500">Select an event to inspect the full record.</p>
