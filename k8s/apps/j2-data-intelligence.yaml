@@ -48,7 +48,7 @@ spec:
               memory: 64Mi
       containers:
         - name: j2-data-intelligence
-          image: dehanns/disaster-j2-data-intelligence:sha-2d4ceff
+          image: dehanns/disaster-j2-data-intelligence:sha-a07f86a
           imagePullPolicy: Always
           ports:
             - containerPort: 8082
