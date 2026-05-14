@@ -59,30 +59,6 @@ services:
     networks:
       - disaster-net
 
-  # ── J1 — Device & Edge Systems ────────────────────────────────────────────
-
-  mqtt-kafka-bridge:
-    build:
-      context: ./j1-device-edge/mqtt-kafka-bridge
-    image: disaster/mqtt-kafka-bridge:latest
-    container_name: disaster-mqtt-kafka-bridge
-    restart: unless-stopped
-    environment:
-      MQTT_BROKER: ${MQTT_BROKER}
-      MQTT_PORT: ${MQTT_PORT}
-      MQTT_USERNAME: ${MQTT_USERNAME}
-      MQTT_PASSWORD: ${MQTT_PASSWORD}
-      MQTT_TOPICS: j1/disaster/#
-      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      KAFKA_TOPIC: disaster_data_stream
-      KAFKA_TOPIC_FLOOD: j1.sensor.telemetry.flood
-      KAFKA_TOPIC_LANDSLIDE: j1.sensor.telemetry.landslide
-    depends_on:
-      kafka:
-        condition: service_healthy
-    networks:
-      - disaster-net
-
   j1-bridge-api:
     build:
       context: ./j1-device-edge/backend
@@ -92,16 +68,49 @@ services:
     ports:
       - "8081:8000"
     environment:
-      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      KAFKA_TOPIC_EVENTS: j1.events
-      KAFKA_PRODUCER_TIMEOUT: "10"
+      J2_BASE_URL: http://j2-data-intelligence:8082
+      J2_SECRET_TOKEN: ${INTERNAL_SERVICE_TOKEN}
+      J2_REQUEST_TIMEOUT: "5.0"
       API_HOST: 0.0.0.0
       API_PORT: "8000"
       CORS_ORIGINS: "*"
       IDEMPOTENCY_MAX_KEYS: "50000"
     depends_on:
-      kafka:
-        condition: service_healthy
+      j2-data-intelligence:
+        condition: service_started
+    networks:
+      - disaster-net
+
+  j1-mqtt-http-forwarder:
+    build:
+      context: ./j1-device-edge/backend
+    image: disaster/j1-mqtt-http-forwarder:latest
+    container_name: j1-mqtt-http-forwarder
+    restart: unless-stopped
+    command: ["python", "-m", "app.mqtt_http_forwarder"]
+    environment:
+      MQTT_BROKER: ${MQTT_BROKER}
+      MQTT_PORT: ${MQTT_PORT}
+      MQTT_USERNAME: ${MQTT_USERNAME}
+      MQTT_PASSWORD: ${MQTT_PASSWORD}
+      MQTT_TOPICS: j1/disaster/#
+      J1_BASE_URL: http://j1-bridge-api:8000
+      J1_TIMEOUT_SECONDS: "8"
+      DATABASE_URL: ${DATABASE_URL}
+      DB_SSLMODE: require
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      SUPABASE_SCHEMA: public
+      SUPABASE_REST_TIMEOUT_SECONDS: "8"
+    healthcheck:
+      disable: true
+    depends_on:
+      j1-bridge-api:
+        condition: service_started
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     networks:
       - disaster-net
 
@@ -115,9 +124,11 @@ services:
     ports:
       - "8082:8082"
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATABASE_URL: ${DATABASE_URL}
+      J1_INTERNAL_TOKEN: ${INTERNAL_SERVICE_TOKEN}
       KAFKA_BROKER: kafka:29092
       KAFKA_ALERT_THRESHOLD: "0.0"
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
     depends_on:
       postgres:
         condition: service_healthy
