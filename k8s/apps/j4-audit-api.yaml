@@ -15,6 +15,7 @@ spec:
       labels:
         app: j4-audit-api
     spec:
+      nodeName: pool-k8o6lpuuk-33csgo
       containers:
         - name: j4-audit-api
           image: dehanns/disaster-j4-audit-api:sha-2d4ceff
