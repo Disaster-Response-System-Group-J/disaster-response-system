@@ -47,7 +47,7 @@ type LogEventPayload = {
 };
 
 const auditApiBaseUrl =
-  process.env.AUDIT_API_BASE_URL || "http://kong:8000/api/v1/audit";
+  process.env.AUDIT_API_BASE_URL || "http://localhost:8084/api/v1/audit";
 
 const retryCount = Number(process.env.AUDIT_SEED_RETRY_COUNT || 30);
 const retryDelayMs = Number(process.env.AUDIT_SEED_RETRY_DELAY_MS || 3000);

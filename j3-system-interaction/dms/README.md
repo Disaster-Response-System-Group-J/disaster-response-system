@@ -16,6 +16,24 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Blockchain Audit Dashboard
+
+The admin audit tab and auditor dashboard call the J4 blockchain audit API through the local Next.js audit proxy routes under `/api/audit`.
+
+For local blockchain audit dashboard testing without Kong, use:
+
+```env
+NEXT_PUBLIC_AUDIT_API_BASE_URL=http://localhost:8084/api/v1/audit
+```
+
+For full platform integration through Kong, switch the same value to:
+
+```env
+NEXT_PUBLIC_AUDIT_API_BASE_URL=http://localhost:8000/api/v1/audit
+```
+
+When the dashboard runs inside Docker Compose, the server-side proxy uses `AUDIT_API_BASE_URL=http://j4-audit-api:8084/api/v1/audit`.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
