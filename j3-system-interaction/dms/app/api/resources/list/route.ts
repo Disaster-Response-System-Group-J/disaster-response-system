@@ -8,7 +8,7 @@ export async function GET() {
     const query = 'SELECT * FROM public."DeployableAsset" ORDER BY name ASC';
     const { rows } = await pool.query(query);
 
-    // 2. Calculate real-time deployment aggregates[cite: 4]
+    // 2. Calculate real-time deployment aggregates
     // Filter logic based on the 'type' column in your schema
     const deployment = {
       ambulances: { 
@@ -38,12 +38,12 @@ export async function GET() {
   }
 }
 
-// PATCH: Update a resource's status in the database[cite: 4]
+// PATCH: Update a resource's status in the database
 export async function PATCH(request: Request) {
   try {
     const { assetId, status } = await request.json();
 
-    // Use double quotes for the table name to match PostgreSQL casing[cite: 4]
+    // Use double quotes for the table name to match PostgreSQL casing
     const query = `
       UPDATE public."DeployableAsset"
       SET status = $1

@@ -24,7 +24,9 @@ export async function GET() {
         ir."incidentId"  AS incident_id,
         ir."reviewedAt"  AS reviewed_at
       FROM public."IncomingReport" ir
-      ORDER BY ir."createdAt" DESC
+      ORDER BY 
+        CASE WHEN ir."verificationStatus" = 'PENDING_REVIEW' THEN 0 ELSE 1 END,
+        ir."createdAt" DESC
     `;
     const { rows } = await pool.query(query);
 

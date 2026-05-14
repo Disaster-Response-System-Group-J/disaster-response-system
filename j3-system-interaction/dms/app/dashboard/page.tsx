@@ -78,7 +78,7 @@ export default function DashboardPage() {
         // Process Resources
         const resourcesArray = resourcesRes.resources || [];
 
-        // 2. Process Resources using the extracted array[cite: 5]
+        // 2. Process Resources using the extracted array
         const teams = resourcesArray.filter((r: any) =>
           r.type?.toUpperCase() === 'TEAM' ||
           r.type?.toUpperCase() === 'PERSONNEL' ||
