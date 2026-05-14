@@ -61,6 +61,9 @@ spec:
           imagePullPolicy: Always
           ports:
             - containerPort: 3000
+          envFrom:
+            - secretRef:
+                name: disaster-secrets
           env:
             - name: DATABASE_URL
               valueFrom:
