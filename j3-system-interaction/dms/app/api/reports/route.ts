@@ -1,14 +1,14 @@
-import { NextResponse } from 'next/server';
-import { pool } from '@/lib/db';
-import { createAuditCase } from '@/lib/j4-audit-client';
+import { NextResponse } from "next/server";
+import { pool } from "@/lib/db";
+import { createAuditCase } from "@/lib/j4-audit-client";
 
 function toIsoString(value: unknown) {
-  return value instanceof Date ? value.toISOString() : value ?? null;
+  return value instanceof Date ? value.toISOString() : (value ?? null);
 }
 
 function buildConfirmedIncidentMetadata(incident: Record<string, unknown>) {
   return JSON.stringify({
-    table: 'public.ConfirmedIncident',
+    table: "public.ConfirmedIncident",
     columns: {
       id: incident.id ?? incident.incident_id,
       title: incident.title,
@@ -27,6 +27,12 @@ function buildConfirmedIncidentMetadata(incident: Record<string, unknown>) {
       blockchain_case_id: incident.blockchain_case_id,
     },
   });
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
 }
 
 export async function GET() {
@@ -63,12 +69,16 @@ export async function GET() {
     }
 
     // Fallback: legacy Report table
-    const legacyQuery = 'SELECT * FROM public."Report" ORDER BY created_at DESC';
+    const legacyQuery =
+      'SELECT * FROM public."Report" ORDER BY created_at DESC';
     const legacy = await pool.query(legacyQuery);
     return NextResponse.json(legacy.rows);
   } catch (error) {
-    console.error('Failed to fetch reports:', error);
-    return NextResponse.json({ error: 'Failed to fetch reports' }, { status: 500 });
+    console.error("Failed to fetch reports:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch reports" },
+      { status: 500 },
+    );
   }
 }
 
@@ -79,18 +89,28 @@ export async function PATCH(req: Request) {
     const { reportId, status, reviewedBy } = body;
 
     if (!reportId || !status) {
-      return NextResponse.json({ error: 'reportId and status are required' }, { status: 400 });
+      return NextResponse.json(
+        { error: "reportId and status are required" },
+        { status: 400 },
+      );
     }
 
-    await client.query('BEGIN');
+    if (typeof reportId !== "string" || !isUuid(reportId)) {
+      return NextResponse.json(
+        { error: "reportId must be a valid IncomingReport UUID" },
+        { status: 400 },
+      );
+    }
+
+    await client.query("BEGIN");
 
     // 1. Fetch the report data to populate the incident
     const reportQuery = 'SELECT * FROM public."IncomingReport" WHERE id = $1';
     const reportRes = await client.query(reportQuery, [reportId]);
 
     if (reportRes.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return NextResponse.json({ error: 'Report not found' }, { status: 404 });
+      await client.query("ROLLBACK");
+      return NextResponse.json({ error: "Report not found" }, { status: 404 });
     }
 
     const report = reportRes.rows[0];
@@ -98,7 +118,7 @@ export async function PATCH(req: Request) {
     let createdIncident = null;
 
     // 2. If status is VERIFIED, create the ConfirmedIncident
-    if (status === 'VERIFIED') {
+    if (status === "VERIFIED") {
       const incidentQuery = `
         INSERT INTO public."ConfirmedIncident" 
         (title, "disasterType", district, severity, status, latitude, longitude, description, "affectedPeople")
@@ -111,12 +131,12 @@ export async function PATCH(req: Request) {
         `Reported ${report.disasterType}: ${report.district}`,
         report.disasterType,
         report.district,
-        'MEDIUM',
-        'ACTIVE',
+        "MEDIUM",
+        "ACTIVE",
         report.latitude,
         report.longitude,
         report.description,
-        0
+        0,
       ];
 
       const incidentRes = await client.query(incidentQuery, incidentValues);
@@ -138,10 +158,10 @@ export async function PATCH(req: Request) {
       status,
       createdIncidentId || report.incidentId,
       reviewedBy || null,
-      reportId
+      reportId,
     ]);
 
-    await client.query('COMMIT');
+    await client.query("COMMIT");
 
     const updatedReport = updatedReportRes.rows[0];
 
@@ -153,9 +173,9 @@ export async function PATCH(req: Request) {
       const auditCase = await createAuditCase({
         eventId: `report-verified-${reportId}-${Date.now()}`,
         incidentId: createdIncident.incident_id,
-        performedBy: reviewedBy || 'j3-system',
-        performedRole: 'report-review-api',
-        district: createdIncident.district || 'UNASSIGNED',
+        performedBy: reviewedBy || "j3-system",
+        performedRole: "report-review-api",
+        district: createdIncident.district || "UNASSIGNED",
         notes: `Incoming report ${reportId} verified and converted into incident ${createdIncident.incident_id}`,
         correlationId: reportId,
         metadata: buildConfirmedIncidentMetadata(createdIncident),
@@ -165,7 +185,7 @@ export async function PATCH(req: Request) {
         `UPDATE public."ConfirmedIncident"
          SET blockchain_case_id = $1, "updatedAt" = now()
          WHERE id = $2`,
-        [auditCase.caseId, createdIncident.incident_id]
+        [auditCase.caseId, createdIncident.incident_id],
       );
 
       return NextResponse.json({
@@ -175,14 +195,19 @@ export async function PATCH(req: Request) {
         auditTransactionHash: auditCase.transactionHash,
       });
     } catch (auditError) {
-      console.error('J4 audit case creation failed for verified report:', auditError);
+      console.error(
+        "J4 audit case creation failed for verified report:",
+        auditError,
+      );
       return NextResponse.json(updatedReport);
     }
-
   } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('Failed to verify report and create incident:', error);
-    return NextResponse.json({ error: 'Failed to process verification' }, { status: 500 });
+    await client.query("ROLLBACK");
+    console.error("Failed to verify report and create incident:", error);
+    return NextResponse.json(
+      { error: "Failed to process verification" },
+      { status: 500 },
+    );
   } finally {
     client.release();
   }
