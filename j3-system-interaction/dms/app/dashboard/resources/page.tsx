@@ -35,6 +35,7 @@ export default function ResourcesPage() {
 
   const [resources, setResources] = useState<any[]>([]);
   const [activeIncidents, setActiveIncidents] = useState<any[]>([]);
+  const [logisticsStaff, setLogisticsStaff] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const [search, setSearch] = useState('');
@@ -56,18 +57,21 @@ export default function ResourcesPage() {
   const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.includes('NATIONAL')) ? 'ALL' : (user as any)?.assignedDistrict || 'ALL';
 
   // State for modals
-  const [assignModal, setAssignModal] = useState<string | null>(null);
+  const [assignModal, setAssignModal] = useState<{ resourceId?: string; requestId?: string; incidentId?: string; items?: any[] } | null>(null);
   const [selectedIncidentId, setSelectedIncidentId] = useState<string>('');
+  const [selectedStaffId, setSelectedStaffId] = useState<string>('');
   const [shelterModal, setShelterModal] = useState<string | null>(null);
   const [shelterForm, setShelterForm] = useState({ capacity: 0, currentLoad: 0, status: 'STANDBY' });
 
   useEffect(() => {
     const fetchAllData = async () => {
       try {
-        const [assetsData, sheltersRes, incidentsRes] = await Promise.all([
+        const [assetsData, sheltersRes, incidentsRes, requestsRes, usersRes] = await Promise.all([
           fetch('/api/resources/list').then(res => res.json()),
           fetch('/api/relief/shelter').then(res => res.json()),
-          fetch('/api/incidents').then(res => res.json())
+          fetch('/api/incidents').then(res => res.json()),
+          fetch('/api/resources/requests').then(res => res.ok ? res.json() : []),
+          fetch('/api/users').then(res => res.json())
         ]);
 
         const assetsArray = assetsData.resources || [];
@@ -98,6 +102,11 @@ export default function ResourcesPage() {
         setResources([...mappedAssets, ...mappedShelters]);
         const incidentsArray = Array.isArray(incidentsRes) ? incidentsRes : [];
         setActiveIncidents(incidentsArray.filter((i: any) => i.status === 'ACTIVE'));
+        setResourceRequests(Array.isArray(requestsRes) ? requestsRes : []);
+        
+        // Filter logistics staff
+        const usersArray = Array.isArray(usersRes) ? usersRes : [];
+        setLogisticsStaff(usersArray.filter((u: any) => u.role === UserRole.LOGISTICS_STAFF));
       } catch (err) {
         console.error('Error loading resources:', err);
       } finally {
@@ -232,14 +241,64 @@ export default function ResourcesPage() {
     }
   };
 
-  const handleDispatch = (e: React.FormEvent) => {
+  const handleDispatch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!assignModal || !selectedIncidentId) return;
-    const incident = activeIncidents.find(i => i.incident_id.toString() === selectedIncidentId);
-    if (!incident) return;
-    handleStatusUpdate(assignModal, ResourceStatus.ASSIGNED);
-    setAssignModal(null);
-    setSelectedIncidentId('');
+    if (!assignModal || !selectedIncidentId || !selectedStaffId) return;
+    
+    try {
+      const response = await fetch('/api/incidents/dispatch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          incidentId: selectedIncidentId,
+          personnelId: selectedStaffId,
+          role: UserRole.LOGISTICS_STAFF,
+          resourceId: assignModal.resourceId,
+          requestId: assignModal.requestId,
+          items: assignModal.items,
+          dispatchedBy: user?.id
+        })
+      });
+
+      if (!response.ok) throw new Error('Dispatch failed');
+
+      // Update local UI state for the resource if applicable
+      if (assignModal.resourceId) {
+        const timestamp = new Date().toISOString();
+        setResources(prev => prev.map(r =>
+          r.resourceId === assignModal.resourceId ? { ...r, status: ResourceStatus.ASSIGNED, lastUpdated: timestamp } : r
+        ));
+
+        // Broadcast update via WebSockets
+        if (socket) {
+          socket.emit('client:update-resource-status', {
+            resourceId: assignModal.resourceId,
+            status: ResourceStatus.ASSIGNED,
+            lastUpdated: timestamp
+          });
+        }
+      }
+
+      // Update local UI state for the request if applicable
+      if (assignModal.requestId) {
+        setResourceRequests(prev =>
+          prev.map(r => r.request_id === assignModal.requestId ? { ...r, status: 'DISPATCHED' } : r)
+        );
+        
+        // Update request status in DB
+        await fetch('/api/resources/requests', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ requestId: assignModal.requestId, status: 'DISPATCHED', reviewedBy: user?.id }),
+        });
+      }
+
+      setAssignModal(null);
+      setSelectedIncidentId('');
+      setSelectedStaffId('');
+    } catch (err) {
+      console.error('Failed to dispatch:', err);
+    }
   };
 
   const openShelterModal = (resource: any) => {
@@ -382,19 +441,19 @@ export default function ResourcesPage() {
                 <p className="text-sm font-semibold text-slate-400 mb-2">No plan generated yet</p>
                 <p className="text-xs text-slate-500 mb-6">Click "Generate New Plan" to request an AI allocation plan from the J2 engine.</p>
               </div>
-            ) : currentPlan.status === 'PENDING' ? (
+            ) : currentPlan.status === 'DRAFT' ? (
               <div className="text-center py-24 bg-[#131924] border border-purple-500/20 rounded-xl">
                 <Loader2 size={32} className="mx-auto mb-4 text-purple-400 animate-spin" />
                 <p className="text-sm font-semibold text-slate-300 mb-2">Plan generation in progress</p>
                 <p className="text-xs text-slate-500">Waiting for J2 AI engine response via Kafka. This may take a moment.</p>
               </div>
-            ) : currentPlan.status === 'READY' ? (
+            ) : currentPlan.status === 'APPROVED' ? (
               <ResourcePlanView plan={currentPlan} />
             ) : null}
           </div>
         )}
 
-        <div className={`bg-[#131924] border border-slate-800/80 rounded-xl p-4 flex gap-4 mb-6 ${activeTab === 'AI_PLAN' ? 'hidden' : ''}`}>
+        <div className={`bg-[#131924] border border-slate-800/80 rounded-xl p-4 flex gap-4 mb-6 ${(activeTab === 'AI_PLAN' || activeTab === 'REQUESTS') ? 'hidden' : ''}`}>
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
             <input type="text" placeholder={`Search ${activeTab.toLowerCase()}...`} value={search} onChange={e => setSearch(e.target.value)}
@@ -422,7 +481,7 @@ export default function ResourcesPage() {
           </select>
         </div>
 
-        <div className={`bg-[#131924] border border-slate-800/80 rounded-xl overflow-hidden ${activeTab === 'AI_PLAN' ? 'hidden' : ''}`}>
+        <div className={`bg-[#131924] border border-slate-800/80 rounded-xl overflow-hidden ${(activeTab === 'AI_PLAN' || activeTab === 'REQUESTS') ? 'hidden' : ''}`}>
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-slate-800/80 bg-[#0a0f16]/50 text-[9px] font-bold text-slate-500 tracking-widest uppercase">
@@ -493,7 +552,10 @@ export default function ResourcesPage() {
 
                         {/* Common specialized actions */}
                         {hasPermission('dispatch:resources') && r.status === 'AVAILABLE' && (
-                          <button onClick={() => setAssignModal(r.resourceId)} className="w-full text-left px-3 py-2 text-xs font-bold text-blue-400 hover:bg-slate-800 border-t border-slate-700 mt-1 rounded transition-colors">
+                          <button onClick={() => {
+                            setAssignModal({ resourceId: r.resourceId });
+                            setSelectedIncidentId('');
+                          }} className="w-full text-left px-3 py-2 text-xs font-bold text-blue-400 hover:bg-slate-800 border-t border-slate-700 mt-1 rounded transition-colors">
                             Dispatch to Incident...
                           </button>
                         )}
@@ -546,6 +608,16 @@ export default function ResourcesPage() {
                       req={req}
                       user={user}
                       onAction={async (requestId, status) => {
+                        if (status === 'DISPATCHED') {
+                          // Open unified dispatch modal for requests
+                          setAssignModal({ 
+                            requestId, 
+                            incidentId: req.incident_id?.toString(),
+                            items: typeof req.items === 'string' ? JSON.parse(req.items) : req.items
+                          });
+                          setSelectedIncidentId(req.incident_id?.toString() || '');
+                          return;
+                        }
                         try {
                           const res = await fetch('/api/resources/requests', {
                             method: 'PATCH',
@@ -575,14 +647,28 @@ export default function ResourcesPage() {
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#131924] border border-slate-700 rounded-xl w-full max-w-md shadow-2xl overflow-hidden">
             <div className="p-4 border-b border-slate-700 flex items-center justify-between">
-              <h3 className="font-bold text-white">Dispatch Resource</h3>
+              <h3 className="font-bold text-white">
+                {assignModal.requestId ? 'Dispatch Request' : 'Dispatch Resource'}
+              </h3>
               <button onClick={() => setAssignModal(null)} className="text-slate-400 hover:text-white"><XCircle size={18} /></button>
             </div>
             <form onSubmit={handleDispatch} className="p-6">
-              <p className="text-xs text-slate-400 mb-4">Select an active incident for <span className="font-bold text-blue-400">{assignModal}</span>.</p>
-              <select required value={selectedIncidentId} onChange={e => setSelectedIncidentId(e.target.value)} className="w-full bg-[#0a0f16] border border-slate-700 rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-blue-500 text-white mb-6">
+              <p className="text-xs text-slate-400 mb-4">
+                {assignModal.requestId 
+                  ? `Assign logistics staff to fulfill request ${assignModal.requestId.slice(0,8)}...`
+                  : `Select an active incident and staff for ${assignModal.resourceId}.`
+                }
+              </p>
+              <p className="text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-2 block">Incident Selection</p>
+              <select required value={selectedIncidentId} onChange={e => setSelectedIncidentId(e.target.value)} className="w-full bg-[#0a0f16] border border-slate-700 rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-blue-500 text-white mb-4">
                 <option value="" disabled>Select an incident...</option>
                 {activeIncidents.map(inc => <option key={inc.incident_id} value={inc.incident_id}>{inc.title}</option>)}
+              </select>
+
+              <p className="text-[10px] font-bold text-slate-500 tracking-widest uppercase mb-2 block">Assign Logistics Staff</p>
+              <select required value={selectedStaffId} onChange={e => setSelectedStaffId(e.target.value)} className="w-full bg-[#0a0f16] border border-slate-700 rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-blue-500 text-white mb-6">
+                <option value="" disabled>Select logistics personnel...</option>
+                {logisticsStaff.map(staff => <option key={staff.id} value={staff.id}>{staff.name}</option>)}
               </select>
               <div className="flex gap-3">
                 <button type="button" onClick={() => setAssignModal(null)} className="flex-1 py-2.5 bg-slate-800 rounded-lg text-xs font-bold text-slate-300">Cancel</button>
@@ -661,7 +747,8 @@ function ResourceRequestCard({
   user: any;
   onAction: (requestId: string, status: string) => Promise<void>;
 }) {
-  const items: any[] = typeof req.items === 'string' ? JSON.parse(req.items) : (req.items ?? []);
+  const itemsArray = req.items || req.item || [];
+  const items: any[] = typeof itemsArray === 'string' ? JSON.parse(itemsArray) : (itemsArray ?? []);
 
   return (
     <div className={`bg-[#131924] border rounded-xl p-5 transition-all ${req.status === 'PENDING' ? 'border-amber-500/20' : 'border-slate-800/80'
@@ -698,14 +785,18 @@ function ResourceRequestCard({
           <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-2">Requested Items</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {items.map((item: any, i: number) => (
-              <div key={i} className="flex items-center justify-between p-2 rounded-lg bg-slate-800/40 border border-slate-700/50">
+              <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-slate-800/60 border border-slate-700/50 shadow-sm hover:border-slate-600/50 transition-colors">
                 <div>
-                  <p className="text-[10px] font-semibold text-slate-300">{item.resource_type?.replace(/_/g, ' ')}</p>
-                  <p className="text-xs font-bold text-white">{item.quantity} {item.unit}</p>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">
+                    {item.resourceType?.replace(/_/g, ' ') || item.resource_type?.replace(/_/g, ' ')}
+                  </p>
+                  <p className="text-sm font-extrabold text-white">
+                    Qty: {item.quantity} {item.unit || ''}
+                  </p>
                 </div>
-                {item.urgency && (
-                  <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border ${URGENCY_STYLES[item.urgency] ?? ''}`}>
-                    {item.urgency}
+                {(item.priority || item.urgency) && (
+                  <span className={`text-[8px] font-bold px-2 py-0.5 rounded-full border ${URGENCY_STYLES[item.priority || item.urgency] ?? ''}`}>
+                    {item.priority || item.urgency}
                   </span>
                 )}
               </div>
