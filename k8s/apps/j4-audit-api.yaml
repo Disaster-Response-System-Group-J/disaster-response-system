@@ -18,7 +18,7 @@ spec:
       nodeName: pool-k8o6lpuuk-33csgo
       containers:
         - name: j4-audit-api
-          image: dehanns/disaster-j4-audit-api:sha-a07f86a
+          image: dehanns/disaster-j4-audit-api:sha-dac6932
           imagePullPolicy: Always
           ports:
             - containerPort: 8084
