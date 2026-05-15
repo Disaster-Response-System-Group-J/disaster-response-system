@@ -48,12 +48,10 @@ void setup() {
         while (1);
     }
 
-    // LoRa.enableCrc(); // Disabled: CRC drops packets corrupted by RF saturation before the Gateway's JSON recovery can fix them
+    // Enable CRC to detect and reject corrupted packets before transmission
+    LoRa.enableCrc();
     
-    // 🔥 CRITICAL FIX: Lowered TX Power from 20 to 2
-    // 20dBm causes extreme RF interference at close range, which physically corrupts 
-    // the SPI data lines and crashes the LoRa chip permanently until power cycled.
-    // 2dBm minimizes RF saturation at the receiver.
+    // Lowered TX Power from 20 to 2 to minimize RF interference
     LoRa.setTxPower(2); 
     
     LoRa.setSpreadingFactor(9);
@@ -87,7 +85,7 @@ float hum = NAN;
 void loop() {
     lastWatchdogFeed = millis(); // Feed the safe watchdog
 
-    if (millis() - lastDHTReadTime >= 6200 || lastDHTReadTime == 0) {
+    if (millis() - lastDHTReadTime >= 1200 || lastDHTReadTime == 0) {
         if (millis() > 3600000) {
             Serial.println("Scheduled hourly reboot...");
             delay(1000);
@@ -109,7 +107,7 @@ void loop() {
             doc["temp"] = round(temp * 10.0) / 10.0;
             doc["hum"] = round(hum * 10.0) / 10.0;
         }
-        doc["depth"] = std::max(0.0f, 19.0f - static_cast<float>(round(depth * 10.0) / 10.0));
+        doc["depth"] = round(std::max(0.0f, 19.0f - (depth > 0 ? depth : 0)));
 
         String jsonString;
         serializeJson(doc, jsonString);
@@ -118,14 +116,28 @@ void loop() {
         Serial.print("JSON Output: "); Serial.println(jsonString);
 
         Serial.println("Initiating LoRa transmission...");
-        delay(random(10, 800));
+        
+        // Use absolute system time for collision avoidance
+        unsigned long positionInLandslideCycle = millis() % 3700;
+        
+        // If in danger zone, wait for Landslide to finish transmitting
+        if (positionInLandslideCycle > 3300) {
+            unsigned long waitTime = (3700 - positionInLandslideCycle) + 100;
+            Serial.print("   Collision detected. Waiting ");
+            Serial.print(waitTime);
+            Serial.println("ms...");
+            delay(waitTime);
+        } else {
+            delay(50 + random(0, 50));
+        }
+        
         LoRa.beginPacket();
         LoRa.print(jsonString);
         int txResult = LoRa.endPacket();
         if (txResult) {
-            Serial.println("✅ LoRa packet transmitted successfully!\n");
+            Serial.println("LoRa packet transmitted successfully!\n");
         } else {
-            Serial.println("❌ LoRa transmission FAILED! Check antenna/power.\n");
+            Serial.println("LoRa transmission FAILED! Check antenna/power.\n");
         }
 
         lastDHTReadTime = millis();
