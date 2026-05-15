@@ -1,0 +1,12 @@
+# Copy this file to terraform.tfvars for local use.
+# Do not commit terraform.tfvars because it may contain real credentials.
+
+do_token = "CHANGE_ME"
+
+cluster_name       = "disaster-response"
+region             = "sgp1"
+kubernetes_version = "1.35.1-do.5"
+
+node_pool_name = "pool-k8o6lpuuk"
+node_size      = "s-2vcpu-8gb-160gb-intel"
+node_count     = 2

@@ -1,14 +1,15 @@
 # DigitalOcean Managed Kubernetes cluster for the Disaster Response System.
-# Cluster is provisioned in the Singapore (sgp1) region with a fixed node pool.
+# Defaults are defined in variables.tf so the same code can be reused for
+# development, staging, or production without editing this resource.
 resource "digitalocean_kubernetes_cluster" "disaster_response" {
-  name    = "disaster-response"
-  region  = "sgp1"
-  version = "1.35.1-do.5"
+  name    = var.cluster_name
+  region  = var.region
+  version = var.kubernetes_version
 
-  # Primary node pool — all workload pods are scheduled here.
+  # Primary node pool - all workload pods are scheduled here.
   node_pool {
-    name       = "pool-k8o6lpuuk"
-    size       = "s-2vcpu-8gb-160gb-intel"
-    node_count = 2
+    name       = var.node_pool_name
+    size       = var.node_size
+    node_count = var.node_count
   }
 }
