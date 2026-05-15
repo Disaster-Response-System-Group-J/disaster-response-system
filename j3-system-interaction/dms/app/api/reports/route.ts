@@ -1,5 +1,33 @@
 import { NextResponse } from 'next/server';
 import { pool } from '@/lib/db';
+import { createAuditCase } from '@/lib/j4-audit-client';
+
+function toIsoString(value: unknown) {
+  return value instanceof Date ? value.toISOString() : value ?? null;
+}
+
+function buildConfirmedIncidentMetadata(incident: Record<string, unknown>) {
+  return JSON.stringify({
+    table: 'public.ConfirmedIncident',
+    columns: {
+      id: incident.id ?? incident.incident_id,
+      title: incident.title,
+      disasterType: incident.disasterType,
+      district: incident.district,
+      severity: incident.severity,
+      status: incident.status,
+      latitude: incident.latitude,
+      longitude: incident.longitude,
+      description: incident.description,
+      publicVisibility: incident.publicVisibility,
+      affectedPeople: incident.affectedPeople,
+      createdAt: toIsoString(incident.createdAt),
+      updatedAt: toIsoString(incident.updatedAt),
+      division_id: incident.division_id,
+      blockchain_case_id: incident.blockchain_case_id,
+    },
+  });
+}
 
 export async function GET() {
   try {
@@ -67,6 +95,7 @@ export async function PATCH(req: Request) {
 
     const report = reportRes.rows[0];
     let createdIncidentId = null;
+    let createdIncident = null;
 
     // 2. If status is VERIFIED, create the ConfirmedIncident
     if (status === 'VERIFIED') {
@@ -74,7 +103,7 @@ export async function PATCH(req: Request) {
         INSERT INTO public."ConfirmedIncident" 
         (title, "disasterType", district, severity, status, latitude, longitude, description, "affectedPeople")
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        RETURNING id
+        RETURNING id AS incident_id, *
       `;
 
       // Defaulting values from the report; severity is defaulted to 'MEDIUM' if missing
@@ -91,7 +120,8 @@ export async function PATCH(req: Request) {
       ];
 
       const incidentRes = await client.query(incidentQuery, incidentValues);
-      createdIncidentId = incidentRes.rows[0].id;
+      createdIncident = incidentRes.rows[0];
+      createdIncidentId = createdIncident.incident_id;
     }
 
     // 3. Update the IncomingReport with new status and the link to the incident
@@ -112,7 +142,42 @@ export async function PATCH(req: Request) {
     ]);
 
     await client.query('COMMIT');
-    return NextResponse.json(updatedReportRes.rows[0]);
+
+    const updatedReport = updatedReportRes.rows[0];
+
+    if (!createdIncident) {
+      return NextResponse.json(updatedReport);
+    }
+
+    try {
+      const auditCase = await createAuditCase({
+        eventId: `report-verified-${reportId}-${Date.now()}`,
+        incidentId: createdIncident.incident_id,
+        performedBy: reviewedBy || 'j3-system',
+        performedRole: 'report-review-api',
+        district: createdIncident.district || 'UNASSIGNED',
+        notes: `Incoming report ${reportId} verified and converted into incident ${createdIncident.incident_id}`,
+        correlationId: reportId,
+        metadata: buildConfirmedIncidentMetadata(createdIncident),
+      });
+
+      await pool.query(
+        `UPDATE public."ConfirmedIncident"
+         SET blockchain_case_id = $1, "updatedAt" = now()
+         WHERE id = $2`,
+        [auditCase.caseId, createdIncident.incident_id]
+      );
+
+      return NextResponse.json({
+        ...updatedReport,
+        blockchain_case_id: auditCase.caseId,
+        auditEventId: auditCase.auditEventId,
+        auditTransactionHash: auditCase.transactionHash,
+      });
+    } catch (auditError) {
+      console.error('J4 audit case creation failed for verified report:', auditError);
+      return NextResponse.json(updatedReport);
+    }
 
   } catch (error) {
     await client.query('ROLLBACK');

@@ -1,9 +1,33 @@
 import dns from 'dns';
+import fs from 'fs';
+import dotenv from 'dotenv';
 import { Pool } from 'pg';
 import sqlite3 from 'sqlite3';
 import path from 'path';
 
 dns.setDefaultResultOrder('ipv4first');
+
+function loadDatabaseEnv() {
+  const envFiles = [
+    path.resolve(process.cwd(), '.env.local'),
+    path.resolve(process.cwd(), '.env'),
+    path.resolve(process.cwd(), '../../.env'),
+  ];
+
+  for (const envFile of envFiles) {
+    if (fs.existsSync(envFile)) {
+      dotenv.config({ path: envFile, override: false });
+    }
+  }
+}
+
+loadDatabaseEnv();
+
+if (!process.env.DATABASE_URL) {
+  throw new Error(
+    'DATABASE_URL is not set. Add it to j3-system-interaction/dms/.env.local or the repository root .env.'
+  );
+}
 
 // ==========================================
 // 1. SUPABASE POSTGRESQL CONNECTION
