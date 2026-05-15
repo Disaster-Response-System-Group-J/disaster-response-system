@@ -1,24 +1,28 @@
 import { NextResponse } from 'next/server';
 
-const DEFAULT_AUDIT_GATEWAY_URL = 'http://localhost:8000';
+const AUDIT_API_PATH_PREFIX = '/api/v1/audit';
+const DEFAULT_AUDIT_API_BASE_URL = 'http://localhost:8084/api/v1/audit';
 
 function trimTrailingSlash(value: string) {
   return value.replace(/\/+$/, '');
 }
 
-export function getAuditGatewayBaseUrl() {
+export function getAuditApiBaseUrl() {
   const configuredUrl =
     process.env.AUDIT_API_BASE_URL?.trim() ||
-    process.env.KONG_BASE_URL?.trim() ||
-    process.env.NEXT_PUBLIC_API_URL?.trim() ||
-    DEFAULT_AUDIT_GATEWAY_URL;
+    process.env.NEXT_PUBLIC_AUDIT_API_BASE_URL?.trim() ||
+    DEFAULT_AUDIT_API_BASE_URL;
 
   return trimTrailingSlash(configuredUrl);
 }
 
 function buildAuditTargetUrl(pathname: string, searchParams?: URLSearchParams) {
-  const gatewayBaseUrl = getAuditGatewayBaseUrl();
-  const targetUrl = new URL(`/api/v1/audit${pathname}`, gatewayBaseUrl);
+  const auditBaseUrl = getAuditApiBaseUrl();
+  const normalizedPathname = pathname.replace(/^\/+/, '');
+  const targetPathname = auditBaseUrl.endsWith(AUDIT_API_PATH_PREFIX)
+    ? normalizedPathname
+    : `${AUDIT_API_PATH_PREFIX}/${normalizedPathname}`;
+  const targetUrl = new URL(targetPathname, `${auditBaseUrl}/`);
 
   if (searchParams) {
     targetUrl.search = searchParams.toString();
@@ -66,7 +70,7 @@ export async function proxyAuditRequest(
       {
         success: false,
         data: null,
-        error: 'Failed to connect to the audit API gateway',
+        error: 'Failed to connect to the audit API',
       },
       { status: 502 }
     );

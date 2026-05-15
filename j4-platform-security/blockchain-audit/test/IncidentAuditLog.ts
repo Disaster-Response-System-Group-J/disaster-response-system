@@ -35,6 +35,7 @@ describe("IncidentAuditLog", function () {
     expect(auditEvent.previousStatus).to.equal("");
     expect(auditEvent.newStatus).to.equal("new");
     expect(auditEvent.district).to.equal("Colombo");
+    expect(auditEvent.metadata).to.equal("");
 
     expect(await auditLog.getEventIdsByCaseId(1)).to.deep.equal([0n]);
     expect(
@@ -86,10 +87,32 @@ describe("IncidentAuditLog", function () {
     expect(auditEvent.performedBy).to.equal("user-002");
     expect(auditEvent.previousStatus).to.equal("new");
     expect(auditEvent.newStatus).to.equal("assigned");
+    expect(auditEvent.metadata).to.equal("");
 
     expect(await auditLog.getEventIdsByCaseId(1)).to.deep.equal([0n, 1n]);
     expect(await auditLog.getEventIdsByType("INCIDENT_ASSIGNED")).to.deep.equal([
       1n,
     ]);
+  });
+
+  it("Should store metadata for a manual incident audit event", async function () {
+    const auditLog = await ethers.deployContract("IncidentAuditLog");
+    const metadata =
+      '{"table":"public.ConfirmedIncident","columns":{"title":"Flood in Colombo","disasterType":"FLOOD","severity":"HIGH"}}';
+
+    await auditLog.createManualIncidentWithMetadata(
+      "evt-003",
+      "inc-003",
+      "user-003",
+      "operator",
+      "Colombo",
+      "Manual incident created with DB snapshot",
+      "corr-003",
+      metadata,
+    );
+
+    const auditEvent = await auditLog.getFunction("getEvent").staticCall(0);
+
+    expect(auditEvent.metadata).to.equal(metadata);
   });
 });

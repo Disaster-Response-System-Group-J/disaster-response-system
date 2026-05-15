@@ -159,6 +159,7 @@ export interface LogAuditEventPayload {
   district?: string;
   notes?: string;
   correlationId?: string;
+  metadata?: string;
 }
 
 export interface AuditEvent {
@@ -176,6 +177,7 @@ export interface AuditEvent {
   district?: string;
   notes?: string;
   correlationId?: string;
+  metadata?: string;
   timestamp: number;
 }
 

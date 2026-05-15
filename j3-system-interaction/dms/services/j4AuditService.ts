@@ -26,6 +26,7 @@ type RawAuditCase = {
   newStatus: string;
   notes: string;
   correlationId: string;
+  metadata: string;
   timestamp: string;
 };
 
@@ -44,6 +45,7 @@ type RawAuditEvent = {
   district: string;
   notes: string;
   correlationId: string;
+  metadata: string;
   timestamp: string;
 };
 
@@ -73,6 +75,7 @@ export type AuditCaseSummary = {
   newStatus: string;
   notes: string;
   correlationId: string;
+  metadata: string;
   timestamp: number;
 };
 
@@ -91,6 +94,7 @@ export type AuditEventRecord = {
   district: string;
   notes: string;
   correlationId: string;
+  metadata: string;
   timestamp: number;
 };
 
@@ -119,6 +123,7 @@ function normalizeAuditCase(item: RawAuditCase): AuditCaseSummary {
     newStatus: item.newStatus || '',
     notes: item.notes || '',
     correlationId: item.correlationId || '',
+    metadata: item.metadata || '',
     timestamp: toNumber(item.timestamp),
   };
 }
@@ -139,6 +144,7 @@ function normalizeAuditEvent(item: RawAuditEvent): AuditEventRecord {
     district: item.district || '',
     notes: item.notes || '',
     correlationId: item.correlationId || '',
+    metadata: item.metadata || '',
     timestamp: toNumber(item.timestamp),
   };
 }

@@ -171,7 +171,8 @@ services:
     environment:
       DATABASE_URL: postgresql://${J3_DB_USER}:${J3_DB_PASSWORD}@postgres:5432/${J3_DB_NAME}
       SQLITE_DB_PATH: /app/data/local_alerts.db
-      AUDIT_API_BASE_URL: http://j4-audit-api:8084
+      AUDIT_API_BASE_URL: http://j4-audit-api:8084/api/v1/audit
+      NEXT_PUBLIC_AUDIT_API_BASE_URL: http://localhost:8084/api/v1/audit
       KAFKA_BROKER: kafka:29092
     labels:
       prometheus-scrape: "true"
@@ -241,6 +242,23 @@ services:
       - disaster-net
 
   # ── J4 — Identity & Access Management ────────────────────────────────────
+
+  seed-audit-records:
+    image: node:22-alpine
+    container_name: seed-audit-records
+    working_dir: /app
+    restart: "no"
+    volumes:
+      - ./j4-platform-security/blockchain-audit:/app
+      - hardhat-node-modules:/app/node_modules
+    environment:
+      AUDIT_API_BASE_URL: http://j4-audit-api:8084/api/v1/audit
+    command: sh -c "npm ci && npm run seed:audit-records"
+    depends_on:
+      j4-audit-api:
+        condition: service_healthy
+    networks:
+      - disaster-net
 
   keycloak:
     image: quay.io/keycloak/keycloak:24.0
@@ -672,6 +690,7 @@ volumes:
   alertmanager_data:
   grafana_data:
   audit-deployment:
+  hardhat-node-modules:
   j3_dms_data:
 
 # ── Networks ──────────────────────────────────────────────────────────────────

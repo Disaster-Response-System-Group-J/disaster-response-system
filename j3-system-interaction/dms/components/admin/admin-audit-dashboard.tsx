@@ -15,6 +15,7 @@ type ManualIncidentCase = {
   newStatus: string;
   notes: string;
   correlationId: string;
+  metadata: string;
   timestamp: string;
 };
 
@@ -33,6 +34,7 @@ type AuditEventRecord = {
   district: string;
   notes: string;
   correlationId: string;
+  metadata: string;
   timestamp: string;
 };
 
@@ -86,6 +88,29 @@ function getEventTypeStyle(eventType: string) {
   }
 
   return 'bg-slate-800 text-slate-300 border-slate-700';
+}
+
+function readMetadataSummary(metadata: string) {
+  if (!metadata) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(metadata) as {
+      table?: string;
+      columns?: Record<string, unknown>;
+    };
+
+    return {
+      table: parsed.table || 'metadata',
+      columns: parsed.columns || {},
+    };
+  } catch {
+    return {
+      table: 'metadata',
+      columns: { raw: metadata },
+    };
+  }
 }
 
 async function fetchAuditJson<T>(url: string) {
@@ -236,6 +261,7 @@ export function AdminAuditDashboard() {
         auditCase.performedRole,
         auditCase.district,
         auditCase.notes,
+        auditCase.metadata,
       ]
         .join(' ')
         .toLowerCase()
@@ -269,6 +295,7 @@ export function AdminAuditDashboard() {
         event.district,
         event.notes,
         event.correlationId,
+        event.metadata,
       ]
         .join(' ')
         .toLowerCase()
@@ -530,7 +557,29 @@ export function AdminAuditDashboard() {
                           <p className="mt-1 text-slate-500">{event.correlationId || 'No correlation ID'}</p>
                         </td>
                         <td className="px-5 py-4 text-xs text-slate-400">
-                          {event.notes || 'No notes recorded'}
+                          <p>{event.notes || 'No notes recorded'}</p>
+                          {(() => {
+                            const metadataSummary = readMetadataSummary(event.metadata);
+                            const columns = metadataSummary
+                              ? Object.entries(metadataSummary.columns).slice(0, 4)
+                              : [];
+
+                            return metadataSummary ? (
+                              <div className="mt-3 rounded-lg border border-slate-800 bg-[#0a0f16] p-3">
+                                <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                                  DB Snapshot: {metadataSummary.table}
+                                </p>
+                                <div className="space-y-1">
+                                  {columns.map(([key, value]) => (
+                                    <p key={key} className="break-all text-[11px] text-slate-500">
+                                      <span className="text-slate-400">{key}:</span>{' '}
+                                      {String(value ?? 'null')}
+                                    </p>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null;
+                          })()}
                         </td>
                       </tr>
                     ))
