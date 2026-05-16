@@ -28,6 +28,8 @@ spec:
       labels:
         app: j3-dms
     spec:
+      securityContext:
+        fsGroup: 1000
       initContainers:
         - name: wait-for-kafka
           image: busybox:1.37
