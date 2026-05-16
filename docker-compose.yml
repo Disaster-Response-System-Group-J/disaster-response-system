@@ -243,23 +243,6 @@ services:
 
   # ── J4 — Identity & Access Management ────────────────────────────────────
 
-  seed-audit-records:
-    image: node:22-alpine
-    container_name: seed-audit-records
-    working_dir: /app
-    restart: "no"
-    volumes:
-      - ./j4-platform-security/blockchain-audit:/app
-      - hardhat-node-modules:/app/node_modules
-    environment:
-      AUDIT_API_BASE_URL: http://j4-audit-api:8084/api/v1/audit
-    command: sh -c "npm ci && npm run seed:audit-records"
-    depends_on:
-      j4-audit-api:
-        condition: service_healthy
-    networks:
-      - disaster-net
-
   keycloak:
     image: quay.io/keycloak/keycloak:24.0
     container_name: disaster-keycloak
