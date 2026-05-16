@@ -1,7 +1,7 @@
 // app/api/incidents/route.ts
 import { NextResponse } from 'next/server';
 import { pool } from '@/lib/db';
-import { createAuditCase } from '@/lib/j4-audit-client';
+import { createAuditCase, logAuditEvent } from '@/lib/j4-audit-client';
 
 const DISASTER_TYPES = ['FLOOD', 'LANDSLIDE', 'DROUGHT', 'OTHER'] as const;
 const INCIDENT_SEVERITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const;
@@ -51,6 +51,25 @@ function buildConfirmedIncidentMetadata(incident: Record<string, unknown>) {
       blockchain_case_id: incident.blockchain_case_id,
     },
   });
+}
+
+function getIncidentStatusAuditEventType(previousStatus: unknown, newStatus: unknown) {
+  const previous = typeof previousStatus === 'string' ? previousStatus.toUpperCase() : '';
+  const next = typeof newStatus === 'string' ? newStatus.toUpperCase() : '';
+
+  if (previous === 'ACTIVE' && next === 'UNDER_RESPONSE') {
+    return 'INCIDENT_ASSIGNED';
+  }
+
+  if (next === 'ESCALATED') {
+    return 'INCIDENT_ESCALATED';
+  }
+
+  if (previous === 'UNDER_RESPONSE' && (next === 'RESOLVED' || next === 'CLOSED')) {
+    return 'INCIDENT_CLOSED';
+  }
+
+  return null;
 }
 
 export async function GET() {
@@ -161,14 +180,62 @@ export async function POST(req: Request) {
 
 export async function PATCH(req: Request) {
   try {
-    const { incidentId, status } = await req.json();
+    const data = await req.json();
+    const { incidentId, status } = data;
 
     // Check which table the incident is in and update accordingly
-    const confirmedCheck = await pool.query('SELECT id FROM public."ConfirmedIncident" WHERE id = $1', [incidentId]);
+    const confirmedCheck = await pool.query(
+      'SELECT id AS incident_id, * FROM public."ConfirmedIncident" WHERE id = $1',
+      [incidentId]
+    );
 
     if (confirmedCheck.rows.length > 0) {
+      const currentIncident = confirmedCheck.rows[0];
       const query = 'UPDATE public."ConfirmedIncident" SET status = $1, "updatedAt" = now() WHERE id = $2 RETURNING id AS incident_id, *';
       const { rows } = await pool.query(query, [status, incidentId]);
+      const updatedIncident = rows[0];
+
+      const auditEventType = getIncidentStatusAuditEventType(currentIncident.status, updatedIncident.status);
+      if (auditEventType) {
+        if (!currentIncident.blockchain_case_id) {
+          console.warn(`Skipping J4 audit event for incident ${incidentId}: blockchain_case_id is missing`);
+        } else {
+          try {
+            await logAuditEvent({
+              caseId: currentIncident.blockchain_case_id,
+              eventId: `incident-status-${incidentId}-${Date.now()}`,
+              eventType: auditEventType,
+              incidentId,
+              performedBy: data.performedBy || data.updatedBy || data.userId || 'j3-system',
+              performedRole: data.performedRole || 'incident-api',
+              previousStatus: currentIncident.status || '',
+              newStatus: updatedIncident.status || '',
+              district: updatedIncident.district || currentIncident.district || '',
+              notes:
+                data.notes ||
+                `Incident status changed from ${currentIncident.status} to ${updatedIncident.status}`,
+              correlationId: data.correlationId || incidentId,
+              metadata: JSON.stringify({
+                table: 'public.ConfirmedIncident',
+                action: 'PATCH /api/incidents',
+                before: {
+                  id: currentIncident.incident_id,
+                  status: currentIncident.status,
+                  blockchain_case_id: currentIncident.blockchain_case_id,
+                },
+                after: {
+                  id: updatedIncident.incident_id,
+                  status: updatedIncident.status,
+                  blockchain_case_id: updatedIncident.blockchain_case_id,
+                },
+              }),
+            });
+          } catch (auditError) {
+            console.warn('J4 incident status audit event failed:', auditError);
+          }
+        }
+      }
+
       return NextResponse.json(rows[0]);
     } else {
       return NextResponse.json({ error: 'Incident not found' }, { status: 404 });
