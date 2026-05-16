@@ -28,6 +28,8 @@ spec:
       labels:
         app: j3-dms
     spec:
+      securityContext:
+        fsGroup: 1000
       initContainers:
         - name: wait-for-kafka
           image: busybox:1.37
@@ -139,5 +141,5 @@ spec:
   selector:
     app: j3-dms
   ports:
-    - port: 3000
+    - port: 80
       targetPort: 3000

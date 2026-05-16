@@ -24,10 +24,18 @@ data:
         static_configs:
           - targets: ['kong:8001']
 
+      - job_name: grafana
+        static_configs:
+          - targets: ['grafana:3000']
+
       - job_name: j3-dms
         metrics_path: /api/metrics
         static_configs:
-          - targets: ['j3-dms:3000']
+          - targets: ['j3-dms:80']
+
+      - job_name: postgres
+        static_configs:
+          - targets: ['postgres:9187']
 
       - job_name: j1-bridge-api
         metrics_path: /metrics

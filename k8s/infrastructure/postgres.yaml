@@ -140,6 +140,22 @@ spec:
             - name: init-script
               mountPath: /docker-entrypoint-initdb.d/init.sh
               subPath: init.sh
+        - name: postgres-exporter
+          image: prometheuscommunity/postgres-exporter:v0.15.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9187
+              name: metrics
+          env:
+            - name: DATA_SOURCE_NAME
+              value: "postgresql://disaster:DisasterMangementSystem%40j2@localhost:5432/disasterdb?sslmode=disable"
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
       volumes:
         - name: data
           persistentVolumeClaim:
@@ -159,5 +175,9 @@ spec:
   selector:
     app: postgres
   ports:
-    - port: 5432
+    - name: postgres
+      port: 5432
       targetPort: 5432
+    - name: metrics
+      port: 9187
+      targetPort: 9187
