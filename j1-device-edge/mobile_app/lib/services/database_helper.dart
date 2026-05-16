@@ -756,11 +756,11 @@ class DatabaseHelper {
     final stored = await _readMetaValue(db, _apiBaseUrlMetaKey);
     final normalized = _normalizeApiBaseUrl(stored);
 
-    // If a build-time override is provided (e.g. for a physical device build),
-    // prefer it over any stored value. This prevents the app from getting stuck
-    // offline when a previous LAN IP was saved in SQLite.
-    if (AppConstants.apiBaseUrl != AppConstants.emulatorApiBaseUrl) {
-      return AppConstants.apiBaseUrl;
+    // If a build-time URL is injected via --dart-define, always use it.
+    // This prevents the app from getting stuck on a previously saved LAN IP.
+    const buildTimeUrl = String.fromEnvironment('J1_API_BASE_URL');
+    if (buildTimeUrl.isNotEmpty) {
+      return buildTimeUrl;
     }
 
     return normalized ?? AppConstants.apiBaseUrl;
@@ -969,6 +969,15 @@ class DatabaseHelper {
       where: 'event_id = ?',
       whereArgs: [eventId],
     );
+  }
+
+  Future<void> resetQueuedEventAttempts() async {
+    final db = await database;
+    await db.rawUpdate('''
+      UPDATE ${AppConstants.eventsTable}
+      SET sync_attempts = 0, last_sync_error = NULL
+      WHERE status = ?
+    ''', [AppConstants.statusQueued]);
   }
 
   Future<int> incrementSyncAttempts(String eventId, {String? error}) async {

@@ -24,21 +24,49 @@ services:
       dockerfile: Dockerfile
     container_name: j1-bridge-api
     ports:
-      - "8000:8000"
+      - "8081:8081"
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      KAFKA_TOPIC_EVENTS: j1.events
-      KAFKA_PRODUCER_TIMEOUT: 10
+      KAFKA_TOPIC_SOS_REPORTS: j1.sos.raw-reports
+      KAFKA_TOPIC_SENSOR_TELEMETRY: j1.sensor.telemetry
+      MQTT_BROKER: mosquitto
+      MQTT_PORT: "1883"
+      MQTT_USERNAME: ""
+      MQTT_PASSWORD: ""
       API_HOST: 0.0.0.0
-      API_PORT: 8000
+      API_PORT: "8081"
       CORS_ORIGINS: "*"
-      IDEMPOTENCY_MAX_KEYS: 50000
+      IDEMPOTENCY_MAX_KEYS: "50000"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
-      interval: 15s
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/health')"]
+      interval: 30s
       timeout: 5s
       retries: 5
       start_period: 10s
+    networks:
+      - disaster-net
+
+  j1-mqtt-forwarder:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: j1-mqtt-forwarder
+    command: ["python", "-m", "app.mqtt_http_forwarder"]
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_TOPIC_SOS_REPORTS: j1.sos.raw-reports
+      KAFKA_TOPIC_SENSOR_TELEMETRY: j1.sensor.telemetry
+      MQTT_BROKER: mosquitto
+      MQTT_PORT: "1883"
+      MQTT_USERNAME: ""
+      MQTT_PASSWORD: ""
+      API_HOST: 0.0.0.0
+      API_PORT: "8081"
+      CORS_ORIGINS: "*"
+      IDEMPOTENCY_MAX_KEYS: "50000"
+    depends_on:
+      j1-bridge-api:
+        condition: service_healthy
     networks:
       - disaster-net
 
