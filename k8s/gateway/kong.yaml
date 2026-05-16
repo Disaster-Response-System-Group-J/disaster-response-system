@@ -15,7 +15,7 @@ data:
     echo "==> Waiting for Kong..."
     until curl -sf "$KONG_ADMIN" >/dev/null; do sleep 2; done
     echo "==> Waiting for Keycloak realm..."
-    until curl -sf -H 'X-Forwarded-Proto: https' "$KC_REALM_URL" >/dev/null; do sleep 2; done
+    until curl -sf "$KC_REALM_URL" >/dev/null; do sleep 2; done
 
     # Services
     for svc_url in "j1-device-edge:http://j1-bridge-api:8000" \
@@ -28,11 +28,12 @@ data:
     done
 
     # JWT consumer + credential
-    KC_PUB_B64=$(curl -sf -H 'X-Forwarded-Proto: https' "$KC_REALM_URL" | jq -r '.public_key // empty')
+    KC_PUB_B64=$(curl -sf "$KC_REALM_URL" | jq -r '.public_key // empty')
     [[ -z "$KC_PUB_B64" ]] && { echo "ERROR: no public key from realm"; exit 1; }
     KC_PUB_KEY=$'-----BEGIN PUBLIC KEY-----\n'"$KC_PUB_B64"$'\n-----END PUBLIC KEY-----'
+    curl -s -X DELETE "$KONG_ADMIN/consumers/$KC_CONSUMER" >/dev/null
     curl -s -X POST "$KONG_ADMIN/consumers" --data "username=$KC_CONSUMER" >/dev/null
-    curl -sf -X POST "$KONG_ADMIN/consumers/$KC_CONSUMER/jwt" \
+    curl -s -X POST "$KONG_ADMIN/consumers/$KC_CONSUMER/jwt" \
       --data "key=$KC_ISSUER" --data 'algorithm=RS256' \
       --data-urlencode "rsa_public_key=$KC_PUB_KEY" >/dev/null && echo "    JWT credential OK"
 
@@ -42,10 +43,10 @@ data:
       local svc=$1 name=$2 path=$3 methods="${4:-}"
       local args=(--data "name=$name" --data "paths[]=$path" --data strip_path=false)
       [[ -n "$methods" ]] && { IFS=','; for m in $methods; do args+=(--data "methods[]=$m"); done; }
-      curl -sf -X POST "$KONG_ADMIN/services/$svc/routes" "${args[@]}" >/dev/null \
+      curl -s -X POST "$KONG_ADMIN/services/$svc/routes" "${args[@]}" >/dev/null \
         && ROUTES+=("$name") && echo "    $name OK"
     }
-    attach_jwt() { curl -sf -X POST "$KONG_ADMIN/routes/$1/plugins" --data 'name=jwt' >/dev/null; }
+    attach_jwt() { curl -s -X POST "$KONG_ADMIN/routes/$1/plugins" --data 'name=jwt' >/dev/null; }
 
     reg j1-device-edge        j1-route                   /api/v1/devices
     reg j2-data-intelligence  j2-route                   /api/v1/intelligence
@@ -258,7 +259,7 @@ metadata:
   namespace: disaster-response
   annotations:
     argocd.argoproj.io/hook: PostSync
-    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 spec:
   backoffLimit: 3
   template:
