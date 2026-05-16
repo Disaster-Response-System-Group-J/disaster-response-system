@@ -109,7 +109,7 @@ def trigger_moratuwa_resource_plan(
         population_factor = min(population / 1_000_000.0, 1.0)
         consideration_score = round(prob * population_factor, 4)
 
-        division_name = getattr(division, "name", "Moratuwa")
+        division_name = getattr(division, "division_name", None) or "Moratuwa"
 
         user_message = (
             f"Division: {division_name} (division_id={MORATUWA_DIVISION_ID})\n"

@@ -21,6 +21,7 @@ class _HelpRequestFormState extends State<HelpRequestForm> {
   final _locationController = TextEditingController();
 
   String _selectedType = 'Medical help';
+  String _selectedDistrict = 'Colombo';
   bool _mobilitySupport = false;
   bool _injuries = false;
   bool _saving = false;
@@ -34,6 +35,14 @@ class _HelpRequestFormState extends State<HelpRequestForm> {
     'Shelter',
     'Evacuation',
     'Other',
+  ];
+
+  static const List<String> _sriLankaDistricts = [
+    'Ampara', 'Anuradhapura', 'Badulla', 'Batticaloa', 'Colombo',
+    'Galle', 'Gampaha', 'Hambantota', 'Jaffna', 'Kalutara',
+    'Kandy', 'Kegalle', 'Kilinochchi', 'Kurunegala', 'Mannar',
+    'Matale', 'Matara', 'Monaragala', 'Mullaitivu', 'Nuwara Eliya',
+    'Polonnaruwa', 'Puttalam', 'Ratnapura', 'Trincomalee', 'Vavuniya',
   ];
 
   @override
@@ -58,6 +67,7 @@ class _HelpRequestFormState extends State<HelpRequestForm> {
 
       final payload = <String, dynamic>{
         'request_type': _selectedType,
+        'district': _selectedDistrict,
         'description': _descriptionController.text.trim(),
         'people_count': peopleCount,
         'mobility_support_required': _mobilitySupport,
@@ -95,6 +105,7 @@ class _HelpRequestFormState extends State<HelpRequestForm> {
       _locationController.clear();
       setState(() {
         _selectedType = _requestTypes.first;
+        _selectedDistrict = 'Colombo';
         _mobilitySupport = false;
         _injuries = false;
         _currentPosition = null;
@@ -173,6 +184,33 @@ class _HelpRequestFormState extends State<HelpRequestForm> {
             validator: (value) {
               if (value == null || value.isEmpty) {
                 return 'Select a request type';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 12),
+          CustomDropdown<String>(
+            value: _selectedDistrict,
+            labelText: 'District',
+            items: _sriLankaDistricts
+                .map(
+                  (value) => DropdownMenuItem<String>(
+                    value: value,
+                    child: Text(value),
+                  ),
+                )
+                .toList(),
+            onChanged: (value) {
+              if (value == null) {
+                return;
+              }
+              setState(() {
+                _selectedDistrict = value;
+              });
+            },
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Select a district';
               }
               return null;
             },

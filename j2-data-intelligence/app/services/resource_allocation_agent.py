@@ -129,7 +129,7 @@ def _query_resources(db: Session) -> dict[str, dict[str, Any]]:
     """Return {division_name: {resource_fields}} from DivisionResources joined with Division."""
     try:
         rows = (
-            db.query(Division.name, DivisionResources)
+            db.query(Division.division_name, DivisionResources)
             .join(DivisionResources, Division.division_id == DivisionResources.division_id)
             .all()
         )
