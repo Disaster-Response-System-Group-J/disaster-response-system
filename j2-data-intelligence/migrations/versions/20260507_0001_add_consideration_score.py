@@ -1,7 +1,7 @@
 """add consideration score table
 
 Revision ID: 20260507_0001
-Revises: 20260505_0002
+Revises: 20260505_0003
 Create Date: 2026-05-07 00:00:01.000000
 """
 
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 revision = "20260507_0001"
-down_revision = "20260505_0002"
+down_revision = "20260505_0003"
 branch_labels = None
 depends_on = None
 

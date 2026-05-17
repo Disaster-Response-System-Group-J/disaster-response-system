@@ -1,16 +1,16 @@
 """create iot device data table
 
-Revision ID: 20260505_0002
-Revises: 20260505_0001
-Create Date: 2026-05-05 00:00:02.000000
+Revision ID: 20260505_0003
+Revises: 20260505_0002
+Create Date: 2026-05-05 00:00:03.000000
 """
 
 from alembic import op
 import sqlalchemy as sa
 
 
-revision = "20260505_0002"
-down_revision = "20260505_0001"
+revision = "20260505_0003"
+down_revision = "20260505_0002"
 branch_labels = None
 depends_on = None
 
