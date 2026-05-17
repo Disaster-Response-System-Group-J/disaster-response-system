@@ -59,7 +59,7 @@ spec:
       containers:
         - name: j3-dms
 
-          image: dehanns/disaster-j3-dms:sha-504d7a4
+          image: dehanns/disaster-j3-dms:sha-1b7661c
           imagePullPolicy: Always
           ports:
             - containerPort: 3000
