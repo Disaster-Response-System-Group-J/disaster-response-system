@@ -63,12 +63,37 @@ variable "node_size" {
 }
 
 variable "node_count" {
-  description = "Number of worker nodes in the primary node pool."
+  description = "Number of worker nodes in the primary node pool (if auto-scaling is off)."
   type        = number
   default     = 2
+}
 
-  validation {
-    condition     = var.node_count >= 1
-    error_message = "node_count must be at least 1."
-  }
+variable "auto_scale" {
+  description = "Enable cluster auto-scaling."
+  type        = bool
+  default     = true
+}
+
+variable "min_nodes" {
+  description = "Minimum number of nodes in the pool."
+  type        = number
+  default     = 2
+}
+
+variable "max_nodes" {
+  description = "Maximum number of nodes in the pool."
+  type        = number
+  default     = 5
+}
+
+variable "project_name" {
+  description = "Name of the DigitalOcean project."
+  type        = string
+  default     = "Disaster Response System"
+}
+
+variable "project_description" {
+  description = "Description of the DigitalOcean project."
+  type        = string
+  default     = "Infrastructure for the Group J Disaster Response Platform."
 }
