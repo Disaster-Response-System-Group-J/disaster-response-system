@@ -127,9 +127,9 @@ services:
       KAFKA_BROKER: kafka:29092
       KAFKA_ALERT_THRESHOLD: "0.0"
       GEMINI_API_KEY: ${GEMINI_API_KEY}
+    # Schema already provisioned on Supabase — skip alembic upgrade.
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8082"]
     depends_on:
-      postgres:
-        condition: service_healthy
       kafka:
         condition: service_healthy
     networks:
