@@ -9,6 +9,7 @@ from app.services.model_predictor import generate_predictions
 from app.services.event_manager import event_manager
 from app.services.iot_event_handler import run_iot_prediction_cycle
 from app.api.ingest import router as ingest_router
+from app.services.kafka_consumer import start_sensor_consumer, start_report_consumer
 from apscheduler.schedulers.background import BackgroundScheduler
 import uvicorn
 import logging
@@ -76,6 +77,10 @@ def startup_event():
     logger.info("Scheduler started (weather: daily 02:00 UTC | IoT poll: every 30 s).")
     event_manager.subscribe("DATA_FETCHED", handle_data_fetched)
     logger.info("Event listener for DATA_FETCHED registered.")
+    start_sensor_consumer()
+    logger.info("Kafka sensor consumer thread started (topic: j1.sensor.telemetry).")
+    start_report_consumer()
+    logger.info("Kafka report consumer thread started (topic: j1.sos.raw-reports).")
 
 
 @app.on_event("shutdown")

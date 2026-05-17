@@ -15,6 +15,11 @@ class SyncService {
   StreamSubscription<bool>? _networkSubscription;
 
   Future<void> start() async {
+    // Reset sync_attempts on any QUEUED events so they get a fresh retry
+    // after an app restart. This recovers events that exhausted retries in a
+    // previous session (e.g. due to wrong payload format or API being down).
+    await dbHelper.resetQueuedEventAttempts();
+
     listenNetwork();
 
     NetworkService.startListening();
@@ -73,7 +78,7 @@ class SyncService {
       try {
         final response = await _sendEvent(event);
 
-        if (response == 200 || response == 202) {
+        if (response == 200 || response == 201 || response == 202) {
           await dbHelper.updateEventStatus(
             eventId: event.eventId,
             status: AppConstants.statusSubmitted,
@@ -90,6 +95,17 @@ class SyncService {
             submittedAt: DateTime.now().toIso8601String(),
           );
           print('Duplicate event: ${event.eventId}');
+          return;
+        }
+
+        // 422 = validation error — retrying will never help, mark failed immediately
+        if (response == 422 || response == 400) {
+          await dbHelper.updateEventStatus(
+            eventId: event.eventId,
+            status: AppConstants.statusFailed,
+            lastSyncError: 'Server rejected payload: HTTP $response',
+          );
+          print('Event permanently failed (HTTP $response): ${event.eventId}');
           return;
         }
 
@@ -130,15 +146,22 @@ class SyncService {
       request.headers.set('Accept', 'application/json');
       request.headers.set('Idempotency-Key', event.eventId);
 
+      // Decode the inner payload stored in SQLite
+      final inner = jsonDecode(event.data) as Map<String, dynamic>;
+
+      // Build the flat body the API expects at /api/v1/ingest/report
       final eventPayload = jsonEncode({
         'eventId': event.eventId,
-        'eventType': event.type,
-        'eventVersion': event.eventVersion,
-        'timestamp': event.createdAt,
-        'userId': event.userId,
         'deviceId': event.deviceId,
-        'payload': jsonDecode(event.data),
-        'metadata': event.metadata,
+        'timestamp': event.createdAt,
+        // Map HELP_REQUEST fields → ReportIngestPayload fields
+        'disasterType': _mapEventTypeToDisasterType(event.type, inner),
+        'district': inner['district']?.toString() ?? 'Unknown',
+        'latitude': (inner['latitude'] as num?)?.toDouble() ?? 0.0,
+        'longitude': (inner['longitude'] as num?)?.toDouble() ?? 0.0,
+        'description': _buildDescription(inner),
+        'contact': inner['contact']?.toString(),
+        'mediaUrls': inner['mediaUrls'] ?? [],
       });
 
       request.write(eventPayload);
@@ -148,15 +171,16 @@ class SyncService {
           );
 
       final responseBody = await response.transform(utf8.decoder).join();
-      if (response.statusCode == 200 || response.statusCode == 202 || response.statusCode == 409) {
-        print('POST $uri -> HTTP ${response.statusCode}');
+      final code = response.statusCode;
+      if (code == 200 || code == 201 || code == 202 || code == 409) {
+        print('POST $uri -> HTTP $code ✓');
       } else {
-        final preview = responseBody.length > 200
-            ? '${responseBody.substring(0, 200)}...'
+        final preview = responseBody.length > 300
+            ? '${responseBody.substring(0, 300)}...'
             : responseBody;
-        print('POST $uri -> HTTP ${response.statusCode}; body=$preview');
+        print('POST $uri -> HTTP $code ✗ body=$preview');
       }
-      return response.statusCode;
+      return code;
     } on SocketException catch (e) {
       print('Network error: $e');
       rethrow;
@@ -173,6 +197,41 @@ class SyncService {
     _networkSubscription?.cancel();
     _networkSubscription = null;
     print('Sync service stopped');
+  }
+
+  /// Maps the mobile event type + inner payload to one of FLOOD|LANDSLIDE|DROUGHT.
+  /// HELP_REQUEST events use request_type to pick the best match.
+  String _mapEventTypeToDisasterType(String eventType, Map<String, dynamic> inner) {
+    if (eventType == 'DISASTER_REPORT') {
+      final dt = inner['disasterType']?.toString().toUpperCase() ?? '';
+      if (dt == 'FLOOD' || dt == 'LANDSLIDE' || dt == 'DROUGHT') return dt;
+    }
+    // HELP_REQUEST — pick based on request_type context, default to FLOOD
+    final requestType = inner['request_type']?.toString().toLowerCase() ?? '';
+    if (requestType.contains('landslide')) return 'LANDSLIDE';
+    if (requestType.contains('drought') || requestType.contains('water')) return 'DROUGHT';
+    return 'FLOOD';
+  }
+
+  /// Builds a description string that satisfies the API's 10-char minimum.
+  String _buildDescription(Map<String, dynamic> inner) {
+    final parts = <String>[];
+
+    final requestType = inner['request_type']?.toString();
+    if (requestType != null && requestType.isNotEmpty) parts.add(requestType);
+
+    final desc = inner['description']?.toString();
+    if (desc != null && desc.isNotEmpty) parts.add(desc);
+
+    final location = inner['location']?.toString();
+    if (location != null && location.isNotEmpty) parts.add('Location: $location');
+
+    final count = inner['people_count'];
+    if (count != null) parts.add('People: $count');
+
+    final result = parts.join(' | ');
+    // Pad to minimum 10 chars if somehow still short
+    return result.length >= 10 ? result : result.padRight(10, '.');
   }
 
   Future<void> debugDatabaseStatus() async {

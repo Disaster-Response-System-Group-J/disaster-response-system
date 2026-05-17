@@ -1,27 +1,26 @@
 """
 J1 Bridge API - Configuration.
 
-Settings are loaded from environment variables with safe defaults for local
-Docker Compose development.
+All settings are loaded from environment variables with safe defaults for
+local Docker Compose development.
 """
 
 import os
 
 
 class Settings:
-    """Application settings loaded from environment variables."""
+    # Kafka
+    KAFKA_BOOTSTRAP_SERVERS: str = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092")
+    KAFKA_TOPIC_SOS_REPORTS: str = os.getenv("KAFKA_TOPIC_SOS_REPORTS", "j1.sos.raw-reports")
+    KAFKA_TOPIC_SENSOR_TELEMETRY: str = os.getenv("KAFKA_TOPIC_SENSOR_TELEMETRY", "j1.sensor.telemetry")
 
-    # J2 Service Integration (HTTP)
-    J2_BASE_URL: str = os.getenv("J2_BASE_URL", "http://j2:8082")
-    J2_SECRET_TOKEN: str = os.getenv("J2_SECRET_TOKEN", "dev-secret-token")
-    J2_REQUEST_TIMEOUT: float = float(os.getenv("J2_REQUEST_TIMEOUT", "5.0"))
-
+    # API
     API_HOST: str = os.getenv("API_HOST", "0.0.0.0")
-    API_PORT: int = int(os.getenv("API_PORT", "8000"))
-
-    IDEMPOTENCY_MAX_KEYS: int = int(os.getenv("IDEMPOTENCY_MAX_KEYS", "50000"))
-
+    API_PORT: int = int(os.getenv("API_PORT", "8081"))
     CORS_ORIGINS: list[str] = os.getenv("CORS_ORIGINS", "*").split(",")
+
+    # Idempotency
+    IDEMPOTENCY_MAX_KEYS: int = int(os.getenv("IDEMPOTENCY_MAX_KEYS", "50000"))
 
 
 settings = Settings()

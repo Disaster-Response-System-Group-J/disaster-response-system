@@ -7,7 +7,7 @@ from app.db.database import Base
 class Division(Base):
     __tablename__ = "Division"
     division_id = Column(Integer, primary_key=True, index=True)
-    name = Column(String)
+    division_name = Column(String)
     latitude = Column(Float)
     longitude = Column(Float)
     population = Column(Integer)

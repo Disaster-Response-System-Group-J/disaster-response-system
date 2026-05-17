@@ -66,48 +66,46 @@ services:
     container_name: j1-bridge-api
     restart: unless-stopped
     ports:
-      - "8081:8000"
+      - "8081:8081"
     environment:
-      J2_BASE_URL: http://j2-data-intelligence:8082
-      J2_SECRET_TOKEN: ${INTERNAL_SERVICE_TOKEN}
-      J2_REQUEST_TIMEOUT: "5.0"
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_TOPIC_SOS_REPORTS: j1.sos.raw-reports
+      KAFKA_TOPIC_SENSOR_TELEMETRY: j1.sensor.telemetry
       API_HOST: 0.0.0.0
-      API_PORT: "8000"
+      API_PORT: "8081"
       CORS_ORIGINS: "*"
       IDEMPOTENCY_MAX_KEYS: "50000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     depends_on:
-      j2-data-intelligence:
-        condition: service_started
+      kafka:
+        condition: service_healthy
     networks:
       - disaster-net
 
-  j1-mqtt-http-forwarder:
+  j1-mqtt-forwarder:
     build:
       context: ./j1-device-edge/backend
-    image: disaster/j1-mqtt-http-forwarder:latest
-    container_name: j1-mqtt-http-forwarder
+    image: disaster/j1-mqtt-forwarder:latest
+    container_name: j1-mqtt-forwarder
     restart: unless-stopped
     command: ["python", "-m", "app.mqtt_http_forwarder"]
     environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_TOPIC_SOS_REPORTS: j1.sos.raw-reports
+      KAFKA_TOPIC_SENSOR_TELEMETRY: j1.sensor.telemetry
       MQTT_BROKER: ${MQTT_BROKER}
       MQTT_PORT: ${MQTT_PORT}
       MQTT_USERNAME: ${MQTT_USERNAME}
       MQTT_PASSWORD: ${MQTT_PASSWORD}
-      MQTT_TOPICS: j1/disaster/#
-      J1_BASE_URL: http://j1-bridge-api:8000
-      J1_TIMEOUT_SECONDS: "8"
-      DATABASE_URL: ${DATABASE_URL}
-      DB_SSLMODE: require
-      SUPABASE_URL: ${SUPABASE_URL}
-      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
-      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
-      SUPABASE_SCHEMA: public
-      SUPABASE_REST_TIMEOUT_SECONDS: "8"
-    healthcheck:
-      disable: true
+      MQTT_TLS: "true"
     depends_on:
       j1-bridge-api:
-        condition: service_started
+        condition: service_healthy
     dns:
       - 1.1.1.1
       - 8.8.8.8
@@ -129,9 +127,9 @@ services:
       KAFKA_BROKER: kafka:29092
       KAFKA_ALERT_THRESHOLD: "0.0"
       GEMINI_API_KEY: ${GEMINI_API_KEY}
+    # Schema already provisioned on Supabase — skip alembic upgrade.
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8082"]
     depends_on:
-      postgres:
-        condition: service_healthy
       kafka:
         condition: service_healthy
     networks:

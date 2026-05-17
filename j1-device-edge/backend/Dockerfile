@@ -1,44 +1,24 @@
-FROM python:3.12.10-slim-bookworm AS builder
-
-WORKDIR /build
-
-RUN apt-get update && apt-get upgrade -y --no-install-recommends \
-    && apt-get install -y --no-install-recommends \
-        gcc \
-        librdkafka-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
-
-
-FROM python:3.12.10-slim-bookworm AS runtime
-
-RUN apt-get update && apt-get upgrade -y --no-install-recommends \
-    && apt-get install -y --no-install-recommends \
-        librdkafka1 \
-        ca-certificates \
-        curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && useradd -r --no-create-home -u 1000 appuser
+FROM python:3.11-slim
 
 WORKDIR /app
 
-COPY --from=builder /install /usr/local
+# Install librdkafka for confluent-kafka. Upgrade base packages first to
+# pull security patches (libcap2 CVE-2026-4878, libsystemd0/libudev1
+# CVE-2026-29111) that ship in the base image with old versions.
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && apt-get install -y --no-install-recommends librdkafka-dev gcc \
+    && rm -rf /var/lib/apt/lists/*
 
-# Remove test dirs and Cython sources from installed packages
-RUN find /usr/local/lib/python3.12 \
-        \( -type d -name "tests" -o -type d -name "test" \) \
-        -exec rm -rf {} + 2>/dev/null; true \
-    && find /usr/local/lib/python3.12 -name "*.pyx" -delete 2>/dev/null; true
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app/ ./app/
 
-USER appuser
+ENV API_HOST=0.0.0.0 \
+    API_PORT=8081 \
+    PYTHONUNBUFFERED=1
 
-EXPOSE 8000
+EXPOSE 8081
 
-HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://127.0.0.1:8000/health || exit 1
-
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"]
+CMD ["sh", "-c", "uvicorn app.main:app --host $API_HOST --port $API_PORT"]
