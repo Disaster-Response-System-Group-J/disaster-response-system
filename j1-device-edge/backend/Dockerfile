@@ -2,8 +2,11 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install librdkafka for confluent-kafka
+# Install librdkafka for confluent-kafka. Upgrade base packages first to
+# pull security patches (libcap2 CVE-2026-4878, libsystemd0/libudev1
+# CVE-2026-29111) that ship in the base image with old versions.
 RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
     && apt-get install -y --no-install-recommends librdkafka-dev gcc \
     && rm -rf /var/lib/apt/lists/*
 
