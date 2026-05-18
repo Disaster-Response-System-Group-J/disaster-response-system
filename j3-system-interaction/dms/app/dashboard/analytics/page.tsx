@@ -89,7 +89,7 @@ export default function AnalyticsPage() {
     <div className="flex-1 overflow-y-auto bg-[#0a0f16] text-white">
       <div className="p-8 max-w-[1400px] mx-auto">
         <h1 className="text-3xl font-extrabold tracking-tight mb-2">Analytics & Reporting</h1>
-        <p className="text-sm text-slate-400 mb-8">Data-driven insights for disaster response coordination[cite: 6].</p>
+        <p className="text-sm text-slate-400 mb-8">Data-driven insights for disaster response coordination.</p>
 
         <div className="grid grid-cols-4 gap-6 mb-8">
           <StatCard title="Total Affected" value={totalAffected.toLocaleString()} icon={<Users />} trend="+12%" />
@@ -100,7 +100,7 @@ export default function AnalyticsPage() {
 
         <div className="grid grid-cols-2 gap-6 mb-6">
           <div className="bg-[#131924] border border-slate-800/80 rounded-xl p-6">
-            <h3 className="text-[10px] font-bold text-slate-400 tracking-widest uppercase mb-6">INCIDENTS BY SEVERITY[cite: 6]</h3>
+            <h3 className="text-[10px] font-bold text-slate-400 tracking-widest uppercase mb-6">INCIDENTS BY SEVERITY</h3>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -116,7 +116,7 @@ export default function AnalyticsPage() {
           </div>
 
           <div className="bg-[#131924] border border-slate-800/80 rounded-xl p-6">
-            <h3 className="text-[10px] font-bold text-slate-400 tracking-widest uppercase mb-6 flex items-center gap-2"><MapPin size={12} /> INCIDENTS BY DISTRICT[cite: 6]</h3>
+            <h3 className="text-[10px] font-bold text-slate-400 tracking-widest uppercase mb-6 flex items-center gap-2"><MapPin size={12} /> INCIDENTS BY DISTRICT</h3>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={districtData}>
@@ -132,7 +132,7 @@ export default function AnalyticsPage() {
         </div>
 
         <div className="bg-[#131924] border border-slate-800/80 rounded-xl p-6">
-          <h3 className="text-[10px] font-bold text-slate-400 tracking-widest uppercase mb-6 flex items-center gap-2"><TrendingUp size={12} /> 7-DAY DISASTER TREND[cite: 6]</h3>
+          <h3 className="text-[10px] font-bold text-slate-400 tracking-widest uppercase mb-6 flex items-center gap-2"><TrendingUp size={12} /> 7-DAY DISASTER TREND</h3>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={trendData}>

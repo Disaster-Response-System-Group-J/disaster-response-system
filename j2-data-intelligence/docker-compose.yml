@@ -71,7 +71,7 @@ services:
       dockerfile: Dockerfile
     container_name: j2-data-intelligence
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/j2_data_intelligence
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/disasterdb
       KAFKA_BROKER: kafka:29092
       KAFKA_TOPIC_SENSOR_DATA: j1.sensor-data
       KAFKA_TOPIC_RISK_ALERTS: j2.engine.risk-alerts
@@ -82,8 +82,6 @@ services:
     ports:
       - "8082:8082"
     depends_on:
-      postgres:
-        condition: service_healthy
       kafka:
         condition: service_started
     healthcheck:
@@ -94,6 +92,7 @@ services:
       start_period: 40s
     networks:
       - j2-network
+      - disaster-net
     volumes:
       # Mount source code for development
       - ./app:/app/app
@@ -121,3 +120,6 @@ volumes:
 networks:
   j2-network:
     driver: bridge
+  disaster-net:
+    external: true
+    name: disaster-response-system_disaster-net

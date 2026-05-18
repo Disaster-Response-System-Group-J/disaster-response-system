@@ -28,6 +28,8 @@ spec:
       labels:
         app: j3-dms
     spec:
+      securityContext:
+        fsGroup: 1000
       initContainers:
         - name: wait-for-kafka
           image: busybox:1.37
@@ -57,10 +59,13 @@ spec:
       containers:
         - name: j3-dms
 
-          image: dehanns/disaster-j3-dms:v2.0
+          image: dehanns/disaster-j3-dms:sha-845c6ab
           imagePullPolicy: Always
           ports:
             - containerPort: 3000
+          envFrom:
+            - secretRef:
+                name: disaster-secrets
           env:
             - name: DATABASE_URL
               valueFrom:
@@ -136,5 +141,5 @@ spec:
   selector:
     app: j3-dms
   ports:
-    - port: 3000
+    - port: 80
       targetPort: 3000

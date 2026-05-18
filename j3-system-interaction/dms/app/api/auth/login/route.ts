@@ -1,24 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import bcrypt from 'bcryptjs';
-
-
+import { pool } from '@/lib/db';
 
 export async function POST(request: NextRequest) {
-  const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
   try {
     const { email, passkey } = await request.json();
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
 
-    const { data: user, error } = await supabase
-      .from('User')
-      .select('*')
-      .eq('email', email)
-      .single();
+    const { rows } = await pool.query(
+      `SELECT * FROM public."User" WHERE lower(email) = $1 LIMIT 1`,
+      [normalizedEmail]
+    );
+    const user = rows[0];
 
-    if (error || !user || !user.password_hash) {
+    if (!user || !user.password_hash) {
       return NextResponse.json(
         { success: false, message: 'Invalid credentials' },
         { status: 401 }
@@ -46,6 +41,8 @@ export async function POST(request: NextRequest) {
       { status: 200 }
     );
   } catch (err) {
+    console.error('Login route error:', err);
+
     return NextResponse.json(
       { success: false, message: 'Server error' },
       { status: 500 }

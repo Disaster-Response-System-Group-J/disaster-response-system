@@ -123,12 +123,20 @@ export default function IncomingReportsPage() {
     };
   }, [socket]);
 
-  const filtered = reports.filter((r) => {
-    if (statusFilter !== 'ALL' && r.verificationStatus !== statusFilter) return false;
-    if (sourceFilter !== 'ALL' && r.source !== sourceFilter) return false;
-    if (enforcedDistrict !== 'ALL' && r.district !== enforcedDistrict) return false;
-    return true;
-  });
+  const filtered = reports
+    .filter((r) => {
+      if (statusFilter !== 'ALL' && r.verificationStatus !== statusFilter) return false;
+      if (sourceFilter !== 'ALL' && r.source !== sourceFilter) return false;
+      if (enforcedDistrict !== 'ALL' && r.district !== enforcedDistrict) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      const isAPending = a.verificationStatus === VerificationStatus.PENDING_REVIEW;
+      const isBPending = b.verificationStatus === VerificationStatus.PENDING_REVIEW;
+      if (isAPending && !isBPending) return -1;
+      if (!isAPending && isBPending) return 1;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
 
   const pendingCount = reports.filter(
     (r) => r.verificationStatus === VerificationStatus.PENDING_REVIEW

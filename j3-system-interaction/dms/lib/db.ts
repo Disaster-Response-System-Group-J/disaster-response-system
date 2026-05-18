@@ -1,23 +1,76 @@
 import dns from 'dns';
+import fs from 'fs';
+import dotenv from 'dotenv';
 import { Pool } from 'pg';
 import sqlite3 from 'sqlite3';
 import path from 'path';
 
 dns.setDefaultResultOrder('ipv4first');
 
+function loadDatabaseEnv() {
+  if (process.env.DATABASE_URL || process.env.NODE_ENV === 'production') {
+    return;
+  }
+
+  const envFiles = [
+    path.resolve(process.cwd(), '.env.local'),
+    path.resolve(process.cwd(), '.env'),
+    path.resolve(process.cwd(), '../../.env'),
+  ];
+
+  for (const envFile of envFiles) {
+    if (fs.existsSync(envFile)) {
+      dotenv.config({ path: envFile, override: false });
+    }
+  }
+}
+
+function getDatabaseUrl() {
+  loadDatabaseEnv();
+
+  if (!process.env.DATABASE_URL) {
+    throw new Error(
+      'DATABASE_URL is not set. Add it to j3-system-interaction/dms/.env.local or the repository root .env.'
+    );
+  }
+
+  return process.env.DATABASE_URL;
+}
+
 // ==========================================
 // 1. SUPABASE POSTGRESQL CONNECTION
 // ==========================================
-// This creates a connection pool using the URL from your .env.local file
-export const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
+let sharedPool: Pool | null = null;
 
-// Optional: Log when successfully connected to Supabase
-pool.on('connect', () => {
-  console.log('Connected to Supabase PostgreSQL database');
-});
+function getPool() {
+  if (!sharedPool) {
+    sharedPool = new Pool({
+      connectionString: getDatabaseUrl(),
+    });
 
+    // Optional: Log when successfully connected to Supabase
+    sharedPool.on('connect', () => {
+      console.log('Connected to Supabase PostgreSQL database');
+    });
+  }
+
+  return sharedPool;
+}
+
+// The pool is created only when an API route actually queries the database.
+// This allows Next.js and CI builds to import routes without needing DATABASE_URL.
+export const pool = new Proxy({} as Pool, {
+  get(_target, property) {
+    const realPool = getPool();
+    const value = realPool[property as keyof Pool];
+
+    if (typeof value === 'function') {
+      return value.bind(realPool);
+    }
+
+    return value;
+  },
+});
 
 // ==========================================
 // 2. LOCAL SQLITE CONNECTION (For Alerts)

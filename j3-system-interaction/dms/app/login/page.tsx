@@ -20,7 +20,7 @@ const ROLE_LABELS: Record<string, string> = {
 export default function LoginPage() {
   const { login, isAuthenticated } = useAuth();
   const router = useRouter();
-  
+
   const [email, setEmail] = useState('');
   const [passkey, setPasskey] = useState('');
   const [showPasskey, setShowPasskey] = useState(false);
@@ -88,11 +88,11 @@ export default function LoginPage() {
       {/* Right - Form */}
       <div className="flex-1 flex items-center justify-center p-8 lg:p-24 relative bg-[#0a0f16]">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3/4 h-3/4 bg-blue-900/10 blur-[100px] rounded-full pointer-events-none" />
-        
+
         <div className="w-full max-w-[440px] relative">
           <div className="bg-[#111620] border border-slate-800/80 rounded-xl overflow-hidden relative shadow-2xl shadow-black/50">
             <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-blue-500 to-transparent opacity-80" />
-            
+
             <div className="p-10">
               <h2 className="text-2xl font-semibold text-white mb-2 tracking-tight">Secure Authentication</h2>
               <p className="text-slate-400 text-sm mb-8">Enter your credentials to access the command grid.</p>
@@ -103,7 +103,7 @@ export default function LoginPage() {
                 <div className="space-y-1 text-[11px] text-slate-400">
                   <p><span className="text-slate-300">System Admin:</span> admin@dmc.gov.lk / admin123</p>
                   <p><span className="text-slate-300">Incident Cmdr (Nat):</span> commander@dmc.gov.lk / admin123</p>
-                  <p><span className="text-slate-300">Ops Officer (Zonal):</span> officer@dmc.gov.lk / officer123</p>
+                  <p><span className="text-slate-300">Ops Officer (Nat):</span> officer@dmc.gov.lk / officer123</p>
                   <p><span className="text-slate-300">Resource Mgr (Nat):</span> resource@dmc.gov.lk / resource123</p>
                 </div>
               </div>
@@ -174,7 +174,7 @@ export default function LoginPage() {
 
               <div className="mt-6 text-center">
                 <Link href="/" className="text-xs text-slate-500 hover:text-blue-400 transition-colors">
-                    Back to Public Portal
+                  Back to Public Portal
                 </Link>
               </div>
             </div>

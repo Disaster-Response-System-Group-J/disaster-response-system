@@ -10,7 +10,7 @@ terraform {
 }
 
 # Configure the DigitalOcean provider using the token variable.
-# Never hardcode the token — pass it via TF_VAR_do_token or a .tfvars file.
+# Never hardcode the token - pass it via TF_VAR_do_token or a .tfvars file.
 provider "digitalocean" {
   token = var.do_token
 }

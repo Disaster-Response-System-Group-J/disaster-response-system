@@ -18,10 +18,25 @@ interface PredictionZone {
   likelyImpact: string;
   recommendedAction: string;
   // 3-day horizon forecast
-  forecastH1: RiskLevel;
-  forecastH2: RiskLevel;
-  forecastH3: RiskLevel;
+  forecastH1: string;
+  forecastH2: string;
+  forecastH3: string;
+  predictedStatus: string;
   disasterType: string;
+  predictedAt: string;
+  telemetry?: {
+    temp: number | null;
+    hum: number | null;
+    depth: number | null;
+    depth_prev: number | null;
+    moist: number | null;
+    ax: number | null;
+    ay: number | null;
+    az: number | null;
+    gx: number | null;
+    gy: number | null;
+    gz: number | null;
+  };
 }
 
 const LEVEL_STYLES: Record<RiskLevel, string> = {
@@ -80,13 +95,28 @@ export default function PredictionsPage() {
           riskScore: RISK_SCORE[riskLevel] ?? 10,
           riskLevel,
           confidence: LEVEL_CONFIDENCE[riskLevel] ?? 85,
-          leadTimeHours: 0,   // H=0 = current reading; forecast shown separately
+          leadTimeHours: 0,
           likelyImpact: `${row.disaster_type ? row.disaster_type.charAt(0).toUpperCase() + row.disaster_type.slice(1) : 'Hazard'} risk currently ${row.predicted_status ?? riskLevel}. Forecast: Day+1 ${row.status_h1 ?? '—'}, Day+2 ${row.status_h2 ?? '—'}, Day+3 ${row.status_h3 ?? '—'}.`,
           recommendedAction: `Initiate ${riskLevel} monitoring protocols. ${riskLevel === 'CRITICAL' || riskLevel === 'HIGH' ? 'Pre-position emergency resources and alert response teams.' : 'Continue routine monitoring and review resource availability.'}`,
-          forecastH1,
-          forecastH2,
-          forecastH3,
+          forecastH1: row.status_h1 ?? 'Normal',
+          forecastH2: row.status_h2 ?? 'Normal',
+          forecastH3: row.status_h3 ?? 'Normal',
+          predictedStatus: row.predicted_status ?? 'Normal',
           disasterType: row.disaster_type ?? 'unknown',
+          predictedAt: row.predicted_at,
+          telemetry: {
+            temp: row.temp,
+            hum: row.hum,
+            depth: row.depth,
+            depth_prev: row.depth_prev,
+            moist: row.moist,
+            ax: row.ax,
+            ay: row.ay,
+            az: row.az,
+            gx: row.gx,
+            gy: row.gy,
+            gz: row.gz,
+          }
         };
       });
 
@@ -208,10 +238,10 @@ export default function PredictionsPage() {
             className="bg-[#0a0f16] border border-slate-800 rounded-lg px-4 py-2 text-sm text-slate-300 focus:outline-none min-w-[180px]"
           >
             <option value="ALL">Risk: All</option>
-            <option value="CRITICAL">Critical</option>
-            <option value="HIGH">High</option>
-            <option value="MEDIUM">Medium</option>
-            <option value="LOW">Low</option>
+            <option value="CRITICAL">Extreme</option>
+            <option value="HIGH">Severe</option>
+            <option value="MEDIUM">Moderate</option>
+            <option value="LOW">Normal</option>
           </select>
         </div>
 
@@ -228,7 +258,7 @@ export default function PredictionsPage() {
                     SCORE {zone.riskScore}
                   </span>
                   <span className={`px-2.5 py-1 rounded text-[9px] font-bold tracking-widest border ${LEVEL_STYLES[zone.riskLevel]}`}>
-                    {zone.riskLevel}
+                    {zone.predictedStatus}
                   </span>
                   {hasPermission('issue:alerts') && (
                     <button
@@ -241,12 +271,41 @@ export default function PredictionsPage() {
                 </div>
               </div>
 
+              <div className="flex items-center gap-4 mb-4 text-[10px] text-slate-500 font-medium">
+                <span className="flex items-center gap-1.5"><Clock3 size={12} /> Predicted at: {new Date(zone.predictedAt).toLocaleString()}</span>
+              </div>
+
               <div className="grid grid-cols-4 gap-5 mb-4">
                 <Metric title="Confidence" value={`${zone.confidence}%`} />
                 <Metric title="Day +1" value={zone.forecastH1} />
                 <Metric title="Day +2" value={zone.forecastH2} />
                 <Metric title="Day +3" value={zone.forecastH3} />
               </div>
+
+              {zone.telemetry && (
+                <div className="mb-4 bg-[#0a0f16]/50 rounded-lg p-3 border border-slate-800/40">
+                  <p className="text-[10px] text-slate-500 font-bold tracking-widest uppercase mb-2">Live Telemetry (H=0)</p>
+                  <div className="grid grid-cols-4 sm:grid-cols-6 gap-3">
+                    {zone.disasterType === 'flood' ? (
+                      <>
+                        <TeleMetric label="Temp" value={zone.telemetry.temp} unit="°C" />
+                        <TeleMetric label="Hum" value={zone.telemetry.hum} unit="%" />
+                        <TeleMetric label="Depth" value={zone.telemetry.depth} unit="mm" />
+                        <TeleMetric label="Prev" value={zone.telemetry.depth_prev} unit="mm" />
+                      </>
+                    ) : (
+                      <>
+                        <TeleMetric label="Moist" value={zone.telemetry.moist} unit="%" />
+                        <TeleMetric label="Accel X" value={zone.telemetry.ax} />
+                        <TeleMetric label="Accel Y" value={zone.telemetry.ay} />
+                        <TeleMetric label="Accel Z" value={zone.telemetry.az} />
+                        <TeleMetric label="Gyro X" value={zone.telemetry.gx} />
+                        <TeleMetric label="Gyro Y" value={zone.telemetry.gy} />
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-3 border-t border-slate-800/60 pt-4">
                 <p className="text-sm text-slate-300">
@@ -302,6 +361,16 @@ function Metric({ title, value }: { title: string; value: string }) {
     <div className="bg-[#0a0f16] border border-slate-800/80 rounded-lg p-3">
       <p className="text-[10px] text-slate-500 font-bold tracking-widest uppercase mb-1">{title}</p>
       <p className="text-sm font-semibold text-slate-200">{value}</p>
+    </div>
+  );
+}
+
+function TeleMetric({ label, value, unit = '' }: { label: string, value: number | null | undefined, unit?: string }) {
+  if (value === null || value === undefined) return null;
+  return (
+    <div>
+      <p className="text-[9px] text-slate-500 font-bold uppercase">{label}</p>
+      <p className="text-xs font-medium text-slate-300">{value}{unit}</p>
     </div>
   );
 }

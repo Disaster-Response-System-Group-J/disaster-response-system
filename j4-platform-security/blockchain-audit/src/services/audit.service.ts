@@ -10,6 +10,7 @@ export type CreateAuditCaseInput = {
   district: string;
   notes?: string | null;
   correlationId?: string | null;
+  metadata?: string | null;
 };
 
 export type CreateAuditCaseResult = {
@@ -34,6 +35,7 @@ export type LogAuditEventInput = {
   district?: string | null;
   notes?: string | null;
   correlationId?: string | null;
+  metadata?: string | null;
 };
 
 export type LogAuditEventResult = {
@@ -56,6 +58,7 @@ export type ManualIncidentCase = {
   newStatus: string;
   notes: string;
   correlationId: string;
+  metadata: string;
   timestamp: string;
 };
 
@@ -80,12 +83,17 @@ export type ResourceEvent = {
   district: string;
   notes: string;
   correlationId: string;
+  metadata: string;
   timestamp: string;
 };
 
 export type ResourceEventsByCaseIdResult = {
   caseId: string;
-  includedEventTypes: ["RESOURCE_ASSIGNED", "RESCUE_DISPATCHED"];
+  includedEventTypes: [
+    "RESOURCE_ASSIGNED",
+    "RESCUE_DISPATCHED",
+    "RESOURCE_DEALLOCATED",
+  ];
   count: number;
   events: ResourceEvent[];
 };
@@ -105,6 +113,7 @@ export type CaseEvent = {
   district: string;
   notes: string;
   correlationId: string;
+  metadata: string;
   timestamp: string;
 };
 
@@ -147,12 +156,14 @@ type AuditEventRecord = {
   district: string;
   notes: string;
   correlationId: string;
+  metadata: string;
   timestamp: bigint;
 };
 
 const RESOURCE_EVENT_TYPES = [
   "RESOURCE_ASSIGNED",
   "RESCUE_DISPATCHED",
+  "RESOURCE_DEALLOCATED",
 ] as const;
 
 function mapAuditEventRecordToCaseEvent(auditEvent: AuditEventRecord): CaseEvent {
@@ -171,6 +182,7 @@ function mapAuditEventRecordToCaseEvent(auditEvent: AuditEventRecord): CaseEvent
     district: auditEvent.district,
     notes: auditEvent.notes,
     correlationId: auditEvent.correlationId,
+    metadata: auditEvent.metadata,
     timestamp: auditEvent.timestamp.toString(),
   };
 }
@@ -239,7 +251,7 @@ export async function createManualIncidentAuditCase(
   input: CreateAuditCaseInput,
 ): Promise<CreateAuditCaseResult> {
   const predictedResult =
-    await incidentAuditLogContract.createManualIncident.staticCall(
+    await incidentAuditLogContract.createManualIncidentWithMetadata.staticCall(
       input.eventId,
       input.incidentId,
       input.performedBy,
@@ -247,9 +259,10 @@ export async function createManualIncidentAuditCase(
       input.district,
       input.notes || "",
       input.correlationId || "",
+      input.metadata || "",
     );
 
-  const transaction = await incidentAuditLogContract.createManualIncident(
+  const transaction = await incidentAuditLogContract.createManualIncidentWithMetadata(
     input.eventId,
     input.incidentId,
     input.performedBy,
@@ -257,6 +270,7 @@ export async function createManualIncidentAuditCase(
     input.district,
     input.notes || "",
     input.correlationId || "",
+    input.metadata || "",
   );
 
   const receipt = await transaction.wait();
@@ -303,6 +317,7 @@ export async function getManualIncidentCasesFromChain(): Promise<ManualIncidentC
     newStatus: auditEvent.newStatus,
     notes: auditEvent.notes,
     correlationId: auditEvent.correlationId,
+    metadata: auditEvent.metadata,
     timestamp: auditEvent.timestamp.toString(),
   }));
 
@@ -328,7 +343,11 @@ export async function getResourceEventsByCaseIdFromChain(
 
   return {
     caseId,
-    includedEventTypes: ["RESOURCE_ASSIGNED", "RESCUE_DISPATCHED"],
+    includedEventTypes: [
+      "RESOURCE_ASSIGNED",
+      "RESCUE_DISPATCHED",
+      "RESOURCE_DEALLOCATED",
+    ],
     count: events.length,
     events,
   };
@@ -364,7 +383,7 @@ export async function logAuditEventOnChain(
   }
 
   const predictedAuditEventId =
-    await incidentAuditLogContract.logAuditEvent.staticCall(
+    await incidentAuditLogContract.logAuditEventWithMetadata.staticCall(
       input.caseId,
       input.eventId,
       input.eventType,
@@ -378,9 +397,10 @@ export async function logAuditEventOnChain(
       input.district || "",
       input.notes || "",
       input.correlationId || "",
+      input.metadata || "",
     );
 
-  const transaction = await incidentAuditLogContract.logAuditEvent(
+  const transaction = await incidentAuditLogContract.logAuditEventWithMetadata(
     input.caseId,
     input.eventId,
     input.eventType,
@@ -394,6 +414,7 @@ export async function logAuditEventOnChain(
     input.district || "",
     input.notes || "",
     input.correlationId || "",
+    input.metadata || "",
   );
 
   const receipt = await transaction.wait();

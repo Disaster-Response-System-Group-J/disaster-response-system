@@ -33,7 +33,7 @@ spec:
               memory: 64Mi
       containers:
         - name: j1-bridge-api
-          image: dehanns/disaster-j1-bridge-api:sha-b744329
+          image: dehanns/disaster-j1-bridge-api:sha-845c6ab
           imagePullPolicy: Always
           ports:
             - containerPort: 8000
