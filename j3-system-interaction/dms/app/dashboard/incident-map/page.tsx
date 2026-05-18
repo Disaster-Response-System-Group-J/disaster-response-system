@@ -1,24 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Map, { Marker, NavigationControl, Popup, ViewStateChangeEvent } from 'react-map-gl/maplibre';
+import Map, { Marker, NavigationControl, Popup, ViewStateChangeEvent } from 'react-map-gl';
+import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Shield, Filter, MapPin, AlertTriangle, X, ChevronDown, CheckCircle2, Clock } from 'lucide-react';
 import { IncidentSeverity, IncidentStatus, DISASTER_TYPES, ConfirmedIncident, UserRole, User } from '@/types';
 import { SRI_LANKA_CENTER, DISTRICT_NAMES } from '@/data/districts';
 import { useAuth } from '@/context/AuthContext';
-import { createClient } from '@supabase/supabase-js';
 import { useSocket } from '@/context/SocketContext';
 import Link from 'next/link';
-
-// Module-level singleton — avoids creating a new GoTrueClient on every render
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://qfhmczryyyddgitnlndy.supabase.co';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
-// Force IPv4-compatible URL (avoid db. prefix which often resolves to IPv6-only and is for direct DB access anyway)
-const sanitizedSupabaseUrl = supabaseUrl.replace('db.', '');
-
-const supabase = createClient(sanitizedSupabaseUrl, supabaseKey);
 
 const SEVERITY_COLORS: Record<string, string> = {
   CRITICAL: '#ef4444',
@@ -35,6 +26,8 @@ export default function IncidentMapPage() {
   const [viewState, setViewState] = useState(SRI_LANKA_CENTER);
   const [selectedIncident, setSelectedIncident] = useState<any | null>(null);
   const [mapPins, setMapPins] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // 1. Add this state to hold the real users
   const [activeUsers, setActiveUsers] = useState<any[]>([]);
@@ -53,35 +46,48 @@ export default function IncidentMapPage() {
 
   // Fetch initial data from database
   useEffect(() => {
-    const fetchIncidents = async () => {
+    const fetchMapData = async () => {
+      setIsLoading(true);
+      setError(null);
       try {
-        const response = await fetch('/api/incidents');
-        if (!response.ok) throw new Error('Failed to fetch incidents');
+        // Fetch incidents and users in parallel
+        const [incidentsRes, usersRes] = await Promise.all([
+          fetch('/api/incidents'),
+          fetch('/api/users')
+        ]);
 
-        const data = await response.json();
+        if (!incidentsRes.ok) throw new Error('Failed to fetch incidents');
+        if (!usersRes.ok) throw new Error('Failed to fetch users');
+
+        const incidentsData = await incidentsRes.json();
+        const usersData = await usersRes.json();
 
         // Map database schema to the UI's expected format
-        const mappedPins = data.map((inc: any) => ({
-          incidentId: inc.incident_id.toString(),
+        const mappedPins = incidentsData.map((inc: any) => ({
+          incidentId: inc.incident_id?.toString() || inc.id?.toString(),
           title: inc.title,
-          disasterType: inc.title?.toUpperCase().includes('FLOOD') ? 'FLOOD' :
-            inc.title?.toUpperCase().includes('LANDSLIDE') ? 'LANDSLIDE' : 'UNKNOWN',
+          disasterType: inc.disasterType || inc.hazardType || (inc.title?.toUpperCase().includes('FLOOD') ? 'FLOOD' :
+            inc.title?.toUpperCase().includes('LANDSLIDE') ? 'LANDSLIDE' : 'UNKNOWN'),
           severity: inc.severity || 'LOW',
           status: inc.status || 'ACTIVE',
           latitude: Number(inc.latitude) || 0,
           longitude: Number(inc.longitude) || 0,
-          affectedPeople: inc.affected_population || 0,
-          district: 'UNASSIGNED', // Fallback, could map from division_id if joined in API
-          description: `Reported at ${new Date(inc.created_at).toLocaleString()}`
+          affectedPeople: inc.affectedPeople || inc.affected_population || 0,
+          district: inc.district || 'UNASSIGNED',
+          description: inc.description || `Reported at ${new Date(inc.created_at || inc.createdAt).toLocaleString()}`
         }));
 
         setMapPins(mappedPins);
-      } catch (error) {
-        console.error('Error fetching incidents:', error);
+        setActiveUsers(usersData);
+      } catch (err: any) {
+        console.error('Error fetching map data:', err);
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    fetchIncidents();
+    fetchMapData();
   }, []);
 
   const handleStatusUpdate = async (incidentId: string, newStatus: IncidentStatus) => {
@@ -154,21 +160,6 @@ export default function IncidentMapPage() {
       alert(`Dispatch Failed: ${err.message}`);
     }
   };
-
-  useEffect(() => {
-    const fetchMapData = async () => {
-      // Fetch users from Supabase
-      const { data: userData, error: userError } = await supabase
-        .from('User')
-        .select('*');
-
-      if (!userError && userData) {
-        setActiveUsers(userData);
-      }
-      // (If you also fetch incidents here, keep that logic intact)
-    };
-    fetchMapData();
-  }, [supabase]);
 
   // Listen for incoming reports to drop new pins
   useEffect(() => {
@@ -245,12 +236,35 @@ export default function IncidentMapPage() {
 
   return (
     <div className="flex flex-col h-full bg-[#0a0f16] text-white overflow-hidden relative">
+      {isLoading && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#0a0f16]/80 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
+            <p className="text-xs font-bold tracking-widest text-slate-400 uppercase animate-pulse">Initializing Incident Map...</p>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="absolute top-6 right-6 z-50 bg-red-500/10 border border-red-500/20 p-4 rounded-xl backdrop-blur-md max-w-sm">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="text-red-400 shrink-0" size={18} />
+            <div>
+              <p className="text-sm font-bold text-red-400 mb-1">DATA ERROR</p>
+              <p className="text-xs text-slate-300 leading-relaxed">{error}</p>
+              <button onClick={() => window.location.reload()} className="mt-3 text-[10px] font-bold text-red-400 underline uppercase tracking-widest">Retry Connection</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Map Container */}
       <div className="absolute inset-0">
         <Map
           {...viewState}
           onMove={(evt: ViewStateChangeEvent) => setViewState(evt.viewState)}
           mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json"
+          mapLib={maplibregl}
         >
           <NavigationControl position="bottom-right" />
 
