@@ -15,7 +15,10 @@ async function main() {
   console.log(`IncidentAuditLog deployed to: ${contractAddress}`);
   console.log(`AUDIT_CONTRACT_ADDRESS=${contractAddress}`);
 
-  if (existsSync("/deployment")) {
+  const shouldWriteDeploymentFile =
+    existsSync("/deployment") && process.env.BLOCKCHAIN_NETWORK === "local";
+
+  if (shouldWriteDeploymentFile) {
     writeFileSync(deploymentFilePath, `${contractAddress}\n`, "utf8");
     console.log(`Contract address written to ${deploymentFilePath}`);
   }

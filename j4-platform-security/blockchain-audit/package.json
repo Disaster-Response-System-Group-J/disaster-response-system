@@ -8,7 +8,9 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/server.js",
     "test": "hardhat test mocha",
-    "seed:audit-records": "tsx scripts/seed-operational-audit-records.ts"
+    "seed:audit-records": "tsx scripts/seed-operational-audit-records.ts",
+    "deploy:local": "hardhat run scripts/deploy.ts --network localhost",
+    "deploy:sepolia": "hardhat run scripts/deploy.ts --network sepolia"
   },
   "keywords": [],
   "author": "",

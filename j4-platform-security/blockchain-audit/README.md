@@ -133,15 +133,99 @@ Create a `.env` file based on [.env.example](</c:/Users/LOQ/Documents/GitHub/dis
 
 ```env
 PORT=8084
-BLOCKCHAIN_RPC_URL=http://127.0.0.1:8545
+BLOCKCHAIN_NETWORK=sepolia
+BLOCKCHAIN_RPC_URL=
 AUDIT_CONTRACT_ADDRESS=
 AUDIT_PRIVATE_KEY=
+SEPOLIA_RPC_URL=
+SEPOLIA_PRIVATE_KEY=
 ```
 
 Notes:
-- `BLOCKCHAIN_RPC_URL` points to the blockchain node or local Hardhat node.
-- `AUDIT_CONTRACT_ADDRESS` is the deployed `IncidentAuditLog` address.
-- `AUDIT_PRIVATE_KEY` is the wallet used by the backend to send audit transactions.
+- `BLOCKCHAIN_NETWORK` should be `sepolia` for testnet mode or `local` for Hardhat mode.
+- `BLOCKCHAIN_RPC_URL` should be a Sepolia RPC URL from Alchemy, Infura, QuickNode, etc. In local mode it can be `http://127.0.0.1:8545` or `http://hardhat-node:8545` inside Docker.
+- `AUDIT_CONTRACT_ADDRESS` is the deployed `IncidentAuditLog` address on the active network.
+- `AUDIT_PRIVATE_KEY` is the backend wallet private key. It sends audit transactions and needs Sepolia ETH in Sepolia mode.
+- `SEPOLIA_RPC_URL` and `SEPOLIA_PRIVATE_KEY` are optional aliases used by Hardhat deployment. If they are empty, Hardhat uses `BLOCKCHAIN_RPC_URL` and `AUDIT_PRIVATE_KEY`.
+- Never commit real RPC keys, private keys, or deployed contract addresses.
+
+### Sepolia mode
+
+Sepolia is the default mode for the backend.
+
+1. Fill `.env`:
+
+```env
+PORT=8084
+BLOCKCHAIN_NETWORK=sepolia
+BLOCKCHAIN_RPC_URL=<your-sepolia-rpc-url>
+AUDIT_PRIVATE_KEY=<backend-wallet-private-key>
+AUDIT_CONTRACT_ADDRESS=
+SEPOLIA_RPC_URL=<your-sepolia-rpc-url>
+SEPOLIA_PRIVATE_KEY=<deployer-wallet-private-key>
+```
+
+2. Deploy the contract to Sepolia:
+
+```bash
+npm run deploy:sepolia
+```
+
+The script prints:
+
+```text
+AUDIT_CONTRACT_ADDRESS=0x...
+```
+
+3. Paste that address into `.env`:
+
+```env
+AUDIT_CONTRACT_ADDRESS=0x...
+```
+
+4. Start the API:
+
+```bash
+npm run dev
+```
+
+For Docker Sepolia mode from the repository root, fill the root `.env` with the Sepolia values and run:
+
+```bash
+docker compose up -d --build j4-audit-api
+```
+
+In Sepolia mode, the API does not need `hardhat-node` or `deploy-audit-contract`.
+
+### Local Hardhat mode
+
+Local mode is still available for development.
+
+```env
+PORT=8084
+BLOCKCHAIN_NETWORK=local
+BLOCKCHAIN_RPC_URL=http://127.0.0.1:8545
+AUDIT_CONTRACT_ADDRESS=
+AUDIT_PRIVATE_KEY=<local-hardhat-private-key>
+```
+
+Run a local node, deploy the contract, and start the API:
+
+```bash
+npx hardhat node
+npm run deploy:local
+npm run dev
+```
+
+For non-Docker local mode, copy the printed `AUDIT_CONTRACT_ADDRESS=0x...` value into `.env` before starting the API.
+
+For Docker local mode from the repository root:
+
+```bash
+docker compose up -d --build hardhat-node deploy-audit-contract j4-audit-api
+```
+
+The local deployer writes the contract address to the shared Docker volume at `/deployment/audit-contract-address.txt`, and the API can read it only when `BLOCKCHAIN_NETWORK=local`.
 
 ## Common commands
 
@@ -179,6 +263,34 @@ Deploy the contract to the configured Hardhat network:
 
 ```bash
 npx hardhat run scripts/deploy.ts --network hardhatMainnet
+```
+
+Deploy to Sepolia:
+
+```bash
+npm run deploy:sepolia
+```
+
+Test the running API:
+
+```bash
+curl http://localhost:8084/health
+```
+
+Create a test audit case:
+
+```bash
+curl -X POST http://localhost:8084/api/v1/audit/cases \
+  -H "Content-Type: application/json" \
+  -d '{
+    "eventId": "evt-001",
+    "incidentId": "inc-001",
+    "performedBy": "user-001",
+    "performedRole": "operator",
+    "district": "Colombo",
+    "notes": "Manual incident created from phone call",
+    "correlationId": "corr-001"
+  }'
 ```
 
 ## Notes for new contributors

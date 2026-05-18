@@ -212,6 +212,9 @@ services:
     image: disaster/deploy-audit-contract:latest
     container_name: deploy-audit-contract
     restart: "no"
+    environment:
+      # Local demo deployer only. Sepolia deployments should be run manually.
+      BLOCKCHAIN_NETWORK: local
     volumes:
       - audit-deployment:/deployment
     depends_on:
@@ -231,13 +234,15 @@ services:
       - "8084:8084"
     environment:
       PORT: "8084"
-      BLOCKCHAIN_RPC_URL: http://hardhat-node:8545
-      AUDIT_PRIVATE_KEY: ${AUDIT_PRIVATE_KEY}
+      # Default mode is Sepolia. Fill these in root .env.
+      # For local Hardhat mode, set BLOCKCHAIN_NETWORK=local and
+      # BLOCKCHAIN_RPC_URL=http://hardhat-node:8545.
+      BLOCKCHAIN_NETWORK: ${BLOCKCHAIN_NETWORK:-sepolia}
+      BLOCKCHAIN_RPC_URL: ${BLOCKCHAIN_RPC_URL:-}
+      AUDIT_CONTRACT_ADDRESS: ${AUDIT_CONTRACT_ADDRESS:-}
+      AUDIT_PRIVATE_KEY: ${AUDIT_PRIVATE_KEY:-}
     volumes:
       - audit-deployment:/deployment:ro
-    depends_on:
-      deploy-audit-contract:
-        condition: service_completed_successfully
     networks:
       - disaster-net
 
