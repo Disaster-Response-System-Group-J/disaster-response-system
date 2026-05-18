@@ -141,7 +141,7 @@ Producer is a singleton (`kafka_producer`) initialised at import time. Uses `con
 ## 3. J1 MQTT Forwarder
 
 ### File
-`j1-device-edge/backend/app/mqtt_http_forwarder.py`
+`j1-device-edge/backend/app/mqtt_kafka_bridge.py`
 
 ### MQTT → Kafka pipeline
 

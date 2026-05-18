@@ -1,5 +1,5 @@
 # Disaster Response Platform — stop all dev services
-# Kills all Python uvicorn and mqtt_http_forwarder processes.
+# Kills all Python uvicorn and mqtt_kafka_bridge processes.
 
 Write-Host ""
 Write-Host "Stopping all platform processes..." -ForegroundColor Yellow

@@ -51,7 +51,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: j1-mqtt-forwarder
-    command: ["python", "-m", "app.mqtt_http_forwarder"]
+    command: ["python", "-m", "app.mqtt_kafka_bridge"]
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       KAFKA_TOPIC_SOS_REPORTS: j1.sos.raw-reports

@@ -13,7 +13,7 @@ services:
 
   j1-mqtt-forwarder:
     build: ./backend
-    command: python -m app.mqtt_http_forwarder
+    command: python -m app.mqtt_kafka_bridge
     env_file: .env
     networks:
       - disaster-net

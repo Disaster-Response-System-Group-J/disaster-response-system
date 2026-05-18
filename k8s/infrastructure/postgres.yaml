@@ -1,4 +1,4 @@
-# ConfigMap — init.sh creates per-service databases + users on first boot
+kubectl config current-context# ConfigMap — init.sh creates per-service databases + users on first boot
 apiVersion: v1
 kind: ConfigMap
 metadata:

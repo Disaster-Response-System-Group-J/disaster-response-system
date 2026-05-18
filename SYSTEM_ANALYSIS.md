@@ -233,7 +233,7 @@ j2-data-intelligence/app/
 ## 5. Prompt 4 — Forwarder Supabase Writer
 
 ### File
-`j1-device-edge/backend/app/mqtt_http_forwarder.py`
+`j1-device-edge/backend/app/mqtt_kafka_bridge.py`
 
 ### Topic → Table Routing (`_route_table_for_topic`, line 150)
 

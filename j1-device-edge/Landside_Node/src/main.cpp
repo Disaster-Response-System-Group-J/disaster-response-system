@@ -82,7 +82,7 @@ unsigned long lastReadTime = 0;
 void loop() {
     lastWatchdogFeed = millis(); // Feed the safe watchdog
 
-    if (millis() - lastReadTime >= 3700 || lastReadTime == 0) {
+    if (millis() - lastReadTime >= 300000 || lastReadTime == 0) {
         if (millis() > 3600000) {
             Serial.println("Scheduled hourly reboot...");
             delay(1000);

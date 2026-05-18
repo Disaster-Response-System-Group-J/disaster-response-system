@@ -1,9 +1,9 @@
-"""MQTT -> Kafka forwarder for hardware sensor payloads.
+"""MQTT -> Kafka bridge for hardware sensor payloads.
 
 Subscribes to HiveMQ Cloud topics over TLS, normalises each raw JSON payload
 into the standard sensor telemetry shape, and publishes to j1.sensor.telemetry.
 
-Run standalone: python -m app.mqtt_http_forwarder
+Run standalone: python -m app.mqtt_kafka_bridge
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
 )
-logger = logging.getLogger("j1.mqtt_forwarder")
+logger = logging.getLogger("j1.mqtt_kafka_bridge")
 
 MQTT_BROKER = os.getenv("MQTT_BROKER", "mosquitto")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))

@@ -59,7 +59,7 @@ Start-Process powershell -ArgumentList "-NoExit", "-Command", @"
   `$env:MQTT_PASSWORD = '$MQTT_PASSWORD'
   `$env:MQTT_TLS      = 'true'
   Write-Host 'J1 MQTT Forwarder starting...' -ForegroundColor Green
-  python -m app.mqtt_http_forwarder
+  python -m app.mqtt_kafka_bridge
 "@
 
 Start-Sleep -Seconds 2

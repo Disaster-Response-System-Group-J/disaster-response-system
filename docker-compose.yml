@@ -93,7 +93,7 @@ services:
     image: disaster/j1-mqtt-forwarder:latest
     container_name: j1-mqtt-forwarder
     restart: unless-stopped
-    command: ["python", "-m", "app.mqtt_http_forwarder"]
+    command: ["python", "-m", "app.mqtt_kafka_bridge"]
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       KAFKA_TOPIC_SOS_REPORTS: j1.sos.raw-reports

@@ -85,7 +85,7 @@ float hum = NAN;
 void loop() {
     lastWatchdogFeed = millis(); // Feed the safe watchdog
 
-    if (millis() - lastDHTReadTime >= 1200 || lastDHTReadTime == 0) {
+    if (millis() - lastDHTReadTime >= 300000 || lastDHTReadTime == 0) {
         if (millis() > 3600000) {
             Serial.println("Scheduled hourly reboot...");
             delay(1000);
