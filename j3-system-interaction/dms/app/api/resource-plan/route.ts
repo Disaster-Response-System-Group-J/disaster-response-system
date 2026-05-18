@@ -22,13 +22,16 @@ export async function GET(request: Request) {
   }
 }
 
-// Called by the Kafka consumer when J2 responds with the completed plan
 export async function PATCH(request: Request) {
   try {
-    const { planId, planData } = await request.json();
+    const { planId, planData, status } = await request.json();
+    const nextStatus = ['DRAFT', 'APPROVED', 'EXECUTED'].includes(status) ? status : 'DRAFT';
     const { rows } = await pool.query(
-      `UPDATE public."ResourcePlan" SET status = 'APPROVED', plan_json = $1 WHERE plan_id = $2 RETURNING *`,
-      [JSON.stringify(planData), planId]
+      `UPDATE public."ResourcePlan"
+       SET status = $1, plan_json = $2
+       WHERE plan_id = $3
+       RETURNING *`,
+      [nextStatus, JSON.stringify(planData), planId]
     );
     return NextResponse.json(rows[0]);
   } catch (error) {

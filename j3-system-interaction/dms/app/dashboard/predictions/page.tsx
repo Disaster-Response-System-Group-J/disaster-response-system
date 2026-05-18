@@ -198,7 +198,7 @@ export default function PredictionsPage() {
       <div className="p-8 max-w-[1400px] mx-auto">
         <div className="flex items-end justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-extrabold tracking-tight mb-2">AI Disaster Predictions</h1>
+            <h1 className="text-3xl font-extrabold tracking-tight mb-2">Disaster Predictions</h1>
             <p className="text-sm text-slate-400">
               Real-time IoT sensor predictions with 3-day horizon forecasts for flood and landslide risk.
             </p>

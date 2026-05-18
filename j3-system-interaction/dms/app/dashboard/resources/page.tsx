@@ -48,6 +48,7 @@ export default function ResourcesPage() {
   const [currentPlan, setCurrentPlan] = useState<any>(null);
   const [planLoading, setPlanLoading] = useState(false);
   const [planGenerating, setPlanGenerating] = useState(false);
+  const [planError, setPlanError] = useState<string | null>(null);
 
   // Resource Requests inbox
   const [resourceRequests, setResourceRequests] = useState<any[]>([]);
@@ -55,6 +56,12 @@ export default function ResourcesPage() {
   const [requestFilter, setRequestFilter] = useState<string>('ALL');
 
   const enforcedDistrict = (user?.role === UserRole.SYSTEM_ADMIN || user?.role.includes('NATIONAL')) ? 'ALL' : (user as any)?.assignedDistrict || 'ALL';
+  const hasDisplayablePlan = Boolean(
+    currentPlan?.plan_data ||
+    currentPlan?.plan_json ||
+    currentPlan?.allocation_plan ||
+    ['READY', 'DRAFT', 'APPROVED', 'EXECUTED'].includes(currentPlan?.status)
+  );
 
   // State for modals
   const [assignModal, setAssignModal] = useState<{ resourceId?: string; requestId?: string; incidentId?: string; items?: any[] } | null>(null);
@@ -121,11 +128,14 @@ export default function ResourcesPage() {
     if (activeTab !== 'AI_PLAN') return;
     const fetchPlan = async () => {
       setPlanLoading(true);
+      setPlanError(null);
       try {
         const res = await fetch('/api/resource-plan');
-        if (res.ok) setCurrentPlan(await res.json());
+        if (!res.ok) throw new Error('Failed to load latest resource plan');
+        setCurrentPlan(await res.json());
       } catch (err) {
         console.error('Error loading resource plan:', err);
+        setPlanError('Could not load the latest AI resource plan.');
       } finally {
         setPlanLoading(false);
       }
@@ -135,18 +145,22 @@ export default function ResourcesPage() {
 
   const handleGeneratePlan = async () => {
     setPlanGenerating(true);
+    setPlanError(null);
     try {
       const res = await fetch('/api/resource-plan/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ triggeredBy: user?.id }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        setCurrentPlan(data);
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.details ? `${data.error}: ${data.details}` : data.error || 'Failed to generate resource plan');
       }
+      const latest = await fetch('/api/resource-plan');
+      setCurrentPlan(latest.ok ? await latest.json() : data);
     } catch (err) {
       console.error('Failed to generate plan:', err);
+      setPlanError(err instanceof Error ? err.message : 'Failed to generate resource plan.');
     } finally {
       setPlanGenerating(false);
     }
@@ -435,11 +449,17 @@ export default function ResourcesPage() {
               <div className="flex items-center justify-center py-24">
                 <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-500" />
               </div>
+            ) : planError ? (
+              <div className="text-center py-20 bg-[#131924] border border-red-500/20 rounded-xl">
+                <AlertTriangle size={32} className="mx-auto mb-4 text-red-400" />
+                <p className="text-sm font-semibold text-red-300 mb-2">AI plan unavailable</p>
+                <p className="text-xs text-slate-500 max-w-md mx-auto">{planError}</p>
+              </div>
             ) : !currentPlan ? (
               <div className="text-center py-24 bg-[#131924] border border-slate-800/80 rounded-xl">
                 <BrainCircuit size={32} className="mx-auto mb-4 text-slate-600" />
                 <p className="text-sm font-semibold text-slate-400 mb-2">No plan generated yet</p>
-                <p className="text-xs text-slate-500 mb-6">Click "Generate New Plan" to request an AI allocation plan from the J2 engine.</p>
+                <p className="text-xs text-slate-500 mb-6">Click Generate New Plan to request an AI allocation plan from the J2 engine.</p>
               </div>
             ) : currentPlan.status === 'DRAFT' ? (
               <div className="text-center py-24 bg-[#131924] border border-purple-500/20 rounded-xl">
@@ -447,7 +467,7 @@ export default function ResourcesPage() {
                 <p className="text-sm font-semibold text-slate-300 mb-2">Plan generation in progress</p>
                 <p className="text-xs text-slate-500">Waiting for J2 AI engine response via Kafka. This may take a moment.</p>
               </div>
-            ) : currentPlan.status === 'APPROVED' ? (
+            ) : hasDisplayablePlan ? (
               <ResourcePlanView plan={currentPlan} />
             ) : null}
           </div>

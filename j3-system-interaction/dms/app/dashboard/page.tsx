@@ -259,7 +259,7 @@ export default function DashboardPage() {
                     <TrendingUp className="w-3 h-3 mr-1" /> +{data.activeIncidentsChange} in 24h
                   </span>
                 </div>
-                <div className="grid grid-cols-4 gap-3 pt-4 border-t border-slate-800/50">
+                <div className="grid grid-cols-4 gap-2 pt-4 border-t border-slate-800/50">
                   <Stat label="FLOODS" value={data.incidents.floods} />
                   <Stat label="LANDSLIDES" value={data.incidents.landslides} />
                   <Stat label="DROUGHTS" value={data.incidents.droughts} />
@@ -444,8 +444,8 @@ function FilterBtn({ label }: { label: string }) {
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <div>
-      <p className="text-[10px] font-bold text-slate-500 tracking-widest mb-1 uppercase">{label}</p>
+    <div className="min-w-0 text-center">
+      <p className="text-[9px] font-bold text-slate-500 tracking-wide mb-1 uppercase leading-tight truncate">{label}</p>
       <p className="text-xl font-bold">{value}</p>
     </div>
   );
