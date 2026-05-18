@@ -12,10 +12,13 @@ import { useSocket } from '@/context/SocketContext';
 import Link from 'next/link';
 
 // Module-level singleton — avoids creating a new GoTrueClient on every render
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://qfhmczryyyddgitnlndy.supabase.co';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
+// Force IPv4-compatible URL (avoid db. prefix which often resolves to IPv6-only and is for direct DB access anyway)
+const sanitizedSupabaseUrl = supabaseUrl.replace('db.', '');
+
+const supabase = createClient(sanitizedSupabaseUrl, supabaseKey);
 
 const SEVERITY_COLORS: Record<string, string> = {
   CRITICAL: '#ef4444',

@@ -48,7 +48,7 @@ data:
   setup.sh: |
     #!/usr/bin/env bash
     set -euo pipefail
-    KC_URL="${KC_URL:-http://keycloak:8080}"
+    KC_URL="${KC_URL:-http://keycloak:8080/auth}"
     KC_REALM="${KC_REALM:-disaster-response}"
     KC_ADMIN_USER="${KEYCLOAK_ADMIN:-admin}"
     KC_ADMIN_PASS="${KEYCLOAK_ADMIN_PASSWORD:-admin123}"
@@ -169,6 +169,8 @@ spec:
               value: "xforwarded"
             - name: KC_HEALTH_ENABLED
               value: "true"
+            - name: KC_HTTP_RELATIVE_PATH
+              value: "/auth"
           resources:
             requests:
               cpu: 300m
@@ -178,7 +180,7 @@ spec:
               memory: 512Mi
           livenessProbe:
             httpGet:
-              path: /realms/master
+              path: /auth/realms/master
               port: 8080
             initialDelaySeconds: 120
             periodSeconds: 30
@@ -186,7 +188,7 @@ spec:
             failureThreshold: 5
           readinessProbe:
             httpGet:
-              path: /realms/master
+              path: /auth/realms/master
               port: 8080
             initialDelaySeconds: 60
             periodSeconds: 15
