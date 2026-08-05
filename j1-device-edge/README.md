@@ -84,3 +84,5 @@ Content-Type: application/json
 ```
 
 Successful produce returns `202 Accepted`. Duplicate idempotency keys return `409 Conflict`. If Kafka is unavailable, the bridge returns `503` so the mobile app keeps the event queued and retries later.
+
+
